@@ -40,6 +40,12 @@ import {
   stepOwed,
 } from '../../../src/life/animals/animalSim.ts';
 import {
+  CONVERSION_QUEST,
+  elderOpenToBelief,
+  isDusk,
+} from '../../../src/quests/content/conversion.ts';
+import { newQuestState, type QuestEvent, stepQuest } from '../../../src/quests/quest.ts';
+import {
   Activity,
   type Building,
   Role,
@@ -50,6 +56,7 @@ import { TreeState, yieldOf } from '../../../src/world/village/sim/forest.ts';
 import { localToWorld } from '../../../src/world/village/sim/geometry.ts';
 import type { VillageSim } from '../../../src/world/village/sim/villageSim.ts';
 import { check, finish } from '../lib/check.ts';
+import { world as questWorld } from '../lib/questFixtures.ts';
 import {
   convertVillage,
   DAY_S,
@@ -515,45 +522,56 @@ await check(
 // --- a village ---
 
 /**
- * A plausible player. By day they take the standing tree nearest a woodcutter at work (who sees it lifted) to
- * the temple, one tree every `cycleS` seconds; at night nobody is out, so they wait for the morning. Plays
- * until `until` holds or `maxTrees` trees were delivered; returns the trees delivered.
+ * One trip of a plausible player: the standing tree nearest a woodcutter at work (who sees it lifted) goes to the
+ * temple, where everyone about sees it put down.
+ */
+function deliverTree(sim: VillageSim, ledger: ReturnType<typeof createDeedLedger>) {
+  const events: VillageEvent[] = [];
+  const v = sim.villagers;
+  const hut = sim.buildings.find((b) => b.type === 'temple')!;
+  let near: { x: number; z: number } = hut;
+  for (let i = 0; i < v.count; i++) {
+    if (v.role[i] === Role.Woodcutter && !v.indoors[i]) {
+      near = { x: v.x[i]!, z: v.z[i]! };
+      break;
+    }
+  }
+  const id = sim.forest.nearest(near.x, near.z, 1)[0]!;
+  ledger.perform({ kind: 'lift', what: 'tree', at: sim.forest.info(id) });
+  sim.economy.addWood(sim.uprootTree(id, events));
+  const drop = classifyDrop('wood', hut, sim.buildings);
+  assert.equal(drop.zone, 'store', 'the temple takes wood');
+  const needMet = meetsNeed('wood', drop, shortages(sim.economy.stock, v.count));
+  ledger.perform({ kind: 'deliver', what: 'tree', at: hut, needMet });
+}
+
+/** Daylight hours: the villagers are out and about. */
+const isDaytime = (phase: number) =>
+  phase >= PHASE0.DAY.SUNRISE + 0.02 && phase <= PHASE0.DAY.SUNSET - 0.03;
+
+/**
+ * A plausible player. By day they take a tree to the temple every `cycleS` seconds; at night nobody is out, so
+ * they wait for the morning. Plays until `until` holds or `maxTrees` trees were delivered; returns the trees
+ * delivered.
  */
 function playTrees(
   sim: VillageSim,
   o: { cycleS: number; maxTrees: number; until?: () => boolean },
 ): number {
   const events: VillageEvent[] = [];
-  const v = sim.villagers;
-  const hut = sim.buildings.find((b) => b.type === 'temple')!;
   const ledger = createDeedLedger({
-    villagers: v,
+    villagers: sim.villagers,
     addBelief: (i, amount) => sim.addBelief(i, amount, events),
     notice: sim.notice,
     canBelieve: (i) => i !== sim.elder,
   });
-  const { SUNRISE, SUNSET } = PHASE0.DAY;
   let t = 0;
   let trees = 0;
   while (trees < o.maxTrees && t < 4 * DAY_S) {
     stepSim(sim, { seconds: o.cycleS, from: t, onStep: () => ledger.update(DT) });
     t += o.cycleS;
-    const phase = dayPhaseAt(t);
-    if (phase < SUNRISE + 0.02 || phase > SUNSET - 0.03) continue;
-    let near: { x: number; z: number } = hut;
-    for (let i = 0; i < v.count; i++) {
-      if (v.role[i] === Role.Woodcutter && !v.indoors[i]) {
-        near = { x: v.x[i]!, z: v.z[i]! };
-        break;
-      }
-    }
-    const id = sim.forest.nearest(near.x, near.z, 1)[0]!;
-    ledger.perform({ kind: 'lift', what: 'tree', at: sim.forest.info(id) });
-    sim.economy.addWood(sim.uprootTree(id, events));
-    const drop = classifyDrop('wood', hut, sim.buildings);
-    assert.equal(drop.zone, 'store', 'the temple takes wood');
-    const needMet = meetsNeed('wood', drop, shortages(sim.economy.stock, v.count));
-    ledger.perform({ kind: 'deliver', what: 'tree', at: hut, needMet });
+    if (!isDaytime(dayPhaseAt(t))) continue;
+    deliverTree(sim, ledger);
     trees++;
     if (o.until?.()) break;
   }
@@ -573,6 +591,63 @@ await check('pacing: deeds alone convert five villagers in about a dozen minutes
   assert.ok(trees >= 10, `${trees} trees is too quick: belief should be earned`);
   assert.ok(trees <= 24, `${trees} trees is too slow`);
 });
+
+await check(
+  'the whole conversion quest finishes on deeds alone: believers, the dusk fire, the offering, the elder',
+  () => {
+    const sim = makeSim(map, { mode: 'hamlet' });
+    const events: VillageEvent[] = [];
+    const v = sim.villagers;
+    let state = newQuestState();
+    const send = (event: QuestEvent) => {
+      const ctx = questWorld({
+        converts: sim.believers(),
+        elderBelieves: sim.elder >= 0 && v.belief[sim.elder]! >= 1,
+        population: v.count,
+      });
+      state = stepQuest(CONVERSION_QUEST, state, event, ctx).state;
+    };
+    const stepId = () => CONVERSION_QUEST.steps[state.step]?.id;
+    const ledger = createDeedLedger({
+      villagers: v,
+      addBelief: (i, amount) => sim.addBelief(i, amount, events),
+      notice: sim.notice,
+      // The elder waits for his own step, as the game's quest runtime holds him.
+      canBelieve: (i) => i !== sim.elder || elderOpenToBelief(CONVERSION_QUEST, state),
+    });
+    send({ type: 'elderMet' });
+    const cycleS = 40;
+    let t = 0;
+    let trees = 0;
+    const seen: string[] = [];
+    while (!state.done && t < 8 * DAY_S) {
+      stepSim(sim, { seconds: cycleS, from: t, onStep: () => ledger.update(DT) });
+      t += cycleS;
+      const phase = dayPhaseAt(t);
+      const id = stepId();
+      if (id && seen.at(-1) !== id) seen.push(id);
+      if (id === 'offering') {
+        send({ type: 'offered', amount: PHASE0.QUEST.OFFERING_GOAL });
+      } else if (id === 'fire') {
+        // Only wood brought to the temple at dusk lights it.
+        if (!isDusk(phase)) continue;
+        deliverTree(sim, ledger);
+        trees++;
+        send({ type: 'deed', what: 'tree', nearTemple: true, dusk: true });
+      } else if (isDaytime(phase)) {
+        deliverTree(sim, ledger);
+        trees++;
+        send({ type: 'tick' });
+      }
+    }
+    assert.ok(state.done, `the quest is at ${stepId()} after ${trees} trees`);
+    assert.deepEqual(seen, ['convert', 'fire', 'offering', 'believe']);
+    assert.ok(trees <= 70, `${trees} trees is too many`);
+    console.log(
+      `     whole quest: ${trees} trees, ${(t / 60).toFixed(0)} min of play (${(t / DAY_S).toFixed(1)} days)`,
+    );
+  },
+);
 
 await check(
   'determinism: the same deeds give the same village, and an idle hand changes nothing',

@@ -129,6 +129,24 @@ await check(
   },
 );
 
+await check(
+  'the temple fire also takes wood from the hand near the temple at dusk: not food, not by day, not far away',
+  () => {
+    const run = runChain();
+    run.send({ type: 'elderMet' }, world({ converts: CONVERTS }));
+    assert.equal(run.state.step, stepIndex('fire'));
+    run.send({ type: 'deed', what: 'tree', nearTemple: true, dusk: false });
+    run.send({ type: 'deed', what: 'tree', nearTemple: false, dusk: true });
+    run.send({ type: 'deed', what: 'wheat', nearTemple: true, dusk: true });
+    run.send({ type: 'deed', what: 'sheep', nearTemple: true, dusk: true });
+    assert.equal(run.state.step, stepIndex('fire'), 'none of these counts');
+    const r = run.send({ type: 'deed', what: 'tree', nearTemple: true, dusk: true });
+    assert.deepEqual(r.effects.completed, ['fire']);
+    assert.equal(r.effects.beats.length, 1);
+    assert.equal(run.state.step, stepIndex('offering'));
+  },
+);
+
 await check('the offering fills from what is given, in pieces, and gives its spark once', () => {
   const run = runChain();
   run.send({ type: 'elderMet' }, world({ converts: CONVERTS }));

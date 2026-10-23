@@ -31,8 +31,8 @@ Sparks (skill points) are paid by the quest steps and by converts; the numbers a
 | # | Step id | Objective line | Done when | Reward |
 |---|---|---|---|---|
 | 1 | `meet` (hidden) | — | the orb comes within 6 m of the praying elder and he looks at it for 10 s | 1 spark, beat `elder-meets` |
-| 2 | `convert` | Help the village believe. (n / 5) | five villagers believe (Murmur, Dream, Sign) | beat `convert-done` (plus a spark per convert past five) |
-| 3 | `fire` | Light the temple fire at dusk with a Sign. | a Sign cast near the temple around sunset | 1 spark, beat `fire-lit` |
+| 2 | `convert` | Impress five villagers. (n / 5) | five villagers believe, won by the hand's deeds (`HAND.md`; Murmur, Dream and Sign still count until they are removed) | beat `convert-done` (plus a spark per convert past five) |
+| 3 | `fire` | Bring wood to the temple at dusk. | wood from the hand put down at the temple around sunset (a Sign cast there still counts until Sign is removed) | 1 spark, beat `fire-lit` |
 | 4 | `offering` | Make an offering at the temple. (n / 40) | stand at the temple with 50+ energy while it flows | 1 spark, beat `offering-made` |
 | 5 | `believe` | Win the elder's heart. | the elder believes (only possible now) | beat `village-converted`, the village converts, 3 sparks |
 

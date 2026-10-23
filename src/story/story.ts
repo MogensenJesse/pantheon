@@ -28,11 +28,13 @@ export const BEATS: Readonly<Record<string, Beat>> = {
   },
   'convert-done': {
     lines: [
-      '"Five of them now carry you in their thoughts. The others have started to look at the temple differently."',
+      '"Five of them have seen what you can do, and carry you in their thoughts. The others have started to look at the temple differently."',
     ],
   },
   'fire-lit': {
-    lines: ['"The temple fire burns at dusk, and the elder watches it as if it were an answer."'],
+    lines: [
+      '"Wood for the temple fire, brought at dusk. It burns, and the elder watches it as if it were an answer."',
+    ],
   },
   'offering-made': {
     lines: ['"Something of you has been given. The stones of the temple feel it, and so does he."'],

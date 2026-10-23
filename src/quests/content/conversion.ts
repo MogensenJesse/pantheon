@@ -31,15 +31,21 @@ export const CONVERSION_QUEST: QuestDef = {
     },
     {
       id: 'convert',
-      text: 'Help the village believe.',
+      text: 'Impress five villagers.',
       goal: Q.CONVERTS_GOAL,
       advance: (p, _e, ctx) => Math.max(p, Math.min(Q.CONVERTS_GOAL, ctx.converts)),
       reward: { beat: 'convert-done' },
     },
     {
       id: 'fire',
-      text: 'Light the temple fire at dusk with a Sign.',
-      advance: (p, e) => (e.type === 'signCast' && e.nearTemple && e.dusk ? 1 : p),
+      text: 'Bring wood to the temple at dusk.',
+      // A Sign still lights it while the Sign exists; the hand's wood is the way from now on.
+      advance: (p, e) =>
+        (e.type === 'signCast' || (e.type === 'deed' && e.what === 'tree')) &&
+        e.nearTemple &&
+        e.dusk
+          ? 1
+          : p,
       reward: { sparks: 1, beat: 'fire-lit' },
     },
     {

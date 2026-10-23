@@ -43,7 +43,7 @@ A **deed** is a lift or a delivery. Awake, outdoor, living villagers within `WIT
 
 ## The conversion quest on deeds
 
-Step ids and order are unchanged: `meet`, `convert`, `fire`, `offering`, `believe`.
+Step ids and order are unchanged: `meet`, `convert`, `fire`, `offering`, `believe`. Built (H3a): the quest takes a `deed` event as well as the old `signCast`, so it can be finished by the hand now and the Sign can be removed later; `check:hand` plays the whole quest on deeds alone (30 trees over about two in-game days, most of it waiting for dusk and for the elder).
 - `convert` reads "Impress five villagers."
 - `fire` reads "Bring wood to the temple at dusk." (it used to be a Sign).
 - Target pacing: the conversion should take about 10 to 15 minutes of deeds.

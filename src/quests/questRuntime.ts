@@ -1,7 +1,7 @@
 // src/quests/questRuntime.ts — the quests in the running game
 //
 // Feeds the pure rules (quest.ts, questLog.ts) from the game: the elder meeting the orb, a Sign being
-// cast, the energy offered at the temple, the villagers who believe, and what the village and the
+// cast or the hand putting something down, the energy offered at the temple, the villagers who believe, and what the village and the
 // places of power do. Quests begin when their rule says so (all of them but the conversion quest need a
 // converted village), pay sparks, show story beats through the story log and tell memory fragments;
 // finishing the conversion quest converts the village.
@@ -99,11 +99,11 @@ export function initQuest(deps: QuestRuntimeDeps): QuestRuntime {
     return q && !q.done ? QUEST_BY_ID.get(questId)?.steps[q.step]?.id : undefined;
   };
   const temple = () => templeOf(sim.buildings);
-  const near = (m: number) => {
+  const nearAt = (at: { x: number; z: number }, m: number) => {
     const t = temple();
-    const orb = deps.orbPlace();
-    return !!t && dist2d(t, orb) <= m;
+    return !!t && dist2d(t, at) <= m;
   };
+  const near = (m: number) => nearAt(deps.orbPlace(), m);
   // The last night's facts are only worked out while that quest waits for the gathering.
   const finaleWorld = () =>
     currentId(FINALE_QUEST.id) === 'gather'
@@ -168,6 +168,14 @@ export function initQuest(deps: QuestRuntimeDeps): QuestRuntime {
     dispatch({
       type: 'signCast',
       nearTemple: near(Q.FIRE_TEMPLE_M),
+      dusk: isDusk(deps.dayPhase()),
+    });
+  });
+  const offDeed = bus.on('hand:delivered', ({ what, x, z }) => {
+    dispatch({
+      type: 'deed',
+      what,
+      nearTemple: nearAt({ x, z }, Q.FIRE_TEMPLE_M),
       dusk: isDusk(deps.dayPhase()),
     });
   });
@@ -267,6 +275,7 @@ export function initQuest(deps: QuestRuntimeDeps): QuestRuntime {
     dispose: () => {
       offBeliever();
       offSign();
+      offDeed();
       offConverted();
       for (const off of offs) off();
       if (gatheringOn) deps.village.setGathering(false);
