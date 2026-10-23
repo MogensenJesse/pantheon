@@ -203,7 +203,7 @@ await check('specks: they fall at the fall speed and start again at the top', ()
   const period = shape.heightM / shape.fallMps;
   const c0 = boxCoords(s, centre, 0, 0, 0, shape);
   const c1 = boxCoords(s, centre, 0, 0, period, shape);
-  assert.ok(Math.abs(c0.v - c1.v) < 1e-9 || Math.abs(Math.abs(c0.v - c1.v) - 1) < 1e-9);
+  assert.ok(Math.abs(c0.y - c1.y) < 1e-9 || Math.abs(Math.abs(c0.y - c1.y) - 1) < 1e-9);
 });
 
 await check('specks: the box edge fades them out, so the wrap is never seen', () => {

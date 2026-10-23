@@ -24,6 +24,7 @@ How Phase 0 (God Particle) works in the code: the rules, the config keys, the ev
 | Night lift from phase 0 progress | `src/core/reveal/phase0Progress.ts`, `worldLightnessT` in `src/rendering/sky/lightingCurves.ts` |
 | Chapters and captions (placeholder text) | `src/story/fragments.ts`, `src/ui/StoryLog.ts` |
 | Map entity | `landmark` in `src/map/MapTypes.ts`; see `story-mechanics/MAPS.md` |
+| Life at each place (levels, clouds of specks, flocks) | `src/life/places/` (`lifeRules.ts`, `placeLife.ts`, `ambientLife.ts`); see [ambient.md](ambient.md) |
 
 ## Config keys
 

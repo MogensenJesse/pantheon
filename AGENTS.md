@@ -195,7 +195,7 @@ Per-feature detail (rules, config key names, events, save fields, DEV hooks, che
 | Dressing | `render/dressingRenderer.ts` (field fences, site stockpiles), `render/wheatFields.ts` (marks each field as wheat in the grass data map, ripeness follows `Field.growth`), `windowGlow.ts` (additive `_glow` instance per lit building), `smokeRenderer.ts` |
 | Shadows | Buildings are static casters: `shadowInvalidationBatcher.ts` limits only *its own* far + near invalidations to once per 1.5 s; the follow bake (`shadowFollowPose.ts`) still re-runs every frame the sun angle or the player moves; the world cascade re-bakes with the sun (10 Hz cap) |
 | DEV | Dev panel **Village** section (`dev/panel/devPanelVillage.ts`, incl. ring fill and path stats), `window.__pantheonVillage` (`dev/runtime/villageProbe.ts`; `layout()` tables ring offset and door facing), `villageDevState.ts` |
-| Headless checks | `npm run check:fast` runs the village checks in parallel (`scripts/checks/run.mjs`); each is also `npm run check:village-<name>` (list in `package.json`). `npm run tool:village-map -- <mapId> <outDir> [counts] [x,z,rotY]` writes a PNG of the layout at N buildings: hillshade, rings, wear/paths, doors, villagers |
+| Headless checks | `npm run check:fast` runs the typecheck, the lint and every fast headless check in parallel (`scripts/checks/run.mjs`); each check is also `npm run check:<name>` (list in `package.json`). `npm run tool:village-map -- <mapId> <outDir> [counts] [x,z,rotY]` writes a PNG of the layout at N buildings: hillshade, rings, wear/paths, doors, villagers |
 
 Notes: the sim plans on the original ground and seats every building on a level pad (`sim/pad.ts`); the terrain under each pad is levelled into the 2 m detail layer by `render/terraformView.ts`. See [docs/village/render.md](docs/village/render.md).
 
@@ -342,20 +342,21 @@ The sun-driven look is sampled in `rendering/sky/lightingCurves.ts` (`sampleLigh
 Owner: `src/core/gameTick.ts` (`createFrameTick` → `render`). All pixels go through `postFX.render()` — do not call `renderer.render(scene, camera)` in gameplay. `WorldReveal` has **no per-frame `update`**; it listens to `energy:changed`. Player sparkle follow runs inside `player.applyRenderPosition` (before this list).
 
 1. `dayCycle.update` → after energy cap: one-shot `revealSunrise` (then looping `dayDurationSec` arc, left→right)
-2. `player.updateIllumination` + `syncWorldLighting` → night point light (from fixed-step `getDisplayEnergy` + sun) + terrain lighting uniforms
-3. `overview.update` (poses the camera when the overview is on, and sets where the orb is drawn), then `cinematic.update` (the last night's scripted view, which poses the camera over it, moves the detail centre and holds the movement keys); otherwise `cameraRig.update`
-4. `grassSystem.update` (when grass enabled) — after the camera so compact uses this frame’s frustum; mark + compact submit before the draw
-5. `guideLine.update` (ribbon + path sparkles)
-6. `village.render` (when the map has a `villageSeed`: building rise-in, villagers, glow, terrain-layer uploads) → `updatePropLod` (distance-band map prop InstancedMeshes into lod0/1/2; village batches share the same groups). `village.update` runs in `fixedUpdate` after the orbs
-7. `updateFarSunShadowTarget`; when `sun.intensity > 0` also near cascade + `updateCloudCastShadowTarget`; then `resolveWorldCascadeVisibility` + `updateWorldCascadeShadow`
-8. `nightHdriWeightForGameState` → `skySystem.setNightHdriWeight`
-9. `syncAtmosphere` — AgX/sky exposure, bloom/god-ray sun weights, grade, valley fog (see **Color pipeline**)
-10. `cloudSystem.update` (when clouds enabled)
-11. `skySystem.update`
-12. `updateWaterReflectionQuality` + `syncPantheonWater` (when water present)
-13. `postFX.setDofFocus` + `postFX.setDofBokehScale` (energy → bokeh)
-14. `await grassSystem.whenComputeReady()` **only if** `!isFieldReady()` (rebuild boundary)
-15. `postFX.render()`
+2. `weatherView.update` (the weather at the camera → `weatherLook`, before the lighting is pushed), `ambienceView.update` (the one wind and the time of day as numbers) and `life.update` (leaves and fireflies on the wind, the life at the story's places; `life` is `life/worldLife.ts`, whose animals step in `fixedUpdate`)
+3. `player.updateIllumination` + `syncWorldLighting` → night point light (from fixed-step `getDisplayEnergy` + sun) + terrain lighting uniforms
+4. `overview.update` (poses the camera when the overview is on, and sets where the orb is drawn), then `cinematic.update` (the last night's scripted view, which poses the camera over it, moves the detail centre and holds the movement keys); otherwise `cameraRig.update`
+5. `grassSystem.update` (when grass enabled) — after the camera so compact uses this frame’s frustum; mark + compact submit before the draw
+6. `guideLine.update` (ribbon + path sparkles)
+7. `village.render` (when the map has a `villageSeed`: building rise-in, villagers, glow, terrain-layer uploads) → `life.render` (sheep, hens and birds) → `updatePropLod` (distance-band map prop InstancedMeshes into lod0/1/2; village batches share the same groups). `village.update` runs in `fixedUpdate` after the orbs
+8. `updateFarSunShadowTarget`; when `sun.intensity > 0` also near cascade + `updateCloudCastShadowTarget`; then `resolveWorldCascadeVisibility` + `updateWorldCascadeShadow`
+9. `nightHdriWeightForGameState` → `skySystem.setNightHdriWeight`
+10. `syncAtmosphere` — AgX/sky exposure, bloom/god-ray sun weights, grade, valley fog (see **Color pipeline**)
+11. `cloudSystem.update` (when clouds enabled)
+12. `skySystem.update`
+13. `updateWaterReflectionQuality` + `syncPantheonWater` (when water present)
+14. `postFX.setDofFocus` + `postFX.setDofBokehScale` (energy → bokeh)
+15. `await grassSystem.whenComputeReady()` **only if** `!isFieldReady()` (rebuild boundary)
+16. `postFX.render()`
 
 ## Configuration
 

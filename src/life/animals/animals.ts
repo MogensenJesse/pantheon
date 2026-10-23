@@ -2,7 +2,7 @@
 //
 // Cosmetic and never saved (a load starts them fresh). Sheep and hens come once the village is converted, in numbers
 // that follow its population, and stay; the village sim is only read, never changed. Sheep graze a pasture at the edge
-// of the village and hens scratch a yard beside the granary. Birds circle the woods by day on every map, and the
+// of the village and hens scratch a yard beside the granary. Birds circle the woods by day (on a map that has woods), and the
 // places of power add flocks of their own (life/places/placeLife.ts). From Phase 1 the hens run from the orb and a flock of
 // birds flies off when it comes near.
 import alea from 'alea';

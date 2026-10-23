@@ -61,7 +61,7 @@ export const life = {
     altColor: '#b8702c',
     hdr: 1,
     alpha: 0.95,
-    windSpeedMul: 3.2,
+    windMps: 3.2,
     fallMps: 0.55,
     wobbleM: 0.5,
     wobbleHz: 0.35,
@@ -89,7 +89,7 @@ export const life = {
     /** Additive fields multiply their colour by this and by the bloom scale (12), so a tiny speck stays soft. */
     hdr: 0.05,
     alpha: 0.5,
-    windSpeedMul: 1.4,
+    windMps: 1.4,
     fallMps: 0.05,
     wobbleM: 0.8,
     wobbleHz: 0.25,
@@ -119,7 +119,7 @@ export const life = {
     /** Multiplied by the bloom scale (12): a speck glows without filling the screen. */
     hdr: 0.35,
     alpha: 1,
-    windSpeedMul: 0.15,
+    windMps: 0.15,
     fallMps: 0,
     wobbleM: 1.6,
     wobbleHz: 0.12,
@@ -140,7 +140,10 @@ export const life = {
     GALE_KEEP: 0.2,
     RAIN_KEEP: 0.25,
   },
-  /** How creatures (fireflies, hens and birds) notice the orb, once the world is alive. */
+  /**
+   * How the specks near the orb (fireflies) notice it, once the world is alive. Hens and birds have their own distances
+   * (`ANIMALS.CHICKEN.SCARE_RADIUS_M`, `BIRDS.AMBIENT.SCARE_M`).
+   */
   ORB_NOTICE: {
     /** Specks inside this share of the pull radius gather as tightly as they will. */
     INNER_SHARE: 0.35,
@@ -227,7 +230,7 @@ export const life = {
     DRAW_DISTANCE_M: 160,
     /** How often (s) the village is looked at again for new arrivals and a home for the flocks. */
     REVIEW_S: 2,
-    /** Seconds an animal takes to grow into view when it arrives (a new lamb, a hen from the market). */
+    /** Seconds an animal takes to grow into view when it arrives (a new arrival as the village grows). */
     ARRIVE_S: 2.5,
     SHEEP: {
       /** One sheep per this many villagers, between `MIN` and `MAX` (a village of one still has a few). */

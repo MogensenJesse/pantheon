@@ -2,6 +2,8 @@
 // that shows every place as it was.
 // Run: node --experimental-strip-types scripts/checks/life/life-check.ts
 import assert from 'node:assert/strict';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { life } from '../../../src/config/visual/life.ts';
 import { fireflyGate } from '../../../src/life/driftRules.ts';
 import { createAmbientLife } from '../../../src/life/places/ambientLife.ts';
@@ -236,5 +238,63 @@ await check(
     assert.equal(ambient.setPlaceLevel('tree', 1), true);
   },
 );
+
+await check(
+  'DEV: standing the made-up places up again moves them rather than doubling them',
+  () => {
+    const rec = recorder();
+    const ambient = createAmbientLife({
+      placeLife: rec.placeLife,
+      landmarks: story(['tree'], [], []),
+      nameReturned: () => false,
+    });
+    const first = ambient.fakePlaces(50, 60, 20);
+    const second = ambient.fakePlaces(-10, 5, 8);
+    assert.deepEqual(second, first);
+    assert.deepEqual(
+      [...rec.unsited].sort(),
+      [...first].sort(),
+      'the first set was taken away once',
+    );
+    for (const kind of second) {
+      const at = rec.sited.get(kind)!;
+      assert.ok(Math.abs(Math.hypot(at.x + 10, at.z - 5) - 8) < 1e-9, `${kind} on the new ring`);
+    }
+    ambient.clearFakes();
+    assert.equal(rec.unsited.length, first.length * 2);
+    assert.equal(rec.sited.size, 1, 'only the real place is left');
+  },
+);
+
+/** Every `.ts` file under `dir`. */
+function sourcesUnder(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+    const path = join(dir, e.name);
+    return e.isDirectory() ? sourcesUnder(path) : path.endsWith('.ts') ? [path] : [];
+  });
+}
+
+/** The names of every number and string in a config block, nested (arrays and the like count as one). */
+function leafNames(block: object, out = new Map<string, number>()): Map<string, number> {
+  for (const [name, value] of Object.entries(block)) {
+    if (value !== null && typeof value === 'object' && !Array.isArray(value)) leafNames(value, out);
+    else out.set(name, (out.get(name) ?? 0) + 1);
+  }
+  return out;
+}
+
+await check('no number in the animal, bird or place config goes unread', () => {
+  // by name: a name two blocks share is skipped, since a read of one would hide the other being dead
+  const text = sourcesUnder('src')
+    .filter((f) => !f.endsWith(join('config', 'visual', 'life.ts')))
+    .map((f) => readFileSync(f, 'utf8'))
+    .join('\n');
+  const names = new Map<string, number>();
+  for (const block of [life.ANIMALS, life.BIRDS, life.PLACES]) leafNames(block, names);
+  const unread = [...names]
+    .filter(([name, blocks]) => blocks === 1 && !new RegExp(`\\b${name}\\b`).test(text))
+    .map(([name]) => name);
+  assert.deepEqual(unread, [], `unread config: ${unread.join(', ')}`);
+});
 
 finish('all life checks passed');

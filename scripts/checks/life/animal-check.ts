@@ -11,6 +11,7 @@ import {
   type PoseParams,
   posePart,
   RIGS,
+  restPose,
 } from '../../../src/life/animals/animalPose.ts';
 import {
   type AnimalEnv,
@@ -43,16 +44,28 @@ const DT = 1 / 50;
 const flat = { getY: () => 10, waterLevelM: 0, buildings: () => [], fields: () => [], trees: [] };
 const open: AnimalEnv = { walkable: createWalkable(flat), scare: null };
 
-function run(
+type Kind = Parameters<typeof createFlock>[0];
+
+/** Calls `step` for `seconds` of fixed steps, and `each` after every one. */
+function stepFor(seconds: number, step: () => void, each?: () => void): void {
+  for (let i = 0; i < seconds / DT; i++) {
+    step();
+    each?.();
+  }
+}
+
+const run = (
   seconds: number,
   flock: ReturnType<typeof createFlock>,
   env: AnimalEnv,
   each?: () => void,
-): void {
-  for (let i = 0; i < seconds / DT; i++) {
-    stepFlock(flock, DT, env);
-    each?.();
-  }
+) => stepFor(seconds, () => stepFlock(flock, DT, env), each);
+
+/** A flock of `count` animals of `kind` on its kind's home radius round `at`, walking in `env`. */
+function flockOf(kind: Kind, count: number, seed: number, env = open, at = { x: 0, z: 0 }) {
+  const flock = createFlock(kind, at.x, at.z, PARAMS[kind].homeRadiusM, seed);
+  for (let i = 0; i < count; i++) addAnimal(flock, env);
+  return flock;
 }
 
 await check(
@@ -116,8 +129,7 @@ await check(
   'a flock is the same every time from the same seed, and different from another seed',
   () => {
     const make = (seed: number) => {
-      const flock = createFlock('sheep', 100, 100, 9, seed);
-      for (let i = 0; i < 5; i++) addAnimal(flock, open);
+      const flock = flockOf('sheep', 5, seed, open, { x: 100, z: 100 });
       run(60, flock, open);
       return flock.animals.map((a) => [a.x, a.z, a.yaw]);
     };
@@ -134,8 +146,7 @@ await check('animals stay inside their disc and on walkable ground for five minu
   };
   for (const kind of ['sheep', 'chicken'] as const) {
     const radius = PARAMS[kind].homeRadiusM;
-    const flock = createFlock(kind, 100, 100, radius, 3);
-    for (let i = 0; i < 6; i++) addAnimal(flock, env);
+    const flock = flockOf(kind, 6, 3, env, { x: 100, z: 100 });
     run(300, flock, env, () => {
       for (const a of flock.animals) {
         assert.ok(Math.hypot(a.x - 100, a.z - 100) <= radius + 0.5, `${kind} left its disc`);
@@ -149,8 +160,8 @@ await check('animals turn at a sensible rate and walk no faster than their pace'
   for (const kind of ['sheep', 'chicken'] as const) {
     const p = PARAMS[kind];
     // alone, so that nothing nudges it apart from a neighbour
-    const flock = createFlock(kind, 0, 0, p.homeRadiusM, 5);
-    const animal = addAnimal(flock, open);
+    const flock = flockOf(kind, 1, 5);
+    const animal = flock.animals[0]!;
     let moved = 0;
     run(120, flock, open, () => {
       const dyaw = Math.abs(
@@ -166,8 +177,7 @@ await check('animals turn at a sensible rate and walk no faster than their pace'
 });
 
 await check('animals do not stand on each other', () => {
-  const flock = createFlock('sheep', 0, 0, 9, 8);
-  for (let i = 0; i < 8; i++) addAnimal(flock, open);
+  const flock = flockOf('sheep', 8, 8);
   const gap = PARAMS.sheep.gapM;
   let worst = Infinity;
   run(180, flock, open, () => {
@@ -184,8 +194,8 @@ await check('animals do not stand on each other', () => {
 await check(
   'a new arrival grows into view over ARRIVE_S, and one pushed onto a new building is moved off it',
   () => {
-    const flock = createFlock('chicken', 0, 0, 3.5, 4);
-    const hen = addAnimal(flock, open);
+    const flock = flockOf('chicken', 1, 4);
+    const hen = flock.animals[0]!;
     assert.equal(hen.arrive, 0);
     run(A.ARRIVE_S / 2, flock, open);
     assert.ok(hen.arrive > 0.4 && hen.arrive < 0.6, `halfway ${hen.arrive}`);
@@ -209,12 +219,8 @@ await check(
   'hens run from the orb at the run pace, sheep do not mind it, and hens settle when it goes',
   () => {
     const orb = { x: 0.5, z: 0 };
-    const hens = createFlock('chicken', 0, 0, 3.5, 6);
-    const sheep = createFlock('sheep', 0, 0, 9, 6);
-    for (let i = 0; i < 4; i++) {
-      addAnimal(hens, open);
-      addAnimal(sheep, open);
-    }
+    const hens = flockOf('chicken', 4, 6);
+    const sheep = flockOf('sheep', 4, 6);
     const scared: AnimalEnv = { walkable: open.walkable, scare: orb };
     let fastest = 0;
     let sheepFastest = 0;
@@ -251,10 +257,17 @@ for (const walk of [0, 0.5, 1]) {
   }
 }
 
+/** What `part` of `model` does in `pose`. */
+function partTurn(model: string, part: string, pose: PoseParams): PartPose {
+  const out = restPose();
+  posePart(model, part, pose, out);
+  return out;
+}
+
 await check(
   'poses: every part of every rig gives finite, small turns; an unknown part stays at rest',
   () => {
-    const out: PartPose = { rx: 0, ry: 0, rz: 0, dx: 0, dy: 0, dz: 0 };
+    const out = restPose();
     for (const [model, rig] of Object.entries(RIGS)) {
       for (const part of Object.keys(rig)) {
         for (const pose of sweep) {
@@ -273,18 +286,14 @@ await check(
     }
     const rest = { ...sweep[0]!, walk: 0 };
     assert.equal(posePart('sheep', 'horn', rest, out), false);
-    assert.deepEqual(out, { rx: 0, ry: 0, rz: 0, dx: 0, dy: 0, dz: 0 });
+    assert.deepEqual(out, restPose());
   },
 );
 
 await check(
   'poses: sheep legs swing in diagonal pairs and stand still at rest; the head dips to graze',
   () => {
-    const out: PartPose = { rx: 0, ry: 0, rz: 0, dx: 0, dy: 0, dz: 0 };
-    const rx = (part: string, pose: PoseParams) => {
-      posePart('sheep', part, pose, out);
-      return out.rx;
-    };
+    const rx = (part: string, pose: PoseParams) => partTurn('sheep', part, pose).rx;
     const walking: PoseParams = { ...sweep[0]!, stride: 0.25, walk: 1 };
     assert.ok(
       Math.abs(rx('leg_fl', walking) - rx('leg_br', walking)) < 1e-12,
@@ -304,11 +313,7 @@ await check(
 );
 
 await check('poses: hens flap their wings in opposite senses only when they run', () => {
-  const out: PartPose = { rx: 0, ry: 0, rz: 0, dx: 0, dy: 0, dz: 0 };
-  const rz = (part: string, pose: PoseParams) => {
-    posePart('chicken', part, pose, out);
-    return out.rz;
-  };
+  const rz = (part: string, pose: PoseParams) => partTurn('chicken', part, pose).rz;
   const running: PoseParams = { ...sweep[0]!, flap: 0.25, flapAmt: 0.6 };
   assert.ok(
     rz('wing_r', running) > 0.5 && rz('wing_l', running) < -0.5,
@@ -321,8 +326,7 @@ await check('poses: hens flap their wings in opposite senses only when they run'
 await check(
   'the pose of a resting animal follows what it does: grazing sheep put their heads down, walking ones do not',
   () => {
-    const flock = createFlock('sheep', 0, 0, 9, 12);
-    for (let i = 0; i < 6; i++) addAnimal(flock, open);
+    const flock = flockOf('sheep', 6, 12);
     let downWhileResting = 0;
     let downWhileWalking = 0;
     run(240, flock, open, () => {
@@ -368,7 +372,7 @@ await check(
 );
 
 await check(
-  'the stand-in models match their rigs: named parts, pivots inside the body, the right height',
+  'the stand-in models match their rigs: named parts, pivots inside the body, on the ground, about their standing height',
   () => {
     for (const [model, rigKey] of [
       [buildSheep(), 'sheep'],
@@ -396,12 +400,13 @@ await check(
       }
       assert.ok(box.min.y > -0.01 && box.min.y < 0.02, `${rigKey} stands on y = 0 (${box.min.y})`);
       assert.ok(box.max.z > 0.1, `${rigKey} has a front on +z`);
+      const target = life.MODEL_HEIGHT_M[rigKey];
+      assert.ok(
+        Math.abs(box.max.y - target) < target * 0.15,
+        `${rigKey} stands ${box.max.y.toFixed(2)} m high, the target is ${target} m`,
+      );
       model.dispose();
     }
-    const sheep = buildSheep();
-    const top = Math.max(...sheep.parts.map((p) => p.pivot[1]));
-    assert.ok(top > 0.5 && top < 1.0);
-    sheep.dispose();
   },
 );
 
@@ -482,12 +487,8 @@ const newFlock = (place = false, level = 1, count = 8): BirdFlock =>
     { model: 'songbird', place, cx: 0, cz: 0, count, orbitM: 20, altitudeM: 20, seed: 4, level },
     10,
   );
-const runBirds = (flock: BirdFlock, seconds: number, env: BirdEnv, each?: () => void) => {
-  for (let i = 0; i < seconds / DT; i++) {
-    stepBirdFlock(flock, DT, env);
-    each?.();
-  }
-};
+const runBirds = (flock: BirdFlock, seconds: number, env: BirdEnv, each?: () => void) =>
+  stepFor(seconds, () => stepBirdFlock(flock, DT, env), each);
 const shownCount = (f: BirdFlock) => f.birds.filter((b) => b.shown > 0.99).length;
 
 await check('woods: cells with enough trees, at the middle of their trees', () => {

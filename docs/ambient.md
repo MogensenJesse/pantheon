@@ -4,11 +4,12 @@ What makes the world feel alive without touching the game rules: one wind that t
 
 ## Rules that hold for all of it
 
-- **Cosmetic, never saved.** Nothing here is in the save. A load works every level out again from the landmark state, the quests and the clocks, and starts everything at that level, so nothing fades in on a load.
+- **One object.** `src/life/worldLife.ts` (`createWorldLife`, made once in `main.ts`) makes the drift fields, the animals and the place life, and fixes their order; the frame tick calls `life.fixedUpdate(dt)`, `life.update(frameDelta, orb)` after the ambience is set, and `life.render(alpha, x, z)` after the village draws. Its warm-up covers the village's pipelines too.
+- **Cosmetic, never saved.** Nothing here is in the save. A load works every level out again from the landmark state, the quests and the clocks, and starts every place at that level at once, so a place shows as it was on a load. The farm animals and the ambient flocks are not part of that: they grow into view over `ANIMALS.ARRIVE_S` and `BIRDS.FADE_S`.
 - **The village sim is only read.** The animals look at the village; they never change it, so the village goldens (`npm run check:village-golden`) do not move.
 - **Creatures notice the orb only from Phase 1** (`state.phase >= 1`). Plants react to the orb always. Phase 0 keeps its rule that no living creature perceives the orb.
 - **No GPU needed to prove the maths.** Every shader has a pure CPU twin (`.ts` imports, node-runnable) that a check exercises; the twins must stay in step with the shaders. What a screen shows still needs a real GPU (the checklist is in `story-mechanics/PHASE_0_TODO.md`).
-- **Nothing is compiled late.** Every mesh is made before the pipeline warm-up (`bootstrap/shadowWarmup.ts`) and is visible from the first frame at a density or level of 0, which draws nothing. Never toggle `visible` for these.
+- **Nothing is compiled late.** Every mesh is made before the pipeline warm-up (`bootstrap/shadowWarmup.ts`) and is visible from the first frame at a density or level of 0, which draws nothing. Never toggle `visible` for the specks and clouds. The animal renderer does hide a part with nothing to draw, which is why it shows one of each part in its own warm-up (`beginWarmup` / `endWarmup`, called with the village's) so no animal pipeline is compiled late.
 
 ## 1. The one wind
 
@@ -30,7 +31,7 @@ What makes the world feel alive without touching the game rules: one wind that t
 
 - A tree leans along the wind by `lean × height`, weighted by `(height share) ^ heightPower`, so the trunk stays stiff and the crown moves. The lean is a gust wave that travels along the wind (`waveLengthM`, `periodS`; a broad slow wave and a faster narrow one) plus a smaller wobble across the wind. Near trees (lod0) also flutter at the crown, and the flutter rises near the orb (`orbRadiusM`, `orbGain`; plants react always).
 - Which props sway: the tree keys (`PROP_TREE_KEYS`: `birch_`, `pine_`, `fir_`); the species factors are `sway.species`. Rocks, structures and the village's own kit never move. The model height comes from the lod0 bounds and is used by every band, so a tree's lean is identical in all bands and never jumps when its level of detail changes. The phase comes from the world position, never the instance index (which changes on every LOD rebin).
-- `createMapPropNodeMaterial(sun, base, lodBand, grade?, largeFaces?, sway?)` sets `positionNode` when a sway profile is given; it composes with the grass depth pull because the view position derives from the displaced position. The profile is chosen in `mapPropInstancing.ts` per key; a caller that brings its own materials (the village kit) gets none.
+- `createMapPropNodeMaterial(sun, base, { lodBand, grade, largeFaces, sway })` sets `positionNode` when a sway profile is given; it composes with the grass depth pull because the view position derives from the displaced position. The profile is chosen in `mapPropInstancing.ts` per key; a caller that brings its own materials (the village kit) gets none.
 - **Shadows stay at the rest pose** (the casters are separate materials and the maps are baked on demand), so a tree's own shadow does not move; the lean is small enough that the self-shadow drift is not noticeable.
 - What does not sway: the village's buildings, and the temporary instances the forest view draws (a tree falling, a sapling growing); the standing trees are in the static prop groups and do sway.
 - DEV: the "Tree sway" section of the dev panel (`dev/panel/devPanelTreeSway.ts`) moves the live uniforms.
@@ -51,7 +52,7 @@ What makes the world feel alive without touching the game rules: one wind that t
 `src/life/particles/`: `driftField.ts` (the field class), `driftMath.ts` (the CPU twin), `speckMaterial.ts` (shared look), `orbNotice.ts` (the orb's pull on a speck), `driftFields.ts` (the three fields and what decides how many show).
 
 - A field is one `InstancedMesh` of sprites inside a box that follows the camera (`boxM`). Where a speck is comes from its static seed (`iSeed`, golden-ratio `seedAt`), the wind it has been carried by (integrated on the CPU and wrapped modulo the box, so a gust never makes a speck jump), the clock and the box centre. Nothing is uploaded after the start.
-- The share shown is a density: speck `i` shows when `smoothstep(seed.w, seed.w + 0.08, density × 1.08)`. The rules are in `src/life/driftRules.ts`: `leafShare` (near trees, more in wind, fewer in rain and at night), `pollenShare` (a still, dry day over open ground), `fireflyShare` (a night thing, many in woods and on the shore, thinned by gales and rain).
+- The share shown is a density: speck `i` shows when `smoothstep(seed.w, seed.w + 0.08, density × 1.08)`. The rules are in `src/life/driftRules.ts`: `leafShare` (near trees, more in wind, fewer in rain and at night), `pollenShare` (a still, dry day over open ground), `fireflyShare` (full at night, `FIREFLIES.GOLDEN_SHARE` at dusk and dawn through the same `fireflyGate` the place fireflies use, many in woods and on the shore, thinned by gales and rain).
 - **Habitat** is a coarse grid of the map's trees (`src/life/habitat.ts`, `CELL_M`): `density` (how wooded) and `birchShare` (birch leaves are copper). `woodCentres` lists the woods the birds use. The shore comes from the camera's ground height against the water level (`shoreness`).
 - **Orb:** fireflies within `orbPullM` of the orb drift toward it once the world is alive (`ORB_NOTICE`, eased in over 1.5 s), the shader twin of `orbPulled`.
 - Accepted: the habitat is read at the camera, not per speck (a clearing in view inside a wood still shows leaves), fireflies keep their height relative to the box and do not follow terrain per speck, and counts are not scaled by quality tier.
@@ -72,16 +73,16 @@ What makes the world feel alive without touching the game rules: one wind that t
 
 - **Count and place:** sheep `PER_VILLAGERS` 6 (3 to 8) graze a pasture at the edge of the village, on the side with most room, near the fields; hens `PER_VILLAGERS` 4 (4 to 12) scratch a yard beside the granary. They arrive when the village is converted (`sim.converted`; DEV `__pantheonLife.farm(true)`), grow into view over `ARRIVE_S`, and stay.
 - **Motion:** the sim steps at the fixed step with the previous state kept for interpolation; stride comes from distance travelled so feet do not slide. Hens within `SCARE_RADIUS_M` of the orb scatter from Phase 1.
-- **Rendering:** no skinning, no clips: the animal is rigid parts, each a matrix `base × T(pivot + offset) × R(pose)` written per frame, lit by the prop material (`createMapPropNodeMaterials(sun, material, 0)`, so sun, shadows and the grade match the rest of the world), with a blob shadow under it. Animals are drawn within `DRAW_DISTANCE_M` of the camera; there are no LODs.
+- **Rendering:** no skinning, no clips: the animal is rigid parts, each a matrix `base × T(pivot + offset) × R(pose)` written per frame, lit by the prop material (`createMapPropNodeMaterials(sun, material, 0)`, so sun, shadows and the grade match the rest of the world), with a blob shadow under it. Animals are drawn within `ANIMALS.DRAW_DISTANCE_M` of the camera and birds within `BIRDS.DRAW_DISTANCE_M`; there are no LODs.
 - **Models:** see the contract below. A key with no file keeps its stand-in.
 
 ## 6. Birds
 
 `birdSim.ts` (pure) and the same renderer. A flock has a centre, a circle round it and a level.
 
-- **Ambient flocks** (`BIRDS.AMBIENT.FLOCKS` of them, on every map that has woods) circle a wood by day, move on to another wood now and then (the circle closes into a loose cluster in transit), and fly off when the orb comes within `SCARE_M` of one of their birds (Phase 1+). They are out only by day and not in rain (birds grow and shrink over `FADE_S`, so none pops).
+- **Ambient flocks** (`BIRDS.AMBIENT.FLOCKS` of them) need a wood to circle: a 32 m cell with at least `WOOD_TREES` (8) trees (`woodCentres`), so a map without one has none. They circle a wood by day, move on to another wood now and then (the circle closes into a loose cluster in transit), and fly off when the orb comes within `SCARE_M` of one of their birds (Phase 1+). They are out only by day and not in rain (birds grow and shrink over `FADE_S`, so none pops). The sun is pinned to night in Phase 0, so only the flocks of the places of power can show there.
 - **A place's flock** (`place: true`) only circles its place and ignores the orb; `level` says how many of its birds are out (rain still sends them in).
-- Each bird banks into its turn, climbs and glides between wingbeats from its own movement; birds are drawn larger than life (`MODELS.*.SCALE`) because a real songbird is invisible at flying height.
+- Each bird banks into its turn, climbs and glides between wingbeats from its own movement; birds are drawn larger than life (`BIRDS.MODELS.*.SCALE`) because a real songbird is invisible at flying height.
 - Check: `npm run check:animal` (deterministic walks, stays on land and in range, count against population, no overlap, the pose rigs, the model loader, the flocks' behaviour).
 
 ## 7. Life at the places of power
@@ -113,11 +114,11 @@ What makes the world feel alive without touching the game rules: one wind that t
 
 ## Checks
 
-`npm run check:wind`, `check:prop-sway`, `check:drift`, `check:animal`, `check:life` (all in `check:fast`). `check:life` covers the levels per story state, the permanent trace, easing, the firefly gate, the chosen set of life per place, that a load starts every place at its level, and the DEV places.
+`npm run check:wind`, `check:prop-sway`, `check:drift`, `check:animal`, `check:life` (all in `check:fast`). `check:life` covers the levels per story state, the permanent trace, easing, the firefly gate, the chosen set of life per place, the radius of each cloud, that a load starts every place at its level, the DEV places, and that no number in `ANIMALS`, `BIRDS` or `PLACES` goes unread.
 
 ## Models to make
 
-The stand-ins are chunky vertex-coloured toys. Yours replace them one file at a time (`public/models/animals/<key>.glb`); the keys, part names and the rig contract are in `story-mechanics/PHASE_0_TODO.md` ("Animals and ambient life").
+The stand-ins are chunky vertex-coloured toys. Yours replace them one file at a time (`public/models/animals/<key>.glb`); the keys, part names and the rig contract are in `story-mechanics/PHASE_0_TODO.md` ("Animals and ambient life"). The keys are `sheep`, `chicken`, `songbird` and `dove`; a lamb and a rooster are not used yet.
 
 ## Open
 

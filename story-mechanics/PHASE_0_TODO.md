@@ -57,7 +57,7 @@ The animals are not skinned and have no animation clips (the DEV optimizer rejec
 - The whole model stands with its **feet centred on the origin, on y = 0, +Y up, facing +Z**. It is scaled in the game to the height in the table, whatever size you modelled it at; a model made floating is sunk to the ground.
 - **Wings:** `wing_r` sits on the model's +X side and `wing_l` on the -X side; they turn about the Z axis (up and down). Model the rest shape you want: folded at the sides for a hen, spread out for a flying bird (the beat goes about 1 radian up and down). **Head:** nods about X (positive is nose down). **Legs:** swing about X, rest straight down. Keep each model to a few hundred triangles; a few dozen birds and sheep can be in view at once.
 - One material per part is expected; several materials in a part draw as several pieces.
-- Tell me the file names; I check them in the DEV console (`__pantheonLife.animals()`).
+- Tell me the file names. On load the console prints one `[life]` line naming the keys that still have no file (a file that loads but has no mesh is warned about); `__pantheonLife.animals()` only says how many animals and birds are out.
 
 ### To look at on a real GPU (headless could not render any of this)
 - [ ] Tree sway: the amplitude (a calm day should be barely there, a storm should show), the gust sweeping across a wood, birch against fir, the flutter close up and near the orb. DEV panel "Tree sway".
@@ -69,6 +69,7 @@ The animals are not skinned and have no animation clips (the DEV optimizer rejec
 - [ ] Birds over the woods by day: height, speed, banking, the wingbeat, flying off when the orb is near, coming back.
 - [ ] The places' life (`__pantheonLife.fakePlaces()`; real once the five landmarks are placed): the great tree's birds and leaves, fireflies at the sunken ruin and on the runestones' ring, doves at the temple, motes at the monolith; the difference between awake (faint) and restored (full), and the faint trace after the name returns.
 - [ ] After the audit fixes (the shader edits were only built headlessly): birch leaves copper but spread through the air, not in bands; the orb's rustle on the grass fading out smoothly to its rim; the far (LOD2) grass waving along the wind, not a fixed way; grass gusts and flower sway keep time with the trees (and stop together when paused); fireflies follow the orb as drawn, without stutter; a regrowing sapling hardly moves in the wind instead of swaying like a full tree.
+- [ ] After the second clean-up (look-only changes, built headlessly): the fireflies of the box now come out at dusk and dawn (half as many) like the ones at the places; pollen is no longer tinted copper; all specks and clouds now share one material builder (`createSpeckMaterial`), so look for any that is the wrong size, colour or blink; ambient bird flocks start in different spots than before.
 - [ ] Tune with the numbers in `src/config/visual/life.ts` and `VISUAL.props.sway`.
 
 ## Story — final text (placeholder text ships until then; it is all in `src/story/fragments.ts`)

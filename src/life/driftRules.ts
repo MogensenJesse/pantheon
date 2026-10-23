@@ -51,7 +51,7 @@ export function fireflyGate(night01: number, golden01: number): number {
   return Math.max(clamp01(night01), F.GOLDEN_SHARE * clamp01(golden01));
 }
 
-/** Fireflies: a night thing, a few everywhere and many in the woods and on the shore; thinned by gales and rain. */
+/** Fireflies: out at night (fewer at dusk and dawn), a few everywhere and many in the woods and on the shore; thinned by gales and rain. */
 export function fireflyShare(w: DriftWorld): number {
   const habitat = Math.max(clamp01(w.woods01), clamp01(w.shore01 ?? 0));
   const place = F.OPEN_SHARE + (1 - F.OPEN_SHARE) * habitat;

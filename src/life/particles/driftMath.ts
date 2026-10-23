@@ -40,7 +40,7 @@ export function seedAt(i: number, n: number): DriftSeed {
   };
 }
 
-/** The 0..1 position of a speck in the box (before the sway): `u`/`w` across, `v` up. */
+/** The 0..1 position of a speck along each axis of the box (before the sway). */
 export function boxCoords(
   seed: DriftSeed,
   centre: Vec3Like,
@@ -48,11 +48,11 @@ export function boxCoords(
   driftZ: number,
   clockS: number,
   shape: DriftShape,
-): { u: number; v: number; w: number } {
+): Vec3Like {
   return {
-    u: fract(seed.x + (driftX - centre.x) / shape.boxM),
-    v: fract(seed.y - (shape.fallMps * clockS) / shape.heightM),
-    w: fract(seed.z + (driftZ - centre.z) / shape.boxM),
+    x: fract(seed.x + (driftX - centre.x) / shape.boxM),
+    y: fract(seed.y - (shape.fallMps * clockS) / shape.heightM),
+    z: fract(seed.z + (driftZ - centre.z) / shape.boxM),
   };
 }
 
@@ -68,9 +68,9 @@ export function driftPosition(
   const c = boxCoords(seed, centre, driftX, driftZ, clockS, shape);
   const sway = TAU * shape.wobbleHz * clockS;
   return {
-    x: centre.x + (c.u - 0.5) * shape.boxM + Math.sin(sway + seed.z * TAU) * shape.wobbleM,
-    y: centre.y + c.v * shape.heightM + Math.sin(sway * 1.3 + seed.w * TAU) * shape.wobbleM * 0.25,
-    z: centre.z + (c.w - 0.5) * shape.boxM + Math.sin(sway * 0.77 + seed.x * TAU) * shape.wobbleM,
+    x: centre.x + (c.x - 0.5) * shape.boxM + Math.sin(sway + seed.z * TAU) * shape.wobbleM,
+    y: centre.y + c.y * shape.heightM + Math.sin(sway * 1.3 + seed.w * TAU) * shape.wobbleM * 0.25,
+    z: centre.z + (c.z - 0.5) * shape.boxM + Math.sin(sway * 0.77 + seed.x * TAU) * shape.wobbleM,
   };
 }
 
@@ -90,8 +90,8 @@ export function advanceDrift(
 export const EDGE_FADE_FROM = 0.55;
 
 /** The share of the box's edge a speck fades over: 1 at the middle, 0 at the rim (so the wrap is never seen). */
-export function edgeFade(u: number, w: number, from = EDGE_FADE_FROM): number {
-  const r = Math.hypot(u - 0.5, w - 0.5) * 2;
+export function edgeFade(x: number, z: number, from = EDGE_FADE_FROM): number {
+  const r = Math.hypot(x - 0.5, z - 0.5) * 2;
   return 1 - smoothstepEdges(from, 1, r);
 }
 

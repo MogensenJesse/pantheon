@@ -27,7 +27,8 @@ import { createSpeckMaterial, createSpeckMesh, type SpeckLook } from './speckMat
 export interface DriftLook extends SpeckLook {
   boxM: number;
   heightM: number;
-  windSpeedMul: number;
+  /** How fast the wind carries a speck (m/s at a wind boost of 1). */
+  windMps: number;
   fallMps: number;
   wobbleM: number;
   wobbleHz: number;
@@ -112,7 +113,7 @@ export function createDriftField(name: string, look: DriftLook): DriftField {
           ? 0
           : Math.min(MAX_CLOCK_STEP_S, Math.max(0, state.windClock - lastClock));
       lastClock = state.windClock;
-      advanceDrift(drift, state.windDirX, state.windDirZ, look.windSpeedMul * state.windBoost, dt);
+      advanceDrift(drift, state.windDirX, state.windDirZ, look.windMps * state.windBoost, dt);
       // the lattice repeats every box, so keep the numbers small
       drift.x %= look.boxM;
       drift.z %= look.boxM;

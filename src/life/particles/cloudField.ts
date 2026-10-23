@@ -1,8 +1,8 @@
 // @ts-nocheck — TSL node typings incomplete in three r186
 // src/life/particles/cloudField.ts — a small cloud of life around one place (fireflies, dust motes, shed leaves)
 //
-// The shader is the twin of `cloudMath.ts`. The cloud has a centre, a level 0..1 (the share of its specks shown)
-// and nothing else: where a speck is comes from its seed, the clock and the wind. The mesh is visible from the first
+// The shader is the twin of `cloudMath.ts`. The cloud has a centre, a radius, a level 0..1 (the share of its specks
+// shown) and nothing else: where a speck is comes from its seed, the clock and the wind. The mesh is visible from the first
 // frame (level 0 draws nothing) so no pipeline is compiled late.
 import { type InstancedMesh, Vector3 } from 'three';
 import {
