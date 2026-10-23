@@ -99,6 +99,8 @@ export interface Forest {
   readonly changed: ReadonlySet<number>;
   /** The `n` standing trees nearest a point. */
   nearest: (x: number, z: number, n: number) => number[];
+  /** Fills `out` with the standing trees within `radiusM` of a point, in id order (no sorting, no allocation). */
+  within: (x: number, z: number, radiusM: number, out: number[]) => number[];
   counts: () => ForestCounts;
   serialize: () => ForestState;
   restore: (state: ForestState) => void;
@@ -250,6 +252,16 @@ export function createForest(trees: readonly TreeInfo[], rules: ForestRules = {}
       }
       found.sort((a, b) => a.d - b.d || a.id - b.id);
       return found.slice(0, count).map((f) => f.id);
+    },
+    within: (x, z, radiusM, out) => {
+      out.length = 0;
+      const r2 = radiusM * radiusM;
+      for (let id = 0; id < n; id++) {
+        if (state[id] !== TreeState.Standing) continue;
+        const t = trees[id]!;
+        if ((t.x - x) ** 2 + (t.z - z) ** 2 <= r2) out.push(id);
+      }
+      return out;
     },
     counts: () => {
       let falling = 0;

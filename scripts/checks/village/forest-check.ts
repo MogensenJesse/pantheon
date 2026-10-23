@@ -227,6 +227,17 @@ await check('nearest: the standing trees closest to a point, in order', () => {
   assert.deepEqual(forest.nearest(11, 0, 2), [2, 0]);
 });
 
+await check('within: the standing trees inside a radius, in id order, reusing the list', () => {
+  const forest = createForest(trees);
+  const out: number[] = [99];
+  assert.deepEqual(forest.within(11, 0, 11, out), [0, 1, 2], 'cleared, then filled');
+  assert.equal(forest.within(11, 0, 11, out), out, 'the same list comes back');
+  assert.deepEqual(forest.within(11, 0, 0.5, out), []);
+  forest.uproot(1, []);
+  assert.deepEqual(forest.within(11, 0, 11, out), [0, 2], 'a stump is not a tree');
+  assert.deepEqual(forest.within(0, 0, 10, out), [0], 'the edge counts');
+});
+
 // --- in a real village ---
 
 await check(

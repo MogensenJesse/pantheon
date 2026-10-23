@@ -4,6 +4,7 @@
 import assert from 'node:assert/strict';
 import { PHASE0 } from '../../../src/config/phase0.ts';
 import { VILLAGE } from '../../../src/config/village.ts';
+import type { CarryPose } from '../../../src/hand/carryPose.ts';
 import {
   beliefOf,
   createDeedLedger,
@@ -21,6 +22,7 @@ import {
   pickTarget,
   reachOf,
 } from '../../../src/hand/handRules.ts';
+import { createHandRuntime, type HandPorts } from '../../../src/hand/handRuntime.ts';
 import type { HandCandidate, HandEnergy } from '../../../src/hand/handTypes.ts';
 import {
   Activity,
@@ -29,9 +31,11 @@ import {
   type VillageEvent,
 } from '../../../src/world/village/model/types.ts';
 import { shortages } from '../../../src/world/village/sim/economy.ts';
+import { TreeState, yieldOf } from '../../../src/world/village/sim/forest.ts';
 import type { VillageSim } from '../../../src/world/village/sim/villageSim.ts';
 import { check, finish } from '../lib/check.ts';
 import {
+  convertVillage,
   DAY_S,
   DT,
   dayPhaseAt,
@@ -575,6 +579,345 @@ await check(
       savedHash(plain),
       'a hand that does nothing leaves the sim alone',
     );
+  },
+);
+
+// --- the hand at work ---
+
+/** A hamlet with a hand on it. Every call the hand makes to the view is written to `log`. */
+function handOn(sim: VillageSim, over: Partial<HandPorts> = {}, energy = 100) {
+  const events: VillageEvent[] = [];
+  const log: string[] = [];
+  const poses: CarryPose[] = [];
+  const m = meter(energy);
+  let orb = { x: 0, z: 0 };
+  const ports: HandPorts = {
+    energy: m.energy,
+    orb: () => orb,
+    village: {
+      sim,
+      uprootTree: (id) => sim.uprootTree(id, events),
+      haul: (siteId, wood) => sim.haul(siteId, wood, events),
+      carry: {
+        lift: (id) => {
+          log.push(`lift:${id}`);
+          return true;
+        },
+        pose: (id, pose) => {
+          log.push(`pose:${id}`);
+          poses.push(pose);
+        },
+        release: (id, putBack) => {
+          log.push(`release:${id}:${putBack}`);
+        },
+      },
+    },
+    deeds: {
+      villagers: sim.villagers,
+      addBelief: (i, amount) => sim.addBelief(i, amount, events),
+      notice: sim.notice,
+    },
+    ...over,
+  };
+  const hand = createHandRuntime(ports);
+  const standing = (id: number) => sim.forest.isStanding(id);
+  const treeAt = (id: number) => {
+    const t = sim.forest.info(id);
+    return { x: t.x, z: t.z };
+  };
+  return {
+    sim,
+    hand,
+    log,
+    poses,
+    events,
+    state: m.state,
+    standing,
+    treeAt,
+    moveTo: (at: { x: number; z: number }) => {
+      orb = at;
+    },
+  };
+}
+
+const templeOf = (sim: VillageSim) => sim.buildings.find((b) => b.type === 'temple')!;
+
+await check(
+  'lift: the tree is only held; the sim, the stores and the woodcutters see nothing',
+  () => {
+    const sim = makeSim(map, { mode: 'hamlet' });
+    stepSim(sim, { seconds: 30, phase: () => 0.4 });
+    const w = handOn(sim);
+    const id = sim.forest.nearest(templeOf(sim).x, templeOf(sim).z, 1)[0]!;
+    const forest = JSON.stringify(sim.forest.serialize());
+    const stock = { ...sim.economy.stock };
+    w.moveTo(w.treeAt(id));
+    const r = w.hand.pick();
+    assert.ok(r.ok && r.held.kind === 'tree' && r.held.id === id, JSON.stringify(r));
+    assert.equal(w.state.energy, 100 - costOf('tree'), 'paid at the lift');
+    assert.equal(w.standing(id), true, 'still standing in the sim');
+    assert.equal(JSON.stringify(sim.forest.serialize()), forest, 'the forest is as it was');
+    assert.deepEqual({ ...sim.economy.stock }, stock, 'and so are the stores');
+    assert.deepEqual(w.log, [`lift:${id}`]);
+    assert.equal(w.hand.energyOnHold(), costOf('tree'));
+    assert.equal(w.hand.target(), null, 'nothing to aim at while the hand is full');
+    assert.deepEqual(w.hand.pick(), { ok: false, reason: 'busy' });
+  },
+);
+
+await check(
+  'cancel: the tree goes back, the energy comes back, and ending it twice does nothing',
+  () => {
+    const sim = makeSim(map, { mode: 'hamlet' });
+    const w = handOn(sim);
+    const id = sim.forest.nearest(templeOf(sim).x, templeOf(sim).z, 1)[0]!;
+    w.moveTo(w.treeAt(id));
+    assert.ok(w.hand.pick().ok);
+    assert.equal(w.hand.cancel(), true);
+    assert.equal(w.state.energy, 100, 'refunded');
+    assert.equal(w.standing(id), true);
+    assert.deepEqual(w.log, [`lift:${id}`, `release:${id}:true`], 'the view put the tree back');
+    assert.equal(w.hand.cancel(), false);
+    assert.equal(w.state.energy, 100, 'refunded once');
+    assert.equal(w.hand.energyOnHold(), 0);
+  },
+);
+
+await check(
+  'lift refusals: out of reach, not enough energy, blocked, and a skill-tree reach',
+  () => {
+    const sim = makeSim(map, { mode: 'hamlet' });
+    const id = sim.forest.nearest(templeOf(sim).x, templeOf(sim).z, 1)[0]!;
+    const tree = { x: sim.forest.info(id).x, z: sim.forest.info(id).z };
+    const out = { x: tree.x + reachOf('tree') + 2, z: tree.z };
+    const far = handOn(sim);
+    far.moveTo(out);
+    assert.deepEqual(far.hand.pick(), { ok: false, reason: 'none' }, 'out of reach');
+    const reaching = handOn(sim, { reachMul: () => 2 });
+    reaching.moveTo(out);
+    assert.ok(reaching.hand.pick().ok, 'a longer reach takes it');
+
+    const tired = handOn(sim, {}, costOf('tree') - 1);
+    tired.moveTo(tree);
+    assert.deepEqual(tired.hand.pick(), { ok: false, reason: 'energy' });
+    assert.equal(tired.state.energy, costOf('tree') - 1, 'nothing spent');
+    assert.deepEqual(tired.log, [], 'and nothing lifted');
+
+    const cheap = handOn(sim, { costMul: () => 0.5 }, costOf('tree') * 0.5);
+    cheap.moveTo(tree);
+    assert.ok(cheap.hand.pick().ok, 'a cheaper grip (the skill tree)');
+    assert.equal(cheap.state.energy, 0);
+
+    const blocked = handOn(sim, { blocked: () => true });
+    blocked.moveTo(tree);
+    assert.deepEqual(blocked.hand.pick(), { ok: false, reason: 'blocked' });
+    assert.equal(blocked.hand.target(), null);
+  },
+);
+
+await check(
+  'drop at the temple: the tree is uprooted, its wood joins the store, the village sees it',
+  () => {
+    const sim = makeSim(map, { mode: 'hamlet' });
+    stepSim(sim, { seconds: 30, phase: () => 0.4 });
+    const w = handOn(sim);
+    const temple = templeOf(sim);
+    const id = sim.forest.nearest(temple.x, temple.z, 1)[0]!;
+    const wood = yieldOf(sim.forest.info(id));
+    const before = sim.economy.stock.wood;
+    w.moveTo(w.treeAt(id));
+    assert.ok(w.hand.pick().ok);
+    assert.deepEqual(w.hand.zone({ x: 0, z: 0 }), { zone: 'none' });
+    w.moveTo(temple);
+    const r = w.hand.drop();
+    assert.ok(r.kind === 'delivered', r.kind);
+    assert.equal(w.standing(id), false, 'uprooted');
+    assert.equal(sim.forest.state(id), TreeState.Stump);
+    assert.deepEqual(r.delivery.zone, 'store');
+    assert.equal(r.delivery.amount, wood);
+    assert.equal(r.delivery.kept, Math.min(wood, sim.economy.caps().wood - before));
+    assert.equal(sim.economy.stock.wood, before + r.delivery.kept);
+    assert.ok(w.events.some((e) => e.kind === 'treeUprooted' && e.tree === id));
+    assert.equal(w.log.at(-1), `release:${id}:false`, 'the sim’s own events finish the picture');
+    assert.equal(w.state.energy, 100 - costOf('tree'), 'the energy stays spent');
+    assert.equal(w.hand.held(), null);
+    assert.ok(r.delivery.impressed > 0, 'the idlers at the temple saw it');
+    assert.deepEqual(w.hand.drop(), { kind: 'empty' });
+  },
+);
+
+await check('drop outside any zone: the tree goes back and the energy is lost', () => {
+  const sim = makeSim(map, { mode: 'hamlet' });
+  const w = handOn(sim);
+  const id = sim.forest.nearest(templeOf(sim).x, templeOf(sim).z, 1)[0]!;
+  w.moveTo(w.treeAt(id));
+  assert.ok(w.hand.pick().ok);
+  const stock = { ...sim.economy.stock };
+  assert.deepEqual(w.hand.drop({ x: -9999, z: -9999 }), { kind: 'released' });
+  assert.equal(w.standing(id), true);
+  assert.equal(w.state.energy, 100 - costOf('tree'), 'forfeited');
+  assert.deepEqual({ ...sim.economy.stock }, stock);
+  assert.deepEqual(w.log, [`lift:${id}`, `release:${id}:true`]);
+});
+
+await check(
+  'drop on a site: the wood is work for the builders and the stores are untouched',
+  () => {
+    const sim = convertVillage(makeSim(map, { mode: 'hamlet' }));
+    const opened: Building[] = [];
+    stepSim(sim, {
+      seconds: 3600,
+      onStep: () => {
+        const b = sim.buildings.find((x) => x.stage < 2);
+        if (b) opened.push(b);
+        return opened.length === 0;
+      },
+    });
+    const site = opened[0];
+    assert.ok(site, 'a site opened');
+    const w = handOn(sim);
+    const id = sim.forest.nearest(site.x, site.z, 1)[0]!;
+    w.moveTo(w.treeAt(id));
+    assert.ok(w.hand.pick().ok);
+    const stock = { ...sim.economy.stock };
+    const progress = site.progress;
+    const stage = site.stage;
+    w.moveTo(site);
+    const r = w.hand.drop();
+    assert.ok(r.kind === 'delivered' && r.delivery.zone === 'site', JSON.stringify(r));
+    assert.deepEqual({ ...sim.economy.stock }, stock, 'a site takes work, not stock');
+    const worked = r.delivery.amount * H.WORK_PER_WOOD_S;
+    assert.ok(
+      site.stage > stage || Math.abs(site.progress - progress - worked) < 1e-6,
+      `${site.progress - progress} of ${worked}`,
+    );
+    assert.equal(r.delivery.kept, r.delivery.amount);
+  },
+);
+
+await check('a full store still takes the tree and still counts as a deed', () => {
+  const sim = makeSim(map, { mode: 'hamlet' });
+  stepSim(sim, { seconds: 30, phase: () => 0.4 });
+  sim.economy.addWood(Number.POSITIVE_INFINITY);
+  const full = sim.economy.stock.wood;
+  const w = handOn(sim);
+  const temple = templeOf(sim);
+  const id = sim.forest.nearest(temple.x, temple.z, 1)[0]!;
+  w.moveTo(w.treeAt(id));
+  assert.ok(w.hand.pick().ok);
+  w.moveTo(temple);
+  const r = w.hand.drop();
+  assert.ok(r.kind === 'delivered', r.kind);
+  assert.equal(r.delivery.kept, 0, 'no room');
+  assert.equal(sim.economy.stock.wood, full);
+  assert.equal(w.standing(id), false, 'the tree is still uprooted');
+  assert.ok(r.delivery.impressed > 0, 'and the village is still impressed');
+});
+
+await check(
+  'a woodcutter fells the held tree, or the hand is blocked: the hold ends and the energy returns',
+  () => {
+    const sim = makeSim(map, { mode: 'hamlet' });
+    const temple = templeOf(sim);
+    const id = sim.forest.nearest(temple.x, temple.z, 1)[0]!;
+    const w = handOn(sim);
+    w.moveTo(w.treeAt(id));
+    assert.ok(w.hand.pick().ok);
+    assert.equal(w.hand.update(DT), null, 'nothing wrong yet');
+    sim.forest.fell(id, 1, 0, []);
+    assert.equal(w.hand.update(DT), 'gone');
+    assert.equal(w.hand.held(), null);
+    assert.equal(w.state.energy, 100, 'refunded');
+    assert.equal(w.log.at(-1), `release:${id}:true`);
+
+    let blocked = false;
+    const b = handOn(sim, { blocked: () => blocked });
+    const id2 = sim.forest.nearest(temple.x, temple.z, 1)[0]!;
+    b.moveTo(b.treeAt(id2));
+    assert.ok(b.hand.pick().ok);
+    blocked = true;
+    assert.equal(b.hand.update(DT), 'blocked');
+    assert.equal(b.state.energy, 100);
+    assert.equal(b.standing(id2), true);
+  },
+);
+
+await check(
+  'aim: the ring finds the nearest tree a few times a second, and none while one is held',
+  () => {
+    const sim = makeSim(map, { mode: 'hamlet' });
+    const id = sim.forest.nearest(templeOf(sim).x, templeOf(sim).z, 1)[0]!;
+    const w = handOn(sim);
+    assert.equal(w.hand.target(), null, 'not looked yet');
+    w.moveTo(w.treeAt(id));
+    w.hand.update(0.2);
+    assert.equal(w.hand.target()?.id, id);
+    w.moveTo({ x: -9999, z: -9999 });
+    w.hand.update(0.05);
+    assert.equal(w.hand.target()?.id, id, 'between looks it keeps the last answer');
+    w.hand.update(0.1);
+    assert.equal(w.hand.target(), null);
+  },
+);
+
+await check(
+  'carrying: the tree is posed on the orb each frame while held, trailing its heading',
+  () => {
+    const sim = makeSim(map, { mode: 'hamlet' });
+    const id = sim.forest.nearest(templeOf(sim).x, templeOf(sim).z, 1)[0]!;
+    const w = handOn(sim);
+    w.hand.frame(0.016, { x: 0, y: 2, z: 0 });
+    assert.deepEqual(w.log, [], 'nothing is posed while nothing is held');
+    w.moveTo(w.treeAt(id));
+    assert.ok(w.hand.pick().ok);
+    w.hand.frame(0.016, { x: 0, y: 2, z: 0 });
+    for (let k = 1; k <= 20; k++) w.hand.frame(0.1, { x: k * 0.5, y: 2, z: 0 });
+    assert.equal(w.poses.length, 21);
+    const last = w.poses.at(-1)!;
+    assert.ok(
+      Math.abs(last.yaw - Math.PI / 2) < 0.05,
+      `heading ${last.yaw} follows the way it moves`,
+    );
+    assert.equal(last.y, 2 - H.CARRY.HANG_M, 'the root hangs just under the orb');
+    assert.equal(last.x, 10);
+    assert.equal(last.tilt, H.CARRY.TILT_RAD);
+    assert.equal(last.scale, H.CARRY.TREE_SCALE);
+    for (let k = 0; k < 10; k++) w.hand.frame(0.1, { x: 10, y: 2, z: 0 });
+    assert.equal(w.poses.at(-1)!.yaw, last.yaw, 'a hovering orb does not spin its tree');
+    w.hand.cancel();
+    w.hand.frame(0.1, { x: 10, y: 2, z: 0 });
+    assert.equal(w.poses.length, 31, 'and nothing is posed once it is put back');
+  },
+);
+
+await check(
+  'the hand and the sim: a lift and cancel leave the world byte for byte, a delivery changes it once',
+  () => {
+    const run = (script: (w: ReturnType<typeof handOn>) => void) => {
+      const sim = makeSim(map, { mode: 'hamlet' });
+      stepSim(sim, { seconds: 30, phase: () => 0.4 });
+      script(handOn(sim));
+      return JSON.stringify({
+        forest: sim.forest.serialize(),
+        economy: sim.economy.stock,
+      });
+    };
+    const idle = run(() => {});
+    const lifted = run((w) => {
+      const t = templeOf(w.sim);
+      w.moveTo(w.treeAt(w.sim.forest.nearest(t.x, t.z, 1)[0]!));
+      w.hand.pick();
+      w.hand.cancel();
+    });
+    assert.equal(lifted, idle, 'a lift that was cancelled leaves trees and stores as they were');
+    const delivered = run((w) => {
+      const t = templeOf(w.sim);
+      w.moveTo(w.treeAt(w.sim.forest.nearest(t.x, t.z, 1)[0]!));
+      w.hand.pick();
+      w.moveTo(t);
+      w.hand.drop();
+    });
+    assert.notEqual(delivered, idle, 'a delivery does change them');
   },
 );
 

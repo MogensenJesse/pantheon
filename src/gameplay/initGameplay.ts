@@ -14,6 +14,7 @@ import { initBuilderRuntime } from '../abilities/builderRuntime';
 import type { CastResult } from '../abilities/caster';
 import { createPowers, type Powers } from '../abilities/powers';
 import { PHASE0 } from '../config/phase0';
+import { VILLAGE } from '../config/village';
 import type { CameraInputContext } from '../core/CameraInput';
 import { bus } from '../core/EventBus';
 import { energyMeter } from '../core/energy';
@@ -24,6 +25,7 @@ import { createLandmarkLights, type LandmarkLights } from '../entities/landmark/
 import type { PlayerControllerContext } from '../entities/PlayerController';
 import { createShrineZones, type ShrineZones } from '../entities/shrine/shrineZones';
 import { createFinaleCutscene } from '../finale/cutscene';
+import { createHandRuntime, type HandRuntime } from '../hand/handRuntime';
 import type { LandmarkRuntime } from '../landmarks/landmarkRuntime';
 import { type AmbientLife, createAmbientLife } from '../life/places/ambientLife';
 import type { PlaceLife } from '../life/places/placeLife';
@@ -35,6 +37,7 @@ import { initQuest, type QuestRuntime } from '../quests/questRuntime';
 import type { Cinematic } from '../rendering/cinematic';
 import type { SkillRuntime } from '../skills/skillRuntime';
 import { initAbilityUi } from '../ui/abilities';
+import { type HandUi, initHandUi } from '../ui/hand/handUi';
 import { initPowerOverlay } from '../ui/overlay';
 import { initQuestUi } from '../ui/quests';
 import { initSkillUi } from '../ui/skills';
@@ -74,12 +77,17 @@ export interface GameplayDeps {
   /** Plays the last night's scripted view, and the overview is closed for it. */
   cinematic: Cinematic;
   closeOverview: () => void;
+  /** The village overview is open (it owns the orb, so the roam hand rests). */
+  overviewActive: () => boolean;
 }
 
 export interface Gameplay {
   /** The conversion quest; null in a village that has none (a DEV sandbox village) or without one. */
   quest: QuestRuntime | null;
   powers: Powers | null;
+  /** The orb's hand; null without a village. */
+  handRuntime: HandRuntime | null;
+  hand: HandUi | null;
   landmarks: LandmarkRuntime;
   /** Starts and finishes the restoration of the places of power. */
   restoration: RestorationRuntime;
@@ -116,6 +124,8 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
   // The quests are the hamlet's way to a converted village (a sandbox village has none).
   const hamlet = !!village && village.sim.mode === 'hamlet';
   const nameReturned = () => quest?.isDone(FINALE_QUEST.id) ?? false;
+  // The hand is built below, after the quest it asks about the elder; the finale sets down what it holds.
+  let hand: HandUi | null = null;
   // The last night: a beam from each place, the rune over the temple and the cutscene that lights them.
   const temple = village ? templeOf(village.sim.buildings) : undefined;
   const finale =
@@ -149,7 +159,11 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
             allRestored: () =>
               landmarks.places.length > 0 && landmarks.restoredCount() >= landmarks.places.length,
           },
-          playFinale: (done) => (finale ? finale.play(done) : done()),
+          playFinale: (done) => {
+            hand?.cancel();
+            if (finale) finale.play(done);
+            else done();
+          },
         })
       : null;
   const restoration = initRestoration({ landmarks, village, orbPlace });
@@ -180,10 +194,45 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
         energyMeter,
       )
     : null;
+  // The hand lifts and puts down; villagers believe because they see it done.
+  const handRuntime = village
+    ? createHandRuntime({
+        energy: energyMeter,
+        orb: orbPlace,
+        village,
+        deeds: {
+          villagers: village.sim.villagers,
+          addBelief: village.addBelief,
+          notice: village.notice,
+          canBelieve: (i) => quest?.canBelieve(i) ?? true,
+        },
+        blocked: () => deps.cinematic.isPlaying() || deps.overviewActive(),
+      })
+    : null;
+  const burstOrigin = new Vector3();
+  hand = handRuntime
+    ? initHandUi({
+        runtime: handRuntime,
+        camera: deps.camera,
+        groundY: (x, z) => terrain.getWorldY(x, z),
+        enabled: () => skills.isOpen() && !deps.overviewActive() && !deps.cinematic.isPlaying(),
+        orbPlace,
+        onDelivered: (delivery) => {
+          bus.emit('hand:delivered', delivery);
+          burstOrigin.set(
+            player.position.x,
+            player.position.y + VILLAGE.HAND.BURST_HEIGHT_M,
+            player.position.z,
+          );
+          orbSystem.burstAt(burstOrigin, player.position);
+        },
+      })
+    : null;
   // A villager who dies leaves the pool and the last one takes their slot: a channel follows or ends.
-  const offVillagerDied = bus.on('village:villagerDied', ({ villager, moved }) =>
-    powers?.murmur.villagerRemoved(villager, moved),
-  );
+  const offVillagerDied = bus.on('village:villagerDied', ({ villager, moved }) => {
+    powers?.murmur.villagerRemoved(villager, moved);
+    handRuntime?.villagerRemoved(villager, moved);
+  });
   const signOrigin = new Vector3();
   // The arch II powers act on the village and the weather, paid in the village's faith.
   const builder = initBuilderRuntime({
@@ -296,6 +345,8 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
   return {
     quest,
     powers,
+    handRuntime,
+    hand,
     landmarks,
     restoration,
     landmarkLights,
@@ -309,6 +360,7 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
     playCutscene: finale ? finale.play : null,
     update: (dt) => {
       abilities.update(dt);
+      hand?.update(dt);
       if (village && powers) powers.update(dt, orbPlace(), village.dayPhase());
       quest?.update(dt);
       syncVillageSkills(dt);
@@ -321,6 +373,7 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
       shrineZones.update(zoneClock, energyRegen.inActiveZone());
     },
     dispose: () => {
+      hand?.dispose();
       restoration.dispose();
       offVillagerDied();
       skillUi();

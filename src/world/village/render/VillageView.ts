@@ -19,7 +19,7 @@ import type { VillageSim } from '../sim/villageSim';
 import { createBuildingRenderer } from './buildingRenderer';
 import { createCrownOrbs } from './crownOrb';
 import { createDressingRenderer } from './dressingRenderer';
-import { createForestView } from './forestView';
+import { type CarriedPose, createForestView } from './forestView';
 import { smokeStrength, windowsLit } from './lightSchedule';
 import { createShadowInvalidationBatcher } from './shadowInvalidationBatcher';
 import { createSmokeRenderer } from './smokeRenderer';
@@ -76,6 +76,10 @@ export interface VillageView {
   treeStump: (tree: number) => void;
   treeSapling: (tree: number) => void;
   treeGrown: (tree: number) => void;
+  /** The hand holds a tree (see `ForestView.lift`): view only, the sim's events decide what is left behind. */
+  liftTree: (tree: number) => boolean;
+  poseCarried: (tree: number, pose: CarriedPose) => void;
+  releaseCarried: (tree: number, putBack: boolean) => void;
   /** A grave appeared in the graveyard. */
   graveAdded: (grave: Grave) => void;
   frame: (frame: VillageFrame) => void;
@@ -259,6 +263,9 @@ export function createVillageView(options: VillageViewOptions): VillageView {
     fieldStarted,
     treeFelled: forestView.felled,
     treeUprooted: forestView.uprooted,
+    liftTree: forestView.lift,
+    poseCarried: forestView.pose,
+    releaseCarried: forestView.release,
     treeStump: forestView.stump,
     treeSapling: forestView.sapling,
     treeGrown: forestView.grown,

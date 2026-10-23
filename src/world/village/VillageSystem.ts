@@ -19,6 +19,7 @@ import type { VillageBuildingType } from './model/assetKeys';
 import { templeOf } from './model/buildings';
 import { makeVillageSeed, type VillageSeed } from './model/seed';
 import type { VillageEvent } from './model/types';
+import type { CarriedPose } from './render/forestView';
 import { createVillageView } from './render/VillageView';
 import type { LineupFigure } from './render/villagerRenderer';
 import type { BlessKind } from './sim/blessings';
@@ -113,6 +114,16 @@ export interface VillageSystemContext {
   uprootTree: (id: number) => number;
   takeHarvest: (fieldId: number) => number;
   haul: (siteId: number, wood: number) => number;
+  /**
+   * What the hand shows while it holds a tree: view only, the sim keeps the tree standing until `uprootTree`.
+   * `lift` hides the tree and shows a stump (false when it cannot be lifted); `pose` hangs the small copy from
+   * the orb; `release` ends it, putting the tree back when asked.
+   */
+  carry: {
+    lift: (tree: number) => boolean;
+    pose: (tree: number, pose: CarriedPose) => void;
+    release: (tree: number, putBack: boolean) => void;
+  };
   /** Begins the next upgrade of a finished building (the overview panel's button); says why not when it cannot. */
   upgrade: (id: number) => UpgradeStart;
   /** Why the player's plot of this type cannot be marked at (x, z) facing `rotY`, or 'ok' (nothing is spent). */
@@ -356,6 +367,11 @@ export async function initVillageSystem(
       return wood;
     },
     takeHarvest: sim.takeHarvest,
+    carry: {
+      lift: (tree) => view.liftTree(tree),
+      pose: (tree, pose) => view.poseCarried(tree, pose),
+      release: (tree, putBack) => view.releaseCarried(tree, putBack),
+    },
     haul: (siteId, wood) => {
       const seconds = sim.haul(siteId, wood, events);
       applyEvents();

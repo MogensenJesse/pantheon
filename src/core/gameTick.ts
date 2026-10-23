@@ -93,8 +93,13 @@ export interface FrameClocks {
   windClock: number;
 }
 
+/** Runs every drawn frame with the orb as it is drawn (the overview's cursor included). */
+export type RenderHook = (frameDelta: number, orb: Vector3) => void;
+
 export interface FrameTick {
   fixedUpdate: (dt: number) => void;
+  /** Adds a hook that runs right after the life of the world and before the village is drawn; returns its remover. */
+  addRenderHook: (hook: RenderHook) => () => void;
   render: (alpha: number, frameDelta: number) => Promise<void>;
   getElapsed: () => number;
   getClocks: () => FrameClocks;
@@ -135,6 +140,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
   let windClock = ctx.initialClocks?.windClock ?? 0;
 
   const visualPlayerPos = new Vector3().copy(player.position);
+  const renderHooks: RenderHook[] = [];
 
   const visualCameraAnchor = new Vector3().copy(player.cameraAnchor);
   /** Where the world's detail centres: the orb, or the overview's view of the village. */
@@ -195,6 +201,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     const sunElevationDeg = currentSunElevationDeg();
     ambienceView.update(frameDelta, windClock, elapsed, sunElevationDeg);
     life.update(frameDelta, visualPlayerPos);
+    for (const hook of renderHooks) hook(frameDelta, visualPlayerPos);
     // Always push sun/ambient/daylight from the active sample so DEV ToD overrides
     // (and orb night lift) take effect even while day-cycle scrub is frozen.
     applyWorldLightingFromElevation(sunElevationDeg, sun, lightingOpts.ambientLight, skySystem);
@@ -290,6 +297,13 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
 
   return {
     fixedUpdate,
+    addRenderHook: (hook) => {
+      renderHooks.push(hook);
+      return () => {
+        const i = renderHooks.indexOf(hook);
+        if (i >= 0) renderHooks.splice(i, 1);
+      };
+    },
     render,
     getElapsed: () => elapsed,
     getClocks: () => ({ elapsed, windClock }),

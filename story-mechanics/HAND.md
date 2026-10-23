@@ -1,6 +1,6 @@
 # The hand: uproot, lift, drop (design)
 
-Status: designed, being built in milestones H0 to H7 (this page is H0). Built so far: the sim inputs (H1) and the pure core in `src/hand/` with `check:hand` (H2a). Every number is a placeholder, tuned after a playtest. The village, belief and the conversion quest it changes are in `docs/village/` and `QUESTS.md`; where this page disagrees with the code, the code wins until the milestone that changes it has landed.
+Status: designed, being built in milestones H0 to H7 (this page is H0). Built so far: the sim inputs (H1), the pure core in `src/hand/` with `check:hand` (H2a), and the roam hand with trees: the **F** key, the carried tree, deeds that win belief, and the DEV hook `window.__pantheonHand` (H2b; the old powers are still in the game until H3b). Every number is a placeholder, tuned after a playtest. The village, belief and the conversion quest it changes are in `docs/village/` and `QUESTS.md`; where this page disagrees with the code, the code wins until the milestone that changes it has landed.
 
 ## The idea
 

@@ -609,7 +609,10 @@ async function main(): Promise<void> {
     savedQuests: boot?.profile.quests,
     cinematic,
     closeOverview: () => overview.setActive(false, true),
+    overviewActive: overview.isActive,
   });
+  // The hand carries its tree with the orb as it is drawn.
+  const offHandHook = gameplay.hand ? frameTick.addRenderHook(gameplay.hand.frame) : () => {};
   // The arch II powers are cast from the overview with the orb as the cursor.
   const overviewPowers = overviewUi
     ? createOverviewPowers({
@@ -647,6 +650,7 @@ async function main(): Promise<void> {
     }),
     clocks: frameTick.getClocks,
     village,
+    energyOnHold: () => gameplay.handRuntime?.energyOnHold() ?? 0,
     canPause: () => !overview.isActive(),
   });
   if (import.meta.env.DEV) {
@@ -709,6 +713,7 @@ async function main(): Promise<void> {
     overviewPlots?.dispose();
     overviewUi?.dispose();
     overview.dispose();
+    offHandHook();
     gameplay.dispose();
     disposeProgression();
     disposeLandmarkBoons();

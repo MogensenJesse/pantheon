@@ -51,6 +51,8 @@ export interface SavingDeps {
   powers: () => PowersState;
   clocks: () => FrameClocks;
   village: VillageSystemContext | null;
+  /** Energy the orb's hand has paid for something it still holds: a save counts it as unspent, since the world still has the thing. */
+  energyOnHold?: () => number;
   /** False while something owns the mouse and the lock is released on purpose (the village overview). */
   canPause?: () => boolean;
 }
@@ -66,9 +68,14 @@ export interface Saving {
 
 export function setupSaving(deps: SavingDeps): Saving {
   const playClock = createPlayClock(deps.playSecondsAtStart);
+  /** The game state as it is saved: what the hand holds has not changed the world yet, so its energy is not spent. */
+  const heldCounted = () => {
+    const held = deps.energyOnHold?.() ?? 0;
+    return held > 0 ? { ...state, energy: Math.min(state.energyCap, state.energy + held) } : state;
+  };
   const capture = () =>
     captureGame({
-      game: state,
+      game: heldCounted(),
       dayCycle: deps.dayCycle,
       player: deps.player,
       camera: deps.lookInput,

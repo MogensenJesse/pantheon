@@ -3,6 +3,8 @@
 // Loaded with a dynamic import under `import.meta.env.DEV`, so none of it ships. Returns one teardown.
 
 import type { DirectionalLight, Vector3 } from 'three';
+import { setEnergy } from '../../core/energy';
+import { state } from '../../core/state/gameState';
 import type { OrbSystemContext } from '../../entities/energyOrb/orbSystem';
 import type { Gameplay } from '../../gameplay/initGameplay';
 import type { Saving } from '../../gameplay/setupSaving';
@@ -16,6 +18,7 @@ import type { VillageSystemContext } from '../../world/village/VillageSystem';
 import { forceRain } from '../../world/village/villageDevState';
 import type { Weather } from '../../world/weather/weather';
 import { installDevHook } from './devHook';
+import { initHandProbe } from './handProbe';
 import { initLandmarkProbe } from './landmarkProbe';
 import { initLifeProbe } from './lifeProbe';
 import { initOrbProbe } from './orbProbe';
@@ -123,6 +126,22 @@ export function installProbes(src: ProbeSources): () => void {
   );
   if (village) {
     disposers.push(initVillageProbe(village));
+    if (gameplay.handRuntime && gameplay.hand) {
+      disposers.push(
+        initHandProbe({
+          runtime: gameplay.handRuntime,
+          ui: gameplay.hand,
+          sim: village.sim,
+          teleport: (x, z) => {
+            src.playerPosition.x = x;
+            src.playerPosition.z = z;
+          },
+          orbPlace: gameplay.orbPlace,
+          energy: () => state.energy,
+          setEnergy,
+        }),
+      );
+    }
     if (gameplay.powers) {
       disposers.push(
         initPowersProbe({

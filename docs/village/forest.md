@@ -9,6 +9,7 @@ Pure sim in `src/world/village/sim/forest.ts`; numbers in `VILLAGE.FOREST` (`src
 - **All trees can be felled**, near or far from the temple (the player is nudged to regrow the forest). Only the non-standing trees are stored (`changed`, updated in id order so a restored forest continues exactly); partial chopping is kept (`chopIds`/`chopSeconds`).
 - `workSpots` tree spots carry `tree`; `agentTargets.claimSpot` skips trees that are down or already claimed (one woodcutter per tree); `agents.act()` calls `onChop(tree, dt, dirX, dirZ)`; `villageSim.onChop` adds the wood to the store and **chops nothing while the wood store is full**.
 - Reach: the village's woodcutters and the DEV fell fell trees; the hand (`story-mechanics/HAND.md`) uproots one with `forest.uproot` (below). Blessing on a tree only speeds the chopping.
+- **Aim** (`forest.within(x, z, radiusM, out)`): the standing trees within a radius, from the spatial grid, without sorting the whole forest; the hand uses it to find what is in reach of the orb.
 - **Uproot** (`forest.uproot(id, events)`, `VillageSim.uprootTree`): a `Standing` tree goes straight to `Stump` (no `Falling`), partial chopping is dropped, `treeUprooted` is pushed and the tree's yield (`yieldOf` plus `woodAdd`) is returned; anything else returns 0. It regrows like a felled tree. The sim does not credit the stock: the caller (the hand, at delivery) does. `forest.fell` and `chop` do nothing to a stump, and a woodcutter whose tree was uprooted is released like one whose tree was felled by someone else.
 
 ## Events
