@@ -2,7 +2,6 @@
 // (pure: no DOM, node-runnable)
 
 import { VILLAGE } from '../../../config/village.ts';
-import type { ModifierKey, Modifiers } from '../../../skills/modifiers.ts';
 import type { VillageBuildingType } from './assetKeys.ts';
 import type { Building } from './types.ts';
 
@@ -17,17 +16,23 @@ export const PLOT_TYPES: readonly VillageBuildingType[] = [
   'shrine',
 ];
 
+/** The switch modifiers (`skills/modifiers.ts`) that open a plot type: above 0 once the skill tree grants it. */
+type PlotSwitch = 'plotFarmstead' | 'plotShrine';
+
 /**
  * The building types the skill tree opens for plots, and the switch modifier that opens each. A type not named
  * here is open to everyone.
  */
-export const PLOT_UNLOCKS: Readonly<Partial<Record<VillageBuildingType, ModifierKey>>> = {
+export const PLOT_UNLOCKS: Readonly<Partial<Record<VillageBuildingType, PlotSwitch>>> = {
   farmstead: 'plotFarmstead',
   shrine: 'plotShrine',
 };
 
-/** Whether the player may mark a plot of this type yet. */
-export const plotTypeOpen = (type: VillageBuildingType, mods: Modifiers): boolean => {
+/** Whether the player may mark a plot of this type yet (`mods` is the skill tree's modifiers). */
+export const plotTypeOpen = (
+  type: VillageBuildingType,
+  mods: Readonly<Record<PlotSwitch, number>>,
+): boolean => {
   const key = PLOT_UNLOCKS[type];
   return key === undefined || mods[key] > 0;
 };

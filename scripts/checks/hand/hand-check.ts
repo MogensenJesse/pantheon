@@ -4,7 +4,8 @@
 import assert from 'node:assert/strict';
 import { PHASE0 } from '../../../src/config/phase0.ts';
 import { VILLAGE } from '../../../src/config/village.ts';
-import type { CarryPose } from '../../../src/hand/carryPose.ts';
+import { hand } from '../../../src/config/visual/hand.ts';
+import { insideFootprint } from '../../../src/core/math/geom.ts';
 import {
   beliefOf,
   createDeedLedger,
@@ -16,7 +17,6 @@ import {
   costOf,
   createHand,
   distanceTo,
-  insideBuilding,
   isRipe,
   meetsNeed,
   pickTarget,
@@ -46,6 +46,7 @@ import {
   isDusk,
 } from '../../../src/quests/content/conversion.ts';
 import { newQuestState, type QuestEvent, stepQuest } from '../../../src/quests/quest.ts';
+import type { CarriedPose } from '../../../src/world/village/model/carried.ts';
 import {
   Activity,
   type Building,
@@ -71,6 +72,7 @@ import {
 } from '../lib/villageHeadless.ts';
 
 const H = VILLAGE.HAND;
+const CARRY = hand.CARRY;
 const D = H.DEED;
 const map = loadMap('island-mountain');
 
@@ -198,8 +200,13 @@ await check('drop zones: wood to a store or, better, to a site; food only to a s
 
 await check('drop zones: the margin, houses, unfinished stores and the nearest of several', () => {
   const margin = H.ZONE_MARGIN_M;
-  assert.equal(insideBuilding(site, { x: 20 + site.halfW + margin - 0.01, z: 0 }, margin), true);
-  assert.equal(insideBuilding(site, { x: 20 + site.halfW + margin + 0.01, z: 0 }, margin), false);
+  assert.equal(insideFootprint(site, 20 + site.halfW + margin - 0.01, 0, margin), true);
+  assert.equal(insideFootprint(site, 20 + site.halfW + margin + 0.01, 0, margin), false);
+  // The same test as the animals' and the overview's, so one turned frame answers for all three.
+  const frame = { x: 10, z: 10, rotY: Math.PI / 2, halfW: 6, halfD: 1 };
+  assert.equal(insideFootprint(frame, 10, 15), true, 'its long side now runs along z');
+  assert.equal(insideFootprint(frame, 15, 10), false, 'and it is 2 m wide in x');
+  assert.equal(insideFootprint(frame, 15, 10, 4.5), true, 'a margin grows it on every side');
   assert.equal(classifyDrop('wood', { x: 40, z: 0 }, all).zone, 'none', 'a house is not a store');
   const unbuilt = building({ id: 6, type: 'granary', x: 60, stage: 1 });
   assert.equal(
@@ -730,7 +737,7 @@ await check(
 function handOn(sim: VillageSim, over: Partial<HandPorts> = {}, energy = 100) {
   const events: VillageEvent[] = [];
   const log: string[] = [];
-  const poses: CarryPose[] = [];
+  const poses: CarriedPose[] = [];
   const m = meter(energy);
   let orb = { x: 0, z: 0 };
   const ports: HandPorts = {
@@ -1083,10 +1090,10 @@ await check(
       Math.abs(last.yaw - Math.PI / 2) < 0.05,
       `heading ${last.yaw} follows the way it moves`,
     );
-    assert.equal(last.y, 2 - H.CARRY.HANG_M, 'the root hangs just under the orb');
+    assert.equal(last.y, 2 - CARRY.HANG_M, 'the root hangs just under the orb');
     assert.equal(last.x, 10);
-    assert.equal(last.tilt, H.CARRY.TILT_RAD);
-    assert.equal(last.scale, H.CARRY.TREE_SCALE);
+    assert.equal(last.tilt, CARRY.TILT_RAD);
+    assert.equal(last.scale, CARRY.TREE_SCALE);
     for (let k = 0; k < 10; k++) w.hand.frame(0.1, { x: 10, y: 2, z: 0 });
     assert.equal(w.poses.at(-1)!.yaw, last.yaw, 'a hovering orb does not spin its tree');
     w.hand.cancel();
@@ -1177,9 +1184,9 @@ await check(
     assert.equal(w.hand.target(), null);
     w.hand.frame(0.016, { x: f.x, y: 2, z: f.z });
     const pose = w.poses.at(-1)!;
-    assert.equal(pose.scale, H.CARRY.SHEAF_SCALE);
+    assert.equal(pose.scale, CARRY.SHEAF_SCALE);
     assert.equal(pose.tilt, 0, 'a sheaf hangs level');
-    assert.equal(pose.y, 2 - H.CARRY.SHEAF_DROP_M);
+    assert.equal(pose.y, 2 - CARRY.SHEAF_DROP_M);
     assert.equal(w.log.at(-1), `pose:wheat:${f.id}`);
   },
 );
@@ -1321,7 +1328,7 @@ await check('sheep: the nearest in reach is lifted, held out of the flock and co
   assert.equal(headcount(farm.flock), 4);
   assert.deepEqual(w.log, [], 'the village view is not asked to show a sheep');
   w.hand.frame(0.016, { x: sheep.x, y: 3, z: sheep.z });
-  assert.deepEqual(farm.log, [`pose:${H.CARRY.SHEEP_SCALE}:${3 - H.CARRY.SHEEP_DROP_M}`]);
+  assert.deepEqual(farm.log, [`pose:${CARRY.SHEEP_SCALE}:${3 - CARRY.SHEEP_DROP_M}`]);
   assert.equal(w.hand.cancel(), true);
   assert.equal(farm.flock.animals.length, 4, 'back in the flock');
   assert.equal(w.state.energy, 100);

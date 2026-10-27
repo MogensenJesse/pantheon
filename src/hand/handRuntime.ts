@@ -6,9 +6,10 @@
 // site, and pays the witnesses. Any other end of a hold (`cancel`) leaves the world as it was.
 
 import { VILLAGE } from '../config/village.ts';
+import type { CarriedKind, CarriedPose } from '../world/village/model/carried.ts';
 import type { Building, Field, RemoteSite } from '../world/village/model/types.ts';
 import { type Stock, shortages } from '../world/village/sim/economy.ts';
-import { type CarryPose, carryPoseOf, createCarryHeading } from './carryPose.ts';
+import { carryPoseOf, createCarryHeading } from './carryPose.ts';
 import { createDeedLedger, type DeedLedger, type DeedWorld } from './deeds.ts';
 import {
   classifyDrop,
@@ -27,7 +28,6 @@ import {
   type HandEnergy,
   type Held,
   type Place,
-  type VillageKind,
 } from './handTypes.ts';
 
 const H = VILLAGE.HAND;
@@ -38,10 +38,10 @@ const AIM_EVERY_S = 0.1;
 /** What the hand shows while it holds a tree or a sheaf of wheat (view only). */
 export interface HandCarry {
   /** A tree is hidden and a stump shown, a sheaf is drawn at the orb; false when it cannot be lifted. */
-  lift: (what: VillageKind, id: number) => boolean;
-  pose: (what: VillageKind, id: number, pose: CarryPose) => void;
+  lift: (what: CarriedKind, id: number) => boolean;
+  pose: (what: CarriedKind, id: number, pose: CarriedPose) => void;
   /** Ends the hold. `putBack` restores a tree; otherwise the village's own events carry on from here. */
-  release: (what: VillageKind, id: number, putBack: boolean) => void;
+  release: (what: CarriedKind, id: number, putBack: boolean) => void;
 }
 
 /** The village as the hand reaches it; a `VillageSystemContext` fits. */
@@ -87,7 +87,7 @@ export interface HandAnimals {
   ) => { id: number; x: number; z: number }[];
   lift: (id: number) => boolean;
   /** Where the carried sheep hangs this frame. */
-  pose: (pose: CarryPose) => void;
+  pose: (pose: CarriedPose) => void;
   /** `'back'` returns it to the flock; `'consumed'` is a delivery. */
   release: (how: 'back' | 'consumed') => void;
   holding: () => boolean;

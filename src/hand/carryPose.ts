@@ -3,22 +3,12 @@
 // The root hangs just under the orb and the crown trails behind the way the orb is going. The heading follows
 // the orb's movement and stays put when the orb stops, so a hovering orb does not spin its tree.
 
-import { VILLAGE } from '../config/village.ts';
+import { hand } from '../config/visual/hand.ts';
+import { turnToward } from '../core/math/scalar.ts';
+import type { CarriedPose } from '../world/village/model/carried.ts';
 import type { HandKind } from './handTypes.ts';
 
-const C = VILLAGE.HAND.CARRY;
-
-export interface CarryPose {
-  x: number;
-  y: number;
-  z: number;
-  /** The way the orb is heading (rad, about +y; 0 faces +z). The crown trails opposite. */
-  yaw: number;
-  /** Tilt back from upright (rad). */
-  tilt: number;
-  /** Size next to the thing standing. */
-  scale: number;
-}
+const C = hand.CARRY;
 
 export interface CarryHeading {
   /** Follows the orb's movement this frame; returns the heading. */
@@ -26,13 +16,6 @@ export interface CarryHeading {
   heading: () => number;
   /** Start again from a place (a new lift), facing `heading`. */
   reset: (x: number, z: number, heading?: number) => void;
-}
-
-const TWO_PI = Math.PI * 2;
-
-/** The shortest signed turn (rad) from `from` to `to`. */
-export function turnBetween(from: number, to: number): number {
-  return ((((to - from) % TWO_PI) + 3 * Math.PI) % TWO_PI) - Math.PI;
 }
 
 export function createCarryHeading(): CarryHeading {
@@ -53,7 +36,7 @@ export function createCarryHeading(): CarryHeading {
       lastZ = z;
       if (Math.hypot(dx, dz) >= C.MIN_MOVE_M) {
         const follow = 1 - Math.exp(-C.TURN_PER_S * Math.max(0, dt));
-        heading += turnBetween(heading, Math.atan2(dx, dz)) * follow;
+        heading = turnToward(heading, Math.atan2(dx, dz), follow);
       }
       return heading;
     },
@@ -72,7 +55,7 @@ export function carryPoseOf(
   kind: HandKind,
   orb: { x: number; y: number; z: number },
   heading: number,
-): CarryPose {
+): CarriedPose {
   if (kind === 'tree') {
     return {
       x: orb.x,

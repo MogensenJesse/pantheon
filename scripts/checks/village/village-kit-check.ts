@@ -13,6 +13,11 @@ import {
   VillagerSlot,
 } from '../../../src/world/village/assets/placeholder/villagerFigure.ts';
 import { figureFromKit } from '../../../src/world/village/assets/villagerKit.ts';
+import { BUILDING_TYPES } from '../../../src/world/village/model/assetKeys.ts';
+import {
+  BUILDING_HEIGHT_M,
+  BUILDING_LABELS,
+} from '../../../src/world/village/model/buildingInfo.ts';
 import { PLOT_TYPES } from '../../../src/world/village/model/buildings.ts';
 import { ROLE_COUNT, Role, type RoleId, Sex } from '../../../src/world/village/model/types.ts';
 import { check, finish } from '../lib/check.ts';
@@ -20,6 +25,28 @@ import { check, finish } from '../lib/check.ts';
 await check('every plot the player can mark has a kit', () => {
   for (const type of PLOT_TYPES) assert.ok(HOUSE_TYPES.includes(type as never), `${type} kit`);
 });
+
+await check(
+  'every building type has a label, a height, and (but the temple and well) a kit',
+  () => {
+    for (const type of BUILDING_TYPES) {
+      assert.ok(BUILDING_LABELS[type].length > 0, `${type} has a label`);
+      assert.ok(BUILDING_HEIGHT_M[type] > 0, `${type} has a height`);
+    }
+    for (const type of HOUSE_TYPES) {
+      assert.ok(BUILDING_TYPES.includes(type), `${type} is a building type`);
+      // the picking box is a little under the kit's roof on purpose, never above it and never far under
+      const { height } = buildHouseKit(type).meta;
+      const box = BUILDING_HEIGHT_M[type];
+      assert.ok(box <= height && box >= height - 1, `${type} box ${box} vs kit ${height}`);
+    }
+    assert.deepEqual(
+      BUILDING_TYPES.filter((t) => !HOUSE_TYPES.includes(t as never)),
+      ['temple', 'well'],
+      'only the temple and the well have no house kit',
+    );
+  },
+);
 
 for (const type of HOUSE_TYPES) {
   await check(`house kit ${type}: footprint, door and work slots agree with the geometry`, () => {

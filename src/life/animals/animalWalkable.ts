@@ -3,14 +3,7 @@
 // Dry ground that is not steep, clear of the buildings, the wheat and the trees. The buildings are read live, so
 // ground that a new house takes stops being walkable and an animal standing on it is moved out by the sim.
 
-export interface Footprint {
-  x: number;
-  z: number;
-  rotY: number;
-  /** Half the footprint (m) in the footprint's own x and z. */
-  halfW: number;
-  halfD: number;
-}
+import { type Footprint, insideFootprint } from '../../core/math/geom.ts';
 
 export interface WalkableInputs {
   getY: (x: number, z: number) => number;
@@ -30,16 +23,6 @@ export const MAX_RISE_PER_M = 0.7;
 
 const TREE_CELL_M = 4;
 const cellKey = (cx: number, cz: number) => (cx + 8192) * 16384 + (cz + 8192);
-
-export function insideFootprint(f: Footprint, x: number, z: number, marginM: number): boolean {
-  const dx = x - f.x;
-  const dz = z - f.z;
-  const cos = Math.cos(f.rotY);
-  const sin = Math.sin(f.rotY);
-  const lx = dx * cos - dz * sin;
-  const lz = dx * sin + dz * cos;
-  return Math.abs(lx) <= f.halfW + marginM && Math.abs(lz) <= f.halfD + marginM;
-}
 
 export function createWalkable(inputs: WalkableInputs): (x: number, z: number) => boolean {
   const { getY, waterLevelM } = inputs;

@@ -4,12 +4,6 @@ import type { Drop } from './handRules.ts';
 import type { Delivery, Lost, PickOutcome } from './handRuntime.ts';
 import type { HandCandidate, HandKind, Held } from './handTypes.ts';
 
-const THING: Record<HandCandidate['kind'], string> = {
-  tree: 'tree',
-  wheat: 'wheat',
-  sheep: 'sheep',
-};
-
 /** Why a lift did not happen; empty when the player needs no word about it. */
 export function refusalText(reason: Extract<PickOutcome, { ok: false }>['reason']): string {
   if (reason === 'none') return 'There is nothing here to lift.';
@@ -50,7 +44,7 @@ export function hintText(
     if (zone.zone === 'site') return 'haul the wood to the builders';
     return zone.zone === 'remote' ? 'haul the wood to the crew at the camp' : 'put it down';
   }
-  return target ? `pull up the ${THING[target.kind]}` : '';
+  return target ? `pull up the ${target.kind}` : '';
 }
 
 /** The overview's hint lines: the hand is armed with nothing in it, or full. */

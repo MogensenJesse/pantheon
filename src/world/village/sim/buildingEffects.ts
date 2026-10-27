@@ -50,13 +50,22 @@ export function fieldBonus(
   return out;
 }
 
+/** The sum of `share(level)` over the finished buildings of `type`. */
+function sumFinished(
+  buildings: readonly Building[],
+  type: Building['type'],
+  share: (level: number) => number,
+): number {
+  let sum = 0;
+  for (const b of buildings) {
+    if (b.type === type && isFinished(b)) sum += share(b.level);
+  }
+  return sum;
+}
+
 /** Faith per second the finished shrines add to the village's income, by their levels (0 with none). */
 export function shrineFaith(buildings: readonly Building[]): number {
-  let add = 0;
-  for (const b of buildings) {
-    if (b.type === 'shrine' && isFinished(b)) add += shrineShare(b.level);
-  }
-  return Math.min(add, E.SHRINE.MAX_FAITH_ADD);
+  return Math.min(sumFinished(buildings, 'shrine', shrineShare), E.SHRINE.MAX_FAITH_ADD);
 }
 
 /**
@@ -64,9 +73,5 @@ export function shrineFaith(buildings: readonly Building[]): number {
  * level 1 changes nothing, each level above adds `CHOP_PER_LEVEL`.
  */
 export function chopMul(buildings: readonly Building[]): number {
-  let add = 0;
-  for (const b of buildings) {
-    if (b.type === 'workshop' && isFinished(b)) add += workshopShare(b.level);
-  }
-  return 1 + Math.min(add, E.WORKSHOP.MAX_CHOP_ADD);
+  return 1 + Math.min(sumFinished(buildings, 'workshop', workshopShare), E.WORKSHOP.MAX_CHOP_ADD);
 }

@@ -79,7 +79,7 @@ export interface AnimalHand {
   /** False when the hand already holds one or the sheep is not there. */
   lift: (id: number) => boolean;
   /** Where the carried sheep hangs this frame (feet at y), facing `yaw`. */
-  hold: (x: number, y: number, z: number, yaw: number, scale: number) => void;
+  hold: (pose: { x: number; y: number; z: number; yaw: number; scale: number }) => void;
   /** `'back'` returns it to the flock where it was lifted; `'consumed'` is a delivery. False when nothing was held. */
   release: (how: 'back' | 'consumed') => boolean;
   holding: () => boolean;
@@ -257,12 +257,12 @@ function createFarm(options: AnimalsOptions): Farm {
       const flock = sheepFlock();
       return !!flock && liftAnimal(flock, id);
     },
-    hold: (x, y, z, yaw, scale) => {
-      heldAt.x = x;
-      heldAt.y = y;
-      heldAt.z = z;
-      heldAt.yaw = yaw;
-      heldAt.scale = scale;
+    hold: (pose) => {
+      heldAt.x = pose.x;
+      heldAt.y = pose.y;
+      heldAt.z = pose.z;
+      heldAt.yaw = pose.yaw;
+      heldAt.scale = pose.scale;
     },
     release: (how) => {
       const flock = sheepFlock();
@@ -271,35 +271,43 @@ function createFarm(options: AnimalsOptions): Farm {
     holding: () => !!sheepFlock()?.held,
   };
 
-  /** The animal between two fixed steps: smaller while it grows into view, a little different each. */
-  const pose = (animal: Animal, x: number, z: number, alpha: number, blob: number) => {
+  /** Sets the shared puppet to `animal` at (x, y, z); each animal is a little different in size. */
+  const place = (
+    animal: Animal,
+    x: number,
+    y: number,
+    z: number,
+    yaw: number,
+    scale: number,
+    blob: number,
+    groundNx: number,
+    groundNz: number,
+  ) => {
     puppet.model = animal.kind;
     puppet.x = x;
-    puppet.y = options.getY(x, z);
+    puppet.y = y;
     puppet.z = z;
-    puppet.yaw = animal.prevYaw + wrapAngle(animal.yaw - animal.prevYaw) * alpha;
-    puppet.scale = Math.max(0.02, fadeHermite(animal.arrive)) * (0.92 + animal.seed * 0.16);
+    puppet.yaw = yaw;
+    puppet.scale = scale * (0.92 + animal.seed * 0.16);
     poseOf(animal, puppet.pose);
     puppet.blob = blob;
-    puppet.groundNx = ground.x;
-    puppet.groundNz = ground.z;
+    puppet.groundNx = groundNx;
+    puppet.groundNz = groundNz;
+  };
+
+  /** The animal between two fixed steps: smaller while it grows into view. */
+  const pose = (animal: Animal, x: number, z: number, alpha: number, blob: number) => {
+    const yaw = animal.prevYaw + wrapAngle(animal.yaw - animal.prevYaw) * alpha;
+    const scale = Math.max(0.02, fadeHermite(animal.arrive));
+    place(animal, x, options.getY(x, z), z, yaw, scale, blob, ground.x, ground.z);
   };
 
   /** The animal the hand carries, hanging in the air with its legs still. */
   const drawHeld = (renderer: AnimalRenderer, animal: Animal) => {
-    puppet.model = animal.kind;
-    puppet.x = heldAt.x;
-    puppet.y = heldAt.y;
-    puppet.z = heldAt.z;
-    puppet.yaw = heldAt.yaw;
-    puppet.scale = heldAt.scale * (0.92 + animal.seed * 0.16);
-    poseOf(animal, puppet.pose);
+    place(animal, heldAt.x, heldAt.y, heldAt.z, heldAt.yaw, heldAt.scale, 0, 0, 0);
     puppet.pose.walk = 0;
     puppet.pose.headDown = 0;
     puppet.pose.peck = 0;
-    puppet.blob = 0;
-    puppet.groundNx = 0;
-    puppet.groundNz = 0;
     renderer.add(puppet);
   };
 

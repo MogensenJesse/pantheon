@@ -3,6 +3,7 @@
 // Run: node --experimental-strip-types scripts/checks/village/economy-check.ts
 import assert from 'node:assert/strict';
 import { VILLAGE } from '../../../src/config/village.ts';
+import { BUILDING_TYPES } from '../../../src/world/village/model/assetKeys.ts';
 import { type Building, Role, type VillageEvent } from '../../../src/world/village/model/types.ts';
 import { remainingWork } from '../../../src/world/village/sim/construction.ts';
 import {
@@ -149,6 +150,17 @@ await check(
     assert.equal(housing.planned, 0);
   },
 );
+
+/** The least wood a building may cost: the biggest tree gives 9, so no building is ever one tree. */
+const PACING_FLOOR_WOOD = 10;
+
+await check('no building is cheaper than the pacing floor, and every one has a price', () => {
+  assert.ok(CHEAPEST_WOOD_COST >= PACING_FLOOR_WOOD, `cheapest is ${CHEAPEST_WOOD_COST}`);
+  for (const type of BUILDING_TYPES) {
+    if (type === 'temple' || type === 'well') continue; // not built through sites
+    assert.ok(woodCostOf(type) >= PACING_FLOOR_WOOD, `${type} has a price at the floor or above`);
+  }
+});
 
 await check('shortages: less than a day of food, less wood than the cheapest building', () => {
   assert.deepEqual(shortages({ wood: 50, food: 11 }, 12), { food: true, wood: false });

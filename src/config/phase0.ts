@@ -146,7 +146,7 @@ export const PHASE0 = {
     },
   },
   /** What belief looks like in the world. */
-  POWERS: {
+  PIPS: {
     /** Belief pips show above villagers within this distance (m) of the orb. */
     PIP_RANGE_M: 15,
   },

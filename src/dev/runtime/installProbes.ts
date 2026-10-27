@@ -56,12 +56,13 @@ export interface ProbeSources {
 
 export function installProbes(src: ProbeSources): () => void {
   const { gameplay, village } = src;
+  const teleport = (x: number, z: number) => {
+    src.playerPosition.x = x;
+    src.playerPosition.z = z;
+  };
   const disposers: (() => void)[] = [
     // Console teleport for checking distant spots (`__pantheonTeleport(x, z)`).
-    installDevHook('__pantheonTeleport', (x: number, z: number) => {
-      src.playerPosition.x = x;
-      src.playerPosition.z = z;
-    }),
+    installDevHook('__pantheonTeleport', teleport),
     // The village overview: `__pantheonOverview.debug()`, `.setActive(true, true)` (true skips the temple rule).
     installDevHook('__pantheonOverview', {
       debug: () => src.overview.debug(),
@@ -101,10 +102,7 @@ export function installProbes(src: ProbeSources): () => void {
       landmarks: gameplay.landmarks,
       restoration: gameplay.restoration,
       finishRestoration: village ? (kind) => village.dev.completeRestoration(kind) : null,
-      teleport: (x, z) => {
-        src.playerPosition.x = x;
-        src.playerPosition.z = z;
-      },
+      teleport,
     }),
     initLifeProbe({
       ambient: gameplay.ambientLife,
@@ -130,10 +128,7 @@ export function installProbes(src: ProbeSources): () => void {
           ui: gameplay.hand,
           sim: village.sim,
           sheep: src.animals.hand,
-          teleport: (x, z) => {
-            src.playerPosition.x = x;
-            src.playerPosition.z = z;
-          },
+          teleport,
           orbPlace: gameplay.orbPlace,
           energy: () => state.energy,
           setEnergy,

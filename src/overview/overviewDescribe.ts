@@ -6,6 +6,8 @@ import { distXZ } from '../core/math/geom.ts';
 import { modifiers } from '../skills/modifiers.ts';
 import { SPEAKER_NAMES } from '../story/story.ts';
 import { hungerTitle } from '../ui/village/villageText.ts';
+import type { VillageBuildingType } from '../world/village/model/assetKeys.ts';
+import { BUILDING_LABELS } from '../world/village/model/buildingInfo.ts';
 import { bedsOf, isHouse } from '../world/village/model/buildings.ts';
 import {
   Activity,
@@ -125,18 +127,6 @@ export function describeWorldOf(
   };
 }
 
-const BUILDING_NAMES: Readonly<Record<string, string>> = {
-  temple: 'Temple',
-  house_a: 'Small house',
-  house_b: 'House',
-  house_c: 'Large house',
-  workshop: 'Workshop',
-  granary: 'Granary',
-  farmstead: 'Farmstead',
-  shrine: 'Shrine',
-  well: 'Well',
-};
-
 const ROLE_NAMES: Readonly<Record<number, string>> = {
   [Role.Builder]: 'Builder',
   [Role.Priest]: 'Priest',
@@ -148,7 +138,7 @@ const ROLE_NAMES: Readonly<Record<number, string>> = {
 
 const STAGE_NAMES = ['Foundation', 'Frame', 'Finished'] as const;
 
-const buildingName = (type: string): string => BUILDING_NAMES[type] ?? type;
+const buildingName = (type: VillageBuildingType): string => BUILDING_LABELS[type];
 
 /** What the tooltip over a thing says. */
 export function nameOf(sel: Selection, world: DescribeWorld): string | null {

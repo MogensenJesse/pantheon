@@ -11,7 +11,7 @@ import type { AbilityView } from '../../abilities/abilityView';
 import { costOf } from '../../hand/handRules';
 import type { HandRuntime } from '../../hand/handRuntime';
 import { notHereText, overviewHintEmpty, overviewHintFull } from '../../hand/handText';
-import type { Place } from '../../hand/handTypes';
+import { HAND_KINDS, type Place } from '../../hand/handTypes';
 import { type OverviewHandWorld, overviewPlace } from '../../hand/overviewAim';
 import type { Overview } from '../../overview/overviewController';
 import type { Selection } from '../../overview/overviewPick';
@@ -21,7 +21,7 @@ import { notify } from '../kit';
 import { createMarkerLayer } from '../overlay';
 import type { OverviewTool } from './overviewPowers';
 
-export const OVERVIEW_HAND_ID = 'hand';
+const OVERVIEW_HAND_ID = 'hand';
 
 export interface OverviewHandDeps {
   overview: Overview;
@@ -56,16 +56,14 @@ export function createOverviewHand(deps: OverviewHandDeps): OverviewHand {
   const placeAt = (mode: 'lift' | 'drop', pick: Selection | null, out: Place) =>
     overviewPlace(mode, pick, overview.hoverPoint(), deps.world, out);
 
+  const costs = () => HAND_KINDS.map((k) => costOf(k, deps.costMul()));
+  const cheapest = () => Math.min(...costs());
   // The cheapest and the dearest lift, as the slot's cost.
   const costText = () => {
-    const mul = deps.costMul();
-    const costs = (['tree', 'wheat', 'sheep'] as const).map((k) => costOf(k, mul));
-    const lo = Math.round(Math.min(...costs));
-    const hi = Math.round(Math.max(...costs));
+    const lo = Math.round(cheapest());
+    const hi = Math.round(Math.max(...costs()));
     return `${lo === hi ? lo : `${lo}–${hi}`} energy`;
   };
-  const cheapest = () =>
-    Math.min(...(['tree', 'wheat', 'sheep'] as const).map((k) => costOf(k, deps.costMul())));
 
   const view = (): AbilityView | null => {
     if (!deps.open()) return null;

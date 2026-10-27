@@ -4,6 +4,7 @@ import type { PropLodAsset } from '../../../assets/assetManifest';
 import { VILLAGE } from '../../../config/village';
 import { VISUAL } from '../../../config/visualTuning';
 import { FENCE_KEY, GRAVE_KEY, STOCKPILE_KEY, STUMP_KEY } from '../model/assetKeys';
+import type { CarriedPose } from '../model/carried';
 import type { Field, Grave } from '../model/types';
 import { localToWorld } from '../sim/geometry';
 import { createDynamicPropBatch, type DynamicPropBatch } from './dynamicPropBatch';
@@ -21,7 +22,7 @@ export interface DressingRenderer {
   removeStump: (id: number) => void;
   /** The hand's sheaf (a stand-in pile): drawn where the hand holds it, and gone when it is let go. */
   holdSheaf: () => void;
-  poseSheaf: (pose: { x: number; y: number; z: number; yaw: number; scale: number }) => void;
+  poseSheaf: (pose: CarriedPose) => void;
   releaseSheaf: () => void;
   /** Re-seat pieces inside a world rectangle after the ground under them was levelled. */
   resnap: (minX: number, maxX: number, minZ: number, maxZ: number) => void;

@@ -149,6 +149,11 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
   let chopFactor = 1;
   /** What the farmsteads do for the field being looked at (reused, so a step allocates nothing). */
   const bonus: FieldBonus = { growthMul: 1, yieldAdd: 0 };
+  /** Food a reaping of the field gives as it stands: the yield (and what farmsteads and skills add) times its growth. */
+  const harvestOf = (field: Field): number => {
+    fieldBonus(field, buildings, bonus);
+    return (VILLAGE.ECONOMY.FIELD_YIELD + mods.fieldYieldAdd + bonus.yieldAdd) * field.growth;
+  };
   const prayers = createPrayersState();
   const hearten = createHearten();
   const forest = createForest(treeList, {
@@ -447,28 +452,18 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
   /**
    * What putting a building of `type` at (x, z) would come to, with no effect: the village must be converted
    * and have room for another site, the spot must hold the planner's own rules, and the wood and faith must
-   * be there. `free` (DEV) skips the cap and the cost.
+   * be there.
    */
-  const plotCheck = (
-    type: Building['type'],
-    x: number,
-    z: number,
-    rotY: number,
-    free = false,
-  ): PlotResult => {
+  const plotCheck = (type: Building['type'], x: number, z: number, rotY: number): PlotResult => {
     if (!PLOT_TYPES.includes(type)) return 'type';
     if (!converted) return 'not-converted';
     if (!plotTypeOpen(type, mods)) return 'locked';
     if (buildings.length >= Math.floor(PLAN.MAX_BUILDINGS * mods.buildingCapMul)) return 'full';
-    if (!free && openSites().length >= PLAN.MAX_ACTIVE_SITES) return 'cap';
+    if (openSites().length >= PLAN.MAX_ACTIVE_SITES) return 'cap';
     const spot = validatePlot(context(), type, x, z, rotY);
     if (!spot.ok) return spot.reason;
-    if (!free) {
-      if (economy.stock.wood < woodCostOf(type)) return 'wood';
-      if (faith.faith < siteCost(buildings.filter((b) => b.type !== 'temple').length)) {
-        return 'faith';
-      }
-    }
+    if (economy.stock.wood < woodCostOf(type)) return 'wood';
+    if (faith.faith < siteCost(buildings.filter((b) => b.type !== 'temple').length)) return 'faith';
     return 'ok';
   };
 
@@ -479,15 +474,12 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     z: number,
     rotY: number,
     events: VillageEvent[],
-    free = false,
   ): PlotResult => {
-    const result = plotCheck(type, x, z, rotY, free);
+    const result = plotCheck(type, x, z, rotY);
     if (result !== 'ok') return result;
     const spot = validatePlot(context(), type, x, z, rotY);
-    if (!free) {
-      economy.spendWood(woodCostOf(type));
-      faith.faith -= siteCost(buildings.filter((b) => b.type !== 'temple').length);
-    }
+    economy.spendWood(woodCostOf(type));
+    faith.faith -= siteCost(buildings.filter((b) => b.type !== 'temple').length);
     const ring = spot.ok ? spot.ring : -1;
     events.push({ kind: 'siteStarted', building: place(type, 0, x, z, rotY, ring) });
     return 'ok';
@@ -843,8 +835,8 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
           removeDead(i, events);
         }
       }
+      const rainBoost = rainBoostOf(VILLAGE.FIELDS.RAIN_BOOST);
       for (const field of fields) {
-        const rainBoost = rainBoostOf(VILLAGE.FIELDS.RAIN_BOOST);
         fieldBonus(field, buildings, bonus);
         const boost =
           (1 + VILLAGE.FIELDS.TEND_BOOST * Math.min(3, field.tenders)) *
@@ -853,8 +845,8 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
         field.growth = Math.min(1, field.growth + (dt / VILLAGE.FIELDS.GROW_S) * boost);
         // A tended, ripe field is harvested and replanted.
         if (field.growth >= 1 && field.tenders > 0) {
+          economy.addFood(harvestOf(field));
           field.growth = 0;
-          economy.addFood(VILLAGE.ECONOMY.FIELD_YIELD + mods.fieldYieldAdd + bonus.yieldAdd);
         }
       }
       // A hamlet that is not converted yet does not grow.
@@ -954,9 +946,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     takeHarvest: (fieldId) => {
       const field = fields.find((f) => f.id === fieldId);
       if (!field || field.growth < VILLAGE.HAND.WHEAT.MIN_RIPE) return 0;
-      fieldBonus(field, buildings, bonus);
-      const food =
-        (VILLAGE.ECONOMY.FIELD_YIELD + mods.fieldYieldAdd + bonus.yieldAdd) * field.growth;
+      const food = harvestOf(field);
       field.growth = 0;
       return food;
     },

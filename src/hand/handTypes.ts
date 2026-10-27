@@ -1,6 +1,7 @@
 // src/hand/handTypes.ts — what the orb's hand deals in (pure: no DOM, no three, node-runnable)
 
 import type { XZ } from '../core/math/geom.ts';
+import type { CarriedKind } from '../world/village/model/carried.ts';
 
 export type Place = XZ;
 
@@ -11,11 +12,11 @@ export interface HandEnergy {
   refund: (amount: number) => void;
 }
 
-/** What the hand can lift. */
-export type HandKind = 'tree' | 'wheat' | 'sheep';
+/** What the hand can lift: what the village shows being carried, and the farm's sheep. */
+export type HandKind = CarriedKind | 'sheep';
 
-/** The kinds the village itself shows being carried (an animal is the life system's). */
-export type VillageKind = Exclude<HandKind, 'sheep'>;
+/** Every kind, in the order a tie between two things at the same distance is settled. */
+export const HAND_KINDS: readonly HandKind[] = ['tree', 'wheat', 'sheep'];
 
 /** What each kind becomes in the village stock when it is delivered. */
 export type Good = 'wood' | 'food';

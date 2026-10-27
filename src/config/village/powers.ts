@@ -14,7 +14,7 @@ export const POWERS = {
    * The weather powers of arch II, cast from the orb cursor in the overview. Faith costs against an income of
    * about 0.5 faith per second; cooldowns and durations are seconds of game time.
    */
-  BUILDER_POWERS: {
+  WEATHER_POWERS: {
     /** A storm front centred on the cursor. */
     CALL_RAIN: { FAITH: 40, COOLDOWN_S: 900, RADIUS_M: 700, SPEED_MUL: 0.4, PEAK: 1 },
     /** The weather is parted around the cursor for a while. */

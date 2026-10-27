@@ -11,6 +11,7 @@ import { woodCostOf } from './economy.ts';
 
 const U = VILLAGE.UPGRADES;
 
+/** The three groups of upgradable buildings, each with its own ceiling: houses, stores (granary, workshop) and works (farmstead, shrine). */
 export type UpgradeGroup = 'house' | 'store' | 'works';
 
 /** Which tier the skill tree opens for a building, or null when it cannot be upgraded. */

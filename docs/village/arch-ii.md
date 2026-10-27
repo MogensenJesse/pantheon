@@ -1,6 +1,6 @@
 # Arch II, The Village
 
-Skill data in `src/skills/skillTree.ts`, powers in `src/abilities/{abilities,builderPowers,builderRuntime}.ts`, village effects through the shared `modifiers` record. Numbers: `VILLAGE.ARCH_II` and `VILLAGE.BUILDER_POWERS` (`src/config/village/powers.ts`).
+Skill data in `src/skills/skillTree.ts`, powers in `src/abilities/{abilities,builderPowers,builderRuntime}.ts`, village effects through the shared `modifiers` record. Numbers: `VILLAGE.ARCH_II` and `VILLAGE.WEATHER_POWERS` (`src/config/village/powers.ts`).
 
 ## Milestones and gates
 `skills/milestones.ts` (pure): `MILESTONES` (id, label, one village number, threshold), `newlyReached(snapshot, reached)`. `SkillsState.milestones` latches the ids reached; `syncMilestones` records them, `skillRuntime.syncMilestones` applies it and emits `milestone:reached` (a toast in `skillUi.ts`); `gameplay/progression.ts` builds the snapshot (restored places, population, finished buildings) once a second in a converted village. A `SkillNode` may carry `gate: MilestoneId`: `canUnlock` refuses `'gated'` until it is reached, and the tooltip says what is needed. The same latch gates the upgrade tiers and the new verbs (story-mechanics/VILLAGE_INTERACTION.md). Gated nodes today: Great halls (`folk_20`), Vaults (`first_place`), Fine works (`level_2`) and Shrines (`prayers_5`); see [upgrades](upgrades.md) and [plots](plots.md).
@@ -20,7 +20,7 @@ New `Modifiers` fields (`bedsPerHouseAdd`, `woodPerTreeAdd`, `fieldYieldAdd`, `s
 `openSkillPanel(deps, arch)` shows one arch with two tab buttons ("The Void", "The Village", the second disabled until it opens); switching swaps the content in place (the panel stays open, so the world does not unfreeze for a frame).
 
 ## Builder powers
-`abilities.ts` `grantedWithVillage`: they come with arch II, no node. Faith costs and cooldowns in `BUILDER_POWERS`. There are two, both weather; helping the village itself (wood, food, builders) is the orb's hand (`story-mechanics/HAND.md`), which replaced Blessing, Kindle and Provide.
+`abilities.ts` `grantedWithVillage`: they come with arch II, no node. Faith costs and cooldowns in `WEATHER_POWERS`. There are two, both weather; helping the village itself (wood, food, builders) is the orb's hand (`story-mechanics/HAND.md`), which replaced Blessing, Kindle and Provide.
 - **Call rain** (`sky`): a front centred on the cursor (`weather.addFront`).
 - **Clear skies** (`sky`): a hole in the weather around the cursor (`weather.clearSkies`).
 - Hearten is not a power on the bar: it is a button on a villager's info panel (`docs/village/hearten.md`).

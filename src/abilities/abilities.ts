@@ -39,7 +39,7 @@ export const ABILITY_IDS = {
   clearSkies: 'clear_skies',
 } as const;
 
-const BP = VILLAGE.BUILDER_POWERS;
+const BP = VILLAGE.WEATHER_POWERS;
 
 export const ABILITIES: readonly AbilityDef[] = [
   // --- Arch II, The Village: cast with the orb as the cursor in the overview, paid in faith ---

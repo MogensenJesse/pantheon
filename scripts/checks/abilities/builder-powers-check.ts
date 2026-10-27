@@ -17,7 +17,7 @@ import { createWeather, forcedWeatherProblem } from '../../../src/world/weather/
 import { check, finish } from '../lib/check.ts';
 import { loadMap, makeSim } from '../lib/villageHeadless.ts';
 
-const P = VILLAGE.BUILDER_POWERS;
+const P = VILLAGE.WEATHER_POWERS;
 const map = loadMap('island-mountain');
 const def = (id: string) => abilityById(id) as AbilityDef;
 

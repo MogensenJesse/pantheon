@@ -24,12 +24,6 @@ export async function check(name: string, fn: () => void | Promise<void>): Promi
   }
 }
 
-/** Records a failure from a scan that goes on after finding one (it does not throw). */
-export function fail(message: string): void {
-  failures++;
-  console.log(`FAIL ${message}`);
-}
-
 /** Prints the summary and sets the exit code (1 when any check failed). */
 export function finish(passed: string): void {
   if (failures > 0) {

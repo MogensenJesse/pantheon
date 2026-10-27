@@ -13,6 +13,7 @@ import { propCastsShadow } from '../../mapProps/config/propShadowKeys';
 import type { PropLodGroup } from '../../mapProps/mapPropLod';
 import { resolvePropInstanceMatrix } from '../../mapProps/resolvePropInstanceMatrix';
 import { createPropTerrainSurface } from '../../terrain/cpu/terrainSurfaceCpu';
+import type { CarriedPose } from '../model/carried';
 import type { Forest, TreeInfo } from '../sim/forest';
 import { TreeState } from '../sim/forest';
 import type { DressingRenderer } from './dressingRenderer';
@@ -39,22 +40,6 @@ export interface ForestViewOptions {
   dressing: DressingRenderer;
   /** Shadows and anything else that has to notice the trees changed. */
   onChanged: () => void;
-}
-
-/** What the village shows the hand carrying: a tree, or a sheaf of wheat. */
-export type CarriedKind = 'tree' | 'wheat';
-
-/** Where the hand holds what it carries: a tree's root (or a sheaf's base) at (x, y, z), a crown tipped back from the heading. */
-export interface CarriedPose {
-  x: number;
-  y: number;
-  z: number;
-  /** About +y, rad; the crown trails opposite. */
-  yaw: number;
-  /** Tilt back from upright, rad. */
-  tilt: number;
-  /** Size next to the thing standing. */
-  scale: number;
 }
 
 export interface ForestView {

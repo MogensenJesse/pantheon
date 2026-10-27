@@ -5,17 +5,19 @@
 // way leaves the world as it was (see `createHand`).
 
 import { VILLAGE } from '../config/village.ts';
-import { distXZ } from '../core/math/geom.ts';
+import { distXZ, insideFootprint } from '../core/math/geom.ts';
+import { isFinished } from '../world/village/model/buildings.ts';
 import type { Building, RemoteSite } from '../world/village/model/types.ts';
 import { isOpenSite } from '../world/village/sim/construction.ts';
-import type {
-  Good,
-  HandCandidate,
-  HandEnergy,
-  HandKind,
-  Held,
-  Place,
-  Release,
+import {
+  type Good,
+  HAND_KINDS,
+  type HandCandidate,
+  type HandEnergy,
+  type HandKind,
+  type Held,
+  type Place,
+  type Release,
 } from './handTypes.ts';
 
 const H = VILLAGE.HAND;
@@ -63,9 +65,8 @@ export function pickTarget(
   return best;
 }
 
-const KIND_ORDER: Readonly<Record<HandKind, number>> = { tree: 0, wheat: 1, sheep: 2 };
 const order = (a: HandCandidate, b: HandCandidate) =>
-  KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.id - b.id;
+  HAND_KINDS.indexOf(a.kind) - HAND_KINDS.indexOf(b.kind) || a.id - b.id;
 
 /** Where a thing can be put down: the buildings that take the village's goods. */
 const STORE_TYPES: ReadonlySet<Building['type']> = new Set([
@@ -85,18 +86,6 @@ export type Drop =
   | { zone: 'site'; building: Building }
   | { zone: 'remote'; site: RemoteSite; x: number; z: number };
 
-/** Whether `at` lies on a building's footprint or within `marginM` of it. */
-export function insideBuilding(b: Building, at: Place, marginM: number): boolean {
-  const cos = Math.cos(b.rotY);
-  const sin = Math.sin(b.rotY);
-  const dx = at.x - b.x;
-  const dz = at.z - b.z;
-  return (
-    Math.abs(dx * cos - dz * sin) <= b.halfW + marginM &&
-    Math.abs(dx * sin + dz * cos) <= b.halfD + marginM
-  );
-}
-
 /** The unfinished remote site (if any) whose camp or place `at` lies within `radiusM` of; the nearer middle wins. */
 function remoteZone(
   at: Place,
@@ -106,7 +95,7 @@ function remoteZone(
   let best: Extract<Drop, { zone: 'remote' }> | null = null;
   let bestD = radiusM;
   for (const site of sites) {
-    if (site.stage >= 2) continue;
+    if (site.stage >= 2) continue; // a RemoteSite is finished at its last stage
     const camp = distXZ(site.campX, site.campZ, at.x, at.z);
     if (camp <= bestD) {
       best = { zone: 'remote', site, x: site.campX, z: site.campZ };
@@ -139,13 +128,13 @@ export function classifyDrop(
   let siteD = Number.POSITIVE_INFINITY;
   let storeD = Number.POSITIVE_INFINITY;
   for (const b of buildings) {
-    if (!insideBuilding(b, at, marginM)) continue;
+    if (!insideFootprint(b, at.x, at.z, marginM)) continue;
     const d = distXZ(b.x, b.z, at.x, at.z);
     if (good === 'wood' && isOpenSite(b) && d < siteD) {
       site = b;
       siteD = d;
     }
-    if (b.stage >= 2 && STORE_TYPES.has(b.type) && d < storeD) {
+    if (isFinished(b) && STORE_TYPES.has(b.type) && d < storeD) {
       store = b;
       storeD = d;
     }

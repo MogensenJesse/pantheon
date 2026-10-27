@@ -13,7 +13,7 @@ import { headingToXZ } from '../core/math/geom.ts';
 import type { Weather } from '../world/weather/weather.ts';
 import { ABILITY_IDS, type AbilityDef, type AbilityTarget } from './abilities.ts';
 
-const P = VILLAGE.BUILDER_POWERS;
+const P = VILLAGE.WEATHER_POWERS;
 
 export interface CursorAim {
   /** The ground point under the cursor, or null when it is over the sky or a panel. */

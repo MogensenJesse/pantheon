@@ -8,7 +8,10 @@ import {
   buildTempleKit,
   buildWellKit,
 } from '../../../src/world/village/assets/placeholder/temple.ts';
-import type { VillageBuildingType } from '../../../src/world/village/model/assetKeys.ts';
+import {
+  BUILDING_TYPES,
+  type VillageBuildingType,
+} from '../../../src/world/village/model/assetKeys.ts';
 import { makeVillageSeed, type VillageSeed } from '../../../src/world/village/model/seed.ts';
 import type { Building, VillageEvent } from '../../../src/world/village/model/types.ts';
 import type { TreeInfo } from '../../../src/world/village/sim/forest.ts';
@@ -95,20 +98,11 @@ export function loadMap(
     isWet: (x, z) => getY(x, z) < waterLevelM + VILLAGE.PLAN.SHORE_MARGIN_M,
   };
 
-  const metas = new Map<VillageBuildingType, ReturnType<typeof buildTempleKit>['meta']>([
-    ['temple', kitMeta('temple') ?? buildTempleKit().meta],
-    ['well', kitMeta('well_s2') ?? buildWellKit().meta],
-  ]);
-  for (const type of [
-    'house_a',
-    'house_b',
-    'house_c',
-    'workshop',
-    'granary',
-    'farmstead',
-    'shrine',
-  ] as const) {
-    metas.set(type, kitMeta(`${type}_s2`) ?? buildHouseKit(type).meta);
+  const metas = new Map<VillageBuildingType, ReturnType<typeof buildTempleKit>['meta']>();
+  for (const type of BUILDING_TYPES) {
+    if (type === 'temple') metas.set(type, kitMeta('temple') ?? buildTempleKit().meta);
+    else if (type === 'well') metas.set(type, kitMeta('well_s2') ?? buildWellKit().meta);
+    else metas.set(type, kitMeta(`${type}_s2`) ?? buildHouseKit(type).meta);
   }
 
   const src = seedOverride ?? entity;

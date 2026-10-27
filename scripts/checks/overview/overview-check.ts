@@ -1,6 +1,7 @@
 // scripts/checks/overview/overview-check.ts — headless checks of the overview camera's rules and of what a click picks.
 import assert from 'node:assert/strict';
 import { PHASE0 } from '../../../src/config/phase0.ts';
+import { insideFootprint } from '../../../src/core/math/geom.ts';
 import {
   canEnterOverview,
   clampDistance,
@@ -12,12 +13,7 @@ import {
   rayGroundHit,
   rayPlaneHit,
 } from '../../../src/overview/overviewMath.ts';
-import {
-  insideField,
-  pickTarget,
-  rayBuildingHit,
-  sameSelection,
-} from '../../../src/overview/overviewPick.ts';
+import { pickTarget, rayBuildingHit, sameSelection } from '../../../src/overview/overviewPick.ts';
 import { check, finish } from '../lib/check.ts';
 import { loadMap, makeSim } from '../lib/villageHeadless.ts';
 
@@ -189,7 +185,7 @@ await check('a click picks a villager before a building before a field, else not
   );
 
   const field = hamlet.fields[0]!;
-  assert.ok(insideField(field, field.x, field.z));
+  assert.ok(insideFootprint(field, field.x, field.z));
   assert.deepEqual(
     pickTarget({
       mouse: { x: 0, y: 0 },

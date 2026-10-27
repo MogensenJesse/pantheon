@@ -21,7 +21,7 @@ Villagers believe because they see the orb's deeds (design: `story-mechanics/HAN
 - The elder is gated in the same place: `canBelieve(i)` is false for him until his quest step, and the payout skips anyone it is false for (they still stop and look).
 - `addBelief` rounds a run of small payouts to exactly 1 (`NEARLY_BELIEVING`), so the last one converts.
 - Villagers "notice" through `sim.notice(i, x, z, seconds)` (`agents.ts`: they stop, show the Idle pose and face the point, and take up their path or work afterwards; nothing is saved).
-- `PHASE0.POWERS.PIP_RANGE_M` is the one number left of the old powers: how far from the orb belief pips show.
+- `PHASE0.PIPS.PIP_RANGE_M` is the one number left of the old powers: how far from the orb belief pips show.
 
 ## Conversion quest
 - The quest engine is in [quests.md](quests.md). The conversion quest is `CONVERSION_QUEST` in `src/quests/content/conversion.ts`: hidden `meet` → `convert` 5 villagers → `fire` (wood put down at the temple at dusk) → `offering` (stand near the temple with enough energy while it flows) → `believe` (the elder; the village then converts). Numbers in `PHASE0.QUEST`. The rules for the meeting (`elderMeets`), the offering (`offeringRate`), the elder's belief (`elderOpenToBelief`) and the spark for each convert (`sparksForConvert`) are pure too, in the same file. Its lines are in `src/story/story.ts` (`BEATS`), all marked PLACEHOLDER.

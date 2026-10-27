@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import { Box3, BoxGeometry, Group, Mesh, MeshStandardMaterial } from 'three';
 import { life } from '../../../src/config/visual/life.ts';
+import { type Footprint, insideFootprint } from '../../../src/core/math/geom.ts';
 import { modelFromScene } from '../../../src/life/animals/animalModelFromScene.ts';
 import { buildChicken, buildSheep } from '../../../src/life/animals/animalModels.ts';
 import { animalCount, pickPasture, pickYard } from '../../../src/life/animals/animalPlacement.ts';
@@ -29,8 +30,6 @@ import {
 import {
   BUILDING_MARGIN_M,
   createWalkable,
-  type Footprint,
-  insideFootprint,
   MAX_RISE_PER_M,
 } from '../../../src/life/animals/animalWalkable.ts';
 import {

@@ -12,7 +12,7 @@ import type { CursorAim } from '../abilities/builderPowers';
 import { initBuilderRuntime } from '../abilities/builderRuntime';
 import type { CastResult } from '../abilities/caster';
 import { PHASE0 } from '../config/phase0';
-import { VILLAGE } from '../config/village';
+import { VISUAL } from '../config/visual';
 import type { CameraInputContext } from '../core/CameraInput';
 import { bus } from '../core/EventBus';
 import { energyMeter } from '../core/energy';
@@ -191,10 +191,8 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
         animals: {
           sheepWithin: deps.animalHand.sheepWithin,
           lift: deps.animalHand.lift,
-          pose: (p) => deps.animalHand.hold(p.x, p.y, p.z, p.yaw, p.scale),
-          release: (how) => {
-            deps.animalHand.release(how);
-          },
+          pose: deps.animalHand.hold,
+          release: deps.animalHand.release,
           holding: deps.animalHand.holding,
         },
         deeds: {
@@ -223,7 +221,7 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
           const x = at?.x ?? player.position.x;
           const z = at?.z ?? player.position.z;
           const y = at ? terrain.getWorldY(x, z) : player.position.y;
-          burstOrigin.set(x, y + VILLAGE.HAND.BURST_HEIGHT_M, z);
+          burstOrigin.set(x, y + VISUAL.hand.BURST_HEIGHT_M, z);
           orbSystem.burstAt(burstOrigin, player.position);
         },
       })
@@ -248,7 +246,7 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
         villagers: village.sim.villagers,
         orbPosition: orbPlace,
         groundY: (x, z) => terrain.getWorldY(x, z),
-        pipRangeM: PHASE0.POWERS.PIP_RANGE_M,
+        pipRangeM: PHASE0.PIPS.PIP_RANGE_M,
         elder: quest
           ? { index: quest.elder, met: quest.elderMet, rangeM: PHASE0.QUEST.ELDER_PIP_RANGE_M }
           : undefined,
