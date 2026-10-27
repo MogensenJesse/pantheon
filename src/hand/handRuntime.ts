@@ -9,6 +9,7 @@ import { VILLAGE } from '../config/village.ts';
 import type { CarriedKind, CarriedPose } from '../world/village/model/carried.ts';
 import type { Building, Field, RemoteSite } from '../world/village/model/types.ts';
 import { type Stock, shortages } from '../world/village/sim/economy.ts';
+import { isRipe } from '../world/village/sim/fieldsDesk.ts';
 import { carryPoseOf, createCarryHeading } from './carryPose.ts';
 import { createDeedLedger, type DeedLedger, type DeedWorld } from './deeds.ts';
 import {
@@ -16,7 +17,6 @@ import {
   costOf,
   createHand,
   type Drop,
-  isRipe,
   meetsNeed,
   pickTarget,
   reachOf,

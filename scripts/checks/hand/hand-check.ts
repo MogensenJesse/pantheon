@@ -17,7 +17,6 @@ import {
   costOf,
   createHand,
   distanceTo,
-  isRipe,
   meetsNeed,
   pickTarget,
   reachOf,
@@ -55,6 +54,7 @@ import {
   type VillageEvent,
 } from '../../../src/world/village/model/types.ts';
 import { shortages } from '../../../src/world/village/sim/economy.ts';
+import { isRipe } from '../../../src/world/village/sim/fieldsDesk.ts';
 import { TreeState, yieldOf } from '../../../src/world/village/sim/forest.ts';
 import { localToWorld } from '../../../src/world/village/sim/geometry.ts';
 import type { VillageSim } from '../../../src/world/village/sim/villageSim.ts';

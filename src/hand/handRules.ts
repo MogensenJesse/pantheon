@@ -28,9 +28,6 @@ export const reachOf = (kind: HandKind, reachMul = 1): number => H.REACH_M[kind]
 /** Energy a lift of `kind` costs, with the skill tree's cost factor. */
 export const costOf = (kind: HandKind, costMul = 1): number => H.COST[kind] * costMul;
 
-/** Whether a field has grown enough to be harvested by hand. */
-export const isRipe = (growth: number): boolean => growth >= H.WHEAT.MIN_RIPE;
-
 /** How far `at` is from a candidate: from its middle, or for a field from its edge (0 inside). */
 export function distanceTo(c: HandCandidate, at: Place): number {
   if (!c.area) return distXZ(c.x, c.z, at.x, at.z);

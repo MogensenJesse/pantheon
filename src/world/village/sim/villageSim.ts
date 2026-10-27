@@ -14,7 +14,7 @@ import {
 } from '../model/types.ts';
 import { type AgentInputs, createAgents } from './agents.ts';
 import { beliefShare, believerIncome, believes, countBelievers, raiseBelief } from './belief.ts';
-import { chopMul, type FieldBonus, fieldBonus, shrineFaith } from './buildingEffects.ts';
+import { chopMul, shrineFaith } from './buildingEffects.ts';
 import { findCoarseRoute, routeFromGate } from './coarseRoute.ts';
 import { applyWork, isOpenSite } from './construction.ts';
 import {
@@ -27,6 +27,7 @@ import {
   woodCostOf,
 } from './economy.ts';
 import { createFaithState, type FaithInputs, siteCost, stepFaith } from './faith.ts';
+import { createFieldsDesk } from './fieldsDesk.ts';
 import { createForest, forestProblem, type TreeInfo } from './forest.ts';
 import { doorWorld as doorWorldOf } from './geometry.ts';
 import { createGraveyard } from './graveyard.ts';
@@ -147,13 +148,6 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
   const rainBoostOf = (base: number) => Math.max(0, (base + mods.rainBoostAdd) * mods.rainBoostMul);
   /** What the workshops' levels do for the woodcutters, worked out from the buildings at the start of each step. */
   let chopFactor = 1;
-  /** What the farmsteads do for the field being looked at (reused, so a step allocates nothing). */
-  const bonus: FieldBonus = { growthMul: 1, yieldAdd: 0 };
-  /** Food a reaping of the field gives as it stands: the yield (and what farmsteads and skills add) times its growth. */
-  const harvestOf = (field: Field): number => {
-    fieldBonus(field, buildings, bonus);
-    return (VILLAGE.ECONOMY.FIELD_YIELD + mods.fieldYieldAdd + bonus.yieldAdd) * field.growth;
-  };
   const prayers = createPrayersState();
   const hearten = createHearten();
   const forest = createForest(treeList, {
@@ -179,6 +173,13 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
   const buildings: Building[] = [];
   const fields: Field[] = [];
   const remoteSites: RemoteSite[] = [];
+  const fieldsDesk = createFieldsDesk({
+    fields,
+    buildings,
+    mods,
+    rainBoostOf,
+    addFood: (food) => economy.addFood(food),
+  });
   let nextId = 1;
   let planTimer = 0;
   let spawnTimer = 0;
@@ -835,20 +836,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
           removeDead(i, events);
         }
       }
-      const rainBoost = rainBoostOf(VILLAGE.FIELDS.RAIN_BOOST);
-      for (const field of fields) {
-        fieldBonus(field, buildings, bonus);
-        const boost =
-          (1 + VILLAGE.FIELDS.TEND_BOOST * Math.min(3, field.tenders)) *
-          (1 + rainBoost * rain) *
-          bonus.growthMul;
-        field.growth = Math.min(1, field.growth + (dt / VILLAGE.FIELDS.GROW_S) * boost);
-        // A tended, ripe field is harvested and replanted.
-        if (field.growth >= 1 && field.tenders > 0) {
-          economy.addFood(harvestOf(field));
-          field.growth = 0;
-        }
-      }
+      fieldsDesk.grow(dt, rain);
       // A hamlet that is not converted yet does not grow.
       if (!converted) return;
       planTimer += dt;
@@ -943,13 +931,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       return b ? tierCeiling(b, mods) : 1;
     },
     uprootTree: (id, events) => forest.uproot(id, events),
-    takeHarvest: (fieldId) => {
-      const field = fields.find((f) => f.id === fieldId);
-      if (!field || field.growth < VILLAGE.HAND.WHEAT.MIN_RIPE) return 0;
-      const food = harvestOf(field);
-      field.growth = 0;
-      return food;
-    },
+    takeHarvest: fieldsDesk.takeHarvest,
     haul: (siteId, wood, events) => {
       const site = buildings.find((b) => b.id === siteId);
       if (!site || !isOpenSite(site) || !(wood > 0)) return 0;

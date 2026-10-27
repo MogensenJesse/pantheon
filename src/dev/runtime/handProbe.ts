@@ -3,10 +3,10 @@
 // Drives the orb's hand without a mouse or a look at the screen: where it would reach, lift, put down and
 // cancel, and what the village made of it. `goTo`, `goToTree`, `goToField` and `goToSheep` move the orb.
 
-import { isRipe } from '../../hand/handRules';
 import type { HandRuntime } from '../../hand/handRuntime';
 import type { AnimalHand } from '../../life/animals/animals';
 import type { HandUi } from '../../ui/hand/handUi';
+import { isRipe } from '../../world/village/sim/fieldsDesk';
 import type { VillageSim } from '../../world/village/sim/villageSim';
 import { installDevHook } from './devHook';
 

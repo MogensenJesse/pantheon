@@ -7,7 +7,7 @@
 
 import type { Selection } from '../world/village/model/selection.ts';
 import type { Building, Field } from '../world/village/model/types.ts';
-import { isRipe } from './handRules.ts';
+import { isRipe } from '../world/village/sim/fieldsDesk.ts';
 import type { Place } from './handTypes.ts';
 
 export type OverviewHandMode = 'lift' | 'drop';
