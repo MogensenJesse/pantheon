@@ -3,7 +3,7 @@
 import { VILLAGE } from '../../../config/village.ts';
 import { modifiers } from '../../../skills/modifiers.ts';
 import type { VillageStage } from '../model/assetKeys.ts';
-import { isFinished, isHouse, PLOT_TYPES, plotTypeOpen, templeOf } from '../model/buildings.ts';
+import { templeOf } from '../model/buildings.ts';
 import {
   type Building,
   type Field,
@@ -17,16 +17,8 @@ import { beliefShare, believerIncome, believes, countBelievers, raiseBelief } fr
 import { chopMul, shrineFaith } from './buildingEffects.ts';
 import { findCoarseRoute, routeFromGate } from './coarseRoute.ts';
 import { applyWork, isOpenSite } from './construction.ts';
-import {
-  CHEAPEST_WOOD_COST,
-  createEconomy,
-  foodPerDay,
-  housingOf,
-  maxOpenSites,
-  pressureAllowsSite,
-  woodCostOf,
-} from './economy.ts';
-import { createFaithState, type FaithInputs, siteCost, stepFaith } from './faith.ts';
+import { createEconomy, foodPerDay } from './economy.ts';
+import { createFaithState, type FaithInputs, stepFaith } from './faith.ts';
 import { createFieldsDesk } from './fieldsDesk.ts';
 import { createForest, forestProblem, type TreeInfo } from './forest.ts';
 import { doorWorld as doorWorldOf } from './geometry.ts';
@@ -60,7 +52,6 @@ import {
   type PlanContext,
   planBuilding,
   plotFacing,
-  validatePlot,
 } from './planner.ts';
 import { createPopulation } from './population.ts';
 import {
@@ -75,15 +66,10 @@ import {
 } from './prayers.ts';
 import { createRingModel, measureContour } from './ringModel.ts';
 import { cellIndex, createSiteGrid, OCCUPANT, stampBuilding, stampFootprint } from './siteGrid.ts';
+import { createSitesDesk } from './sitesDesk.ts';
 import { seatBuilding } from './siting.ts';
 import { createSupportBuildings, FIELD_BLOCK_MARGIN_M } from './support.ts';
-import {
-  applyUpgradeWork,
-  beginUpgrade,
-  checkUpgrade,
-  tierCeiling,
-  upgradeCost,
-} from './upgrades.ts';
+import { applyUpgradeWork, tierCeiling } from './upgrades.ts';
 import { createVillageRngs } from './villageRng.ts';
 import {
   createVillagerPool,
@@ -93,8 +79,6 @@ import {
 } from './villagerPool.ts';
 import { villageStateProblem } from './villageSave.ts';
 import type {
-  PlotResult,
-  UpgradeStart,
   VillageMode,
   VillageSim,
   VillageSimOptions,
@@ -421,110 +405,19 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     }
   };
 
-  /**
-   * Start a site. It costs faith and wood, and the village has to be short of beds: building runs
-   * ahead of the people only as far as the wood and the housing allow. `free` (DEV) skips all three.
-   */
-  const startSite = (events: VillageEvent[], free: boolean): boolean => {
-    if (buildings.length >= Math.floor(PLAN.MAX_BUILDINGS * mods.buildingCapMul)) return false;
-    const open = openSites().length;
-    if (free) {
-      if (open >= PLAN.MAX_ACTIVE_SITES) return false;
-    } else {
-      const housing = housingOf(buildings, villagers.count, mods.bedsPerHouseAdd);
-      if (open >= maxOpenSites(housing, PLAN.MAX_ACTIVE_SITES) || !pressureAllowsSite(housing)) {
-        return false;
-      }
-      if (faith.faith < siteCost(buildings.filter((b) => b.type !== 'temple').length)) return false;
-      // Not even the cheapest building is affordable: nothing to plan yet.
-      if (economy.stock.wood < CHEAPEST_WOOD_COST) return false;
-    }
-    const site = findSite(chooseNextKind(buildings, rngs.plan));
-    if (!site) return false;
-    if (!free) {
-      if (!economy.spendWood(woodCostOf(site.type!))) return false;
-      faith.faith -= siteCost(buildings.filter((b) => b.type !== 'temple').length);
-    }
-    const building = place(site.type!, 0, site.x, site.z, site.rotY, site.ring);
-    events.push({ kind: 'siteStarted', building });
-    return true;
-  };
-
-  /**
-   * What putting a building of `type` at (x, z) would come to, with no effect: the village must be converted
-   * and have room for another site, the spot must hold the planner's own rules, and the wood and faith must
-   * be there.
-   */
-  const plotCheck = (type: Building['type'], x: number, z: number, rotY: number): PlotResult => {
-    if (!PLOT_TYPES.includes(type)) return 'type';
-    if (!converted) return 'not-converted';
-    if (!plotTypeOpen(type, mods)) return 'locked';
-    if (buildings.length >= Math.floor(PLAN.MAX_BUILDINGS * mods.buildingCapMul)) return 'full';
-    if (openSites().length >= PLAN.MAX_ACTIVE_SITES) return 'cap';
-    const spot = validatePlot(context(), type, x, z, rotY);
-    if (!spot.ok) return spot.reason;
-    if (economy.stock.wood < woodCostOf(type)) return 'wood';
-    if (faith.faith < siteCost(buildings.filter((b) => b.type !== 'temple').length)) return 'faith';
-    return 'ok';
-  };
-
-  /** The player marks a plot: a site starts there and the builders come to it. */
-  const placePlot = (
-    type: Building['type'],
-    x: number,
-    z: number,
-    rotY: number,
-    events: VillageEvent[],
-  ): PlotResult => {
-    const result = plotCheck(type, x, z, rotY);
-    if (result !== 'ok') return result;
-    const spot = validatePlot(context(), type, x, z, rotY);
-    economy.spendWood(woodCostOf(type));
-    faith.faith -= siteCost(buildings.filter((b) => b.type !== 'temple').length);
-    const ring = spot.ok ? spot.ring : -1;
-    events.push({ kind: 'siteStarted', building: place(type, 0, x, z, rotY, ring) });
-    return 'ok';
-  };
-
-  const activeUpgrades = () => buildings.filter((b) => isFinished(b) && b.upgrade > 0).length;
-
-  /**
-   * Begin the next upgrade of a finished building: it costs wood and faith, the tree must allow the level and
-   * only `UPGRADES.MAX_ACTIVE` upgrades run at once. `free` (DEV) skips the cost and the cap.
-   */
-  const upgradeBuilding = (id: number, events: VillageEvent[], free = false): UpgradeStart => {
-    const b = buildings.find((x) => x.id === id);
-    if (!b) return 'unsupported';
-    const check = checkUpgrade(b, mods);
-    if (!check.ok) return check.reason;
-    if (!free) {
-      if (activeUpgrades() >= VILLAGE.UPGRADES.MAX_ACTIVE) return 'cap';
-      const cost = upgradeCost(b);
-      if (faith.faith < cost.faith) return 'faith';
-      if (economy.stock.wood < cost.wood) return 'wood';
-      economy.spendWood(cost.wood);
-      faith.faith -= cost.faith;
-    }
-    beginUpgrade(b);
-    events.push({ kind: 'upgradeStarted', building: b });
-    return 'ok';
-  };
-
-  /** The planner's choice: the lowest level first, houses before stores, then the oldest. No random draw. */
-  const nextUpgrade = (): Building | null => {
-    let best: Building | null = null;
-    for (const b of buildings) {
-      if (!checkUpgrade(b, mods).ok) continue;
-      if (
-        !best ||
-        b.level < best.level ||
-        (b.level === best.level && Number(isHouse(best)) < Number(isHouse(b)))
-      ) {
-        best = b;
-      }
-    }
-    return best;
-  };
+  const { startSite, plotCheck, placePlot, upgradeBuilding, nextUpgrade } = createSitesDesk({
+    buildings,
+    mods,
+    faith,
+    economy,
+    villagerCount: () => villagers.count,
+    isConverted: () => converted,
+    openSites,
+    chooseKind: () => chooseNextKind(buildings, rngs.plan),
+    findSite,
+    context,
+    place,
+  });
 
   const complete = (site: Building, events: VillageEvent[]) => {
     for (const done of applyWork(site, Number.POSITIVE_INFINITY)) {
