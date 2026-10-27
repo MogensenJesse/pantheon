@@ -180,6 +180,8 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
       })
     : () => {};
 
+  // The roam hand shows and answers its key while the skill tree is open and nothing else owns the orb.
+  const roamHandOn = () => skills.isOpen() && !deps.overviewActive() && !deps.cinematic.isPlaying();
   // The hand lifts and puts down; villagers believe because they see it done.
   const handRuntime = village
     ? createHandRuntime({
@@ -205,6 +207,7 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
         costMul: () => modifiers.handCostMul,
         // The overview is not a block: the hand works there too, and what it holds is kept across the toggle.
         blocked: deps.cinematic.isPlaying,
+        active: roamHandOn,
       })
     : null;
   const burstOrigin = new Vector3();
@@ -213,8 +216,7 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
         runtime: handRuntime,
         camera: deps.camera,
         groundY: (x, z) => terrain.getWorldY(x, z),
-        enabled: () => skills.isOpen() && !deps.overviewActive() && !deps.cinematic.isPlaying(),
-        orbPlace,
+        enabled: roamHandOn,
         onDelivered: (delivery, at) => {
           bus.emit('hand:delivered', delivery);
           // Sparkles burst at the orb, or where the overview's cursor put it down.

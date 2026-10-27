@@ -28,7 +28,7 @@ import {
   type HandPorts,
 } from '../../../src/hand/handRuntime.ts';
 import type { HandCandidate, HandEnergy } from '../../../src/hand/handTypes.ts';
-import { overviewPlace } from '../../../src/hand/overviewAim.ts';
+import { canArm, clickOwner, overviewPlace } from '../../../src/hand/overviewAim.ts';
 import {
   type AnimalEnv,
   addAnimal,
@@ -49,6 +49,7 @@ import { newQuestState, type QuestEvent, stepQuest } from '../../../src/quests/q
 import {
   Activity,
   type Building,
+  type RemoteSite,
   Role,
   type VillageEvent,
 } from '../../../src/world/village/model/types.ts';
@@ -175,7 +176,8 @@ const all = [temple, site, granary, upgrading, house];
 await check('drop zones: wood to a store or, better, to a site; food only to a store', () => {
   const zoneAt = (good: 'wood' | 'food', x: number, z: number) => {
     const d = classifyDrop(good, { x, z }, all);
-    return d.zone === 'none' ? 'none' : `${d.zone}:${d.building.id}`;
+    if (d.zone === 'none') return 'none';
+    return d.zone === 'remote' ? `remote:${d.site.id}` : `${d.zone}:${d.building.id}`;
   };
   assert.equal(zoneAt('wood', 0, 0), 'store:1', 'the temple takes wood');
   assert.equal(zoneAt('food', 0, 0), 'store:1', 'and food');
@@ -253,6 +255,54 @@ await check('needs: wood at a site, or goods a store was short of, count as meet
     'the sim agrees',
   );
 });
+
+/** A remote site (a restoration or an outpost) as the hand sees it: only where it is and how far along. */
+const remoteSite = (over: Partial<RemoteSite>): RemoteSite => ({
+  id: 1,
+  kind: 'tree',
+  x: 540,
+  z: 0,
+  campX: 500,
+  campZ: 0,
+  stage: 0,
+  progress: 0,
+  route: [],
+  ...over,
+});
+
+await check(
+  'remote sites: wood at the camp or the place is the crew’s work; food, far away and a finished site are not',
+  () => {
+    const R = H.REMOTE_DROP_M;
+    const camp = remoteSite({});
+    const wood = (x: number, z: number, sites = [camp]) =>
+      classifyDrop('wood', { x, z }, all, sites);
+    const atCamp = wood(500, 0);
+    assert.ok(atCamp.zone === 'remote' && atCamp.site.id === 1, JSON.stringify(atCamp.zone));
+    assert.deepEqual(
+      atCamp.zone === 'remote' && [atCamp.x, atCamp.z],
+      [500, 0],
+      'the ring hangs at the camp',
+    );
+    const atPlace = wood(540 + R - 0.1, 0);
+    assert.ok(atPlace.zone === 'remote' && atPlace.x === 540, 'the place itself counts too');
+    assert.equal(wood(500 + R + 0.1, 0).zone, 'none', 'just outside the camp');
+    assert.equal(wood(540 - R - 0.1, 0).zone, 'none', 'and just outside the place');
+    assert.equal(classifyDrop('food', { x: 500, z: 0 }, all, [camp]).zone, 'none', 'no food');
+    assert.equal(wood(500, 0, [remoteSite({ stage: 2 })]).zone, 'none', 'a finished site');
+    assert.equal(wood(500, 0, []).zone, 'none', 'no sites');
+    assert.equal(classifyDrop('wood', { x: 500, z: 0 }, all).zone, 'none', 'and no sites given');
+    // of two camps the nearer middle wins
+    const near = remoteSite({ id: 2, campX: 506 });
+    const both = wood(504, 0, [camp, near]);
+    assert.ok(both.zone === 'remote' && both.site.id === 2, 'the nearer camp');
+    // a building zone is looked at first
+    const atTemple = remoteSite({ id: 3, campX: temple.x, campZ: temple.z });
+    assert.equal(wood(temple.x, temple.z, [atTemple]).zone, 'store', 'the temple comes first');
+    // and it is always a need
+    assert.equal(meetsNeed('wood', atCamp, { food: false, wood: false }), true);
+  },
+);
 
 // --- the hold ---
 
@@ -691,6 +741,7 @@ function handOn(sim: VillageSim, over: Partial<HandPorts> = {}, energy = 100) {
       uprootTree: (id) => sim.uprootTree(id, events),
       takeHarvest: (id) => sim.takeHarvest(id),
       haul: (siteId, wood) => sim.haul(siteId, wood, events),
+      haulRemote: (siteId, wood) => sim.haulRemote(siteId, wood, events),
       carry: {
         lift: (what, id) => {
           log.push(`lift:${what}:${id}`);
@@ -893,6 +944,59 @@ await check(
       `${site.progress - progress} of ${worked}`,
     );
     assert.equal(r.delivery.kept, r.delivery.amount);
+  },
+);
+
+await check(
+  'drop at a remote camp: the wood is the crew’s work, the stores are untouched, stages roll over',
+  () => {
+    const sim = makeSim(map, { mode: 'hamlet' });
+    stepSim(sim, { seconds: 30, phase: () => 0.4 });
+    const temple = templeOf(sim);
+    const [first, second] = VILLAGE.RESTORATION.SITE_WORK_S as readonly number[] as [
+      number,
+      number,
+    ];
+    const remote = remoteSite({
+      campX: temple.x + 400,
+      campZ: temple.z,
+      x: temple.x + 430,
+      z: temple.z,
+      progress: first - 1,
+    });
+    (sim.remoteSites as RemoteSite[]).push(remote);
+    const camp = { x: remote.campX, z: remote.campZ };
+    const w = handOn(sim);
+    const [a, b] = sim.forest.nearest(temple.x, temple.z, 2) as [number, number];
+    const haul = (id: number) => {
+      w.moveTo(w.treeAt(id));
+      assert.ok(w.hand.pick().ok);
+      assert.equal(w.hand.zone(camp)?.zone, 'remote');
+      w.moveTo(camp);
+      const r = w.hand.drop();
+      assert.ok(r.kind === 'delivered' && r.delivery.zone === 'remote', JSON.stringify(r));
+      assert.equal(r.delivery.kept, r.delivery.amount, 'all of it is work');
+      return r.delivery.amount * H.WORK_PER_WOOD_S;
+    };
+    const stock = { ...sim.economy.stock };
+    const worked = haul(a);
+    assert.deepEqual({ ...sim.economy.stock }, stock, 'a site takes work, not stock');
+    assert.equal(w.standing(a), false, 'the tree was uprooted');
+    assert.equal(remote.stage, 1, 'the first stage is done');
+    assert.ok(
+      Math.abs(remote.progress - (worked - 1)) < 1e-6,
+      `${remote.progress} into the second`,
+    );
+    const stages = () =>
+      w.events.flatMap((e) => (e.kind === 'remoteStageCompleted' ? [e.stage] : []));
+    assert.deepEqual(stages(), [1]);
+
+    remote.progress = second - 1;
+    haul(b);
+    assert.equal(remote.stage, 2, 'the last wood finishes the place');
+    assert.deepEqual(stages(), [1, 2], 'and the stage events come out in order');
+    assert.equal(w.hand.zone(camp), null, 'nothing is held now');
+    assert.equal(classifyDrop('wood', camp, sim.buildings, sim.remoteSites).zone, 'none');
   },
 );
 
@@ -1284,7 +1388,10 @@ await check(
         { id: 4, x: 10, z: 20 },
         { id: 7, x: -30, z: 5 },
       ],
-      fields: [{ id: 2, x: 50, z: 60 }],
+      fields: [
+        { id: 2, x: 50, z: 60, growth: 1 },
+        { id: 3, x: -50, z: 60, growth: H.WHEAT.MIN_RIPE - 0.01 },
+      ],
     };
     const ground = { x: 100, z: 100 };
     assert.deepEqual(overviewPlace('drop', { kind: 'building', id: 7 }, ground, world), {
@@ -1295,6 +1402,8 @@ await check(
       x: 50,
       z: 60,
     });
+    // An unripe field has nothing to lift: a click on it is just the ground under the cursor.
+    assert.deepEqual(overviewPlace('lift', { kind: 'field', id: 3 }, ground, world), ground);
     // A building is no place to lift from, a field no place to put down, and a villager or nothing is the ground.
     assert.deepEqual(overviewPlace('lift', { kind: 'building', id: 7 }, ground, world), ground);
     assert.deepEqual(overviewPlace('drop', { kind: 'field', id: 2 }, ground, world), ground);
@@ -1304,6 +1413,44 @@ await check(
     assert.deepEqual(overviewPlace('drop', { kind: 'building', id: 99 }, ground, world), ground);
     assert.equal(overviewPlace('lift', null, null, world), null);
     assert.equal(overviewPlace('drop', { kind: 'villager', index: 1 }, null, world), null);
+  },
+);
+
+await check('overview powers: the hand takes every click while it holds something', () => {
+  const hand = 'hand';
+  assert.equal(clickOwner(null, hand, false), 'none', 'nothing armed: the panel selects');
+  assert.equal(clickOwner('call_rain', hand, false), 'power');
+  assert.equal(clickOwner(hand, hand, false), 'tool', 'the armed hand lifts');
+  assert.equal(clickOwner(null, hand, true), 'tool', 'a full hand, nothing armed');
+  assert.equal(clickOwner('call_rain', hand, true), 'tool', 'and a full hand beats an armed power');
+  assert.equal(clickOwner('call_rain', undefined, false), 'power', 'without a hand on the bar');
+  assert.equal(clickOwner(null, undefined, true), 'none');
+  assert.equal(canArm('call_rain', hand, false), true);
+  assert.equal(canArm('call_rain', hand, true), false, 'put it down first');
+  assert.equal(canArm(hand, hand, true), true, 'the hand itself may be armed or put away');
+  assert.equal(canArm('call_rain', undefined, true), false);
+});
+
+await check(
+  'looking: a look at a point leaves the orb’s target alone, and an inactive hand does not look',
+  () => {
+    const sim = makeSim(map, { mode: 'hamlet' });
+    const temple = templeOf(sim);
+    const [a, b] = sim.forest.nearest(temple.x, temple.z, 2) as [number, number];
+    let active = true;
+    const w = handOn(sim, { active: () => active });
+    w.moveTo(w.treeAt(a));
+    w.hand.update(1);
+    const seen = w.hand.target();
+    assert.ok(seen && seen.id === a, 'the orb stands at the first tree');
+    const other = w.hand.targetAt(w.treeAt(b));
+    assert.ok(other && other.id === b, 'the cursor is at the second');
+    assert.equal(w.hand.target()?.id, a, 'the orb’s target is still the first');
+    assert.equal(seen.id, a, 'and the object it handed out was not rewritten');
+    active = false;
+    w.hand.update(1);
+    assert.equal(w.hand.target(), null, 'nobody is looking: nothing is aimed at');
+    assert.ok(w.hand.targetAt(w.treeAt(b)), 'but a look at a point still works');
   },
 );
 

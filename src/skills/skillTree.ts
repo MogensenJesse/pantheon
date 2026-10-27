@@ -381,7 +381,7 @@ export const SKILL_NODES: readonly SkillNode[] = [
     id: 'fine_works',
     arch: 'village',
     name: 'Fine works',
-    text: 'Farmsteads can be raised to a second level, then a third: the fields around them grow faster and give more.',
+    text: 'Farmsteads and shrines can be raised to a second level, then a third: the fields around a farmstead grow faster and give more, a shrine gathers more faith. Needs a building raised to level 2.',
     x: 0,
     y: 1,
     cost: 2,

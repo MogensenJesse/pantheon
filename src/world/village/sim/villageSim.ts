@@ -967,6 +967,14 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       workOn(site, seconds, events);
       return seconds;
     },
+    haulRemote: (siteId, wood, events) => {
+      const site = remoteSites.find((r) => r.id === siteId);
+      if (!site || site.stage >= 2 || !(wood > 0)) return 0;
+      const seconds = wood * VILLAGE.HAND.WORK_PER_WOOD_S;
+      sink = events;
+      applyRemoteWork(site, seconds);
+      return seconds;
+    },
     fellNear: (x, z, n, events) => {
       let felled = 0;
       for (const id of forest.nearest(x, z, n)) {

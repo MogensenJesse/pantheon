@@ -223,7 +223,7 @@ export interface VillageSim {
   gatheredShare: (radiusM: number) => number;
   beliefShare: () => number;
   /**
-   * Raises a villager's belief (the orb's powers do this). True when it just reached 1; the events carry
+   * Raises a villager's belief (the hand's deeds do this). True when it just reached 1; the events carry
    * the convert. What converts the village is `convertVillage`.
    */
   addBelief: (villager: number, amount: number, events: VillageEvent[]) => boolean;
@@ -232,7 +232,7 @@ export interface VillageSim {
    * False when it already is converted, and in a sandbox village.
    */
   convertVillage: (events: VillageEvent[]) => boolean;
-  /** Holds a villager still, facing (x, z), for a few seconds (the powers do this); false for someone indoors. */
+  /** Holds a villager still, facing (x, z), for a few seconds (the hand's deeds do this); false for someone indoors. */
   notice: (villager: number, x: number, z: number, seconds: number) => boolean;
   /**
    * The orb's hand (story-mechanics/HAND.md). The village changes only when an item is delivered, so each of
@@ -245,6 +245,12 @@ export interface VillageSim {
   uprootTree: (id: number, events: VillageEvent[]) => number;
   takeHarvest: (fieldId: number) => number;
   haul: (siteId: number, wood: number, events: VillageEvent[]) => number;
+  /**
+   * Counts wood brought to an unfinished remote site (`RemoteSite.id`: a place being restored, an outpost) as the
+   * crew's work, exactly like the crew's own: a finished stage is reported, and the last one ends the site and
+   * calls the crew home. Returns the seconds of work given (0 when there is no such site or it is finished).
+   */
+  haulRemote: (siteId: number, wood: number, events: VillageEvent[]) => number;
   /** What a plot of `type` at (x, z) facing `rotY` would come to (no effect): `'ok'` or the reason it cannot. */
   plotCheck: (type: VillageBuildingType, x: number, z: number, rotY: number) => PlotResult;
   /** The player marks a plot: a site starts there, paid like any site. */

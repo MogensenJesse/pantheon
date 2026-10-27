@@ -34,7 +34,7 @@ export function initPowersProbe(src: PowersProbeSources): () => void {
       })),
     /** The village powers the player has (name, cost, ready, cooldown). */
     builder: () => src.builderList(),
-    /** Cast one at a place: `castBuilder('call_rain', { pick: null, ground: { x, z } })`. */
+    /** Cast one at a place: `castBuilder('call_rain', { ground: { x, z } })`. */
     castBuilder: (id: string, aim: CursorAim) => src.castBuilder(id, aim),
     houses: () => sim.buildings.filter(isHouse).map((b) => ({ id: b.id, x: b.x, z: b.z })),
   });

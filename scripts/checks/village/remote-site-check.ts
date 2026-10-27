@@ -181,4 +181,48 @@ await check('a crew is made up again when its members are lost', () => {
   assert.ok(now.length >= CREW.MIN, `crew of ${now.length} after losses`);
 });
 
+await check(
+  'wood hauled by the hand is the crew’s work: stages and the walk home come out as they would',
+  () => {
+    const sim = grownVillage();
+    assert.equal(sim.startRemoteSite('tree', place.x, place.z, []), 'ok');
+    const site = sim.remoteSites[0]!;
+    const crew = crewOf(sim);
+    // Two minutes on: the crew is on the road (the walk is over three), so nobody has worked yet.
+    stepSim(sim, { seconds: 120, from: 2 * DAY_S, fed: true });
+    assert.equal(site.progress, 0, 'no work yet');
+    const per = VILLAGE.HAND.WORK_PER_WOOD_S;
+    const [first, second] = VILLAGE.RESTORATION.SITE_WORK_S as readonly number[] as [
+      number,
+      number,
+    ];
+    const events: VillageEvent[] = [];
+    const before = site.progress;
+    assert.equal(sim.haulRemote(site.id, 3, events), 3 * per);
+    assert.equal(site.progress, before + 3 * per, 'wood is work, at the rate of a site');
+    assert.equal(events.length, 0, 'not a stage yet');
+    for (const bad of [0, -1, Number.NaN]) {
+      assert.equal(sim.haulRemote(site.id, bad, events), 0, `${bad} wood is no work`);
+    }
+    assert.equal(sim.haulRemote(99, 5, events), 0, 'no such site');
+    assert.equal(site.progress, before + 3 * per, 'and nothing moved');
+
+    sim.haulRemote(site.id, (first - site.progress) / per, events);
+    assert.equal(site.stage, 1);
+    sim.haulRemote(site.id, second / per, events);
+    assert.equal(site.stage, 2);
+    assert.equal(site.progress, 0);
+    const stages = events.flatMap((e) => (e.kind === 'remoteStageCompleted' ? [e.stage] : []));
+    assert.deepEqual(stages, [1, 2], 'both stages are reported, in order');
+    assert.equal(sim.haulRemote(site.id, 5, events), 0, 'a finished place takes no more');
+
+    stepSim(sim, { seconds: 3 * DAY_S, from: 2 * DAY_S + 120, fed: true });
+    assert.equal(crewOf(sim).length, 0, 'the crew is called home and released');
+    for (const i of crew) {
+      const d = Math.hypot(sim.villagers.x[i]! - seed.x, sim.villagers.z[i]! - seed.z);
+      assert.ok(d < seed.radiusM + 20, `builder ${i} is home (${d.toFixed(0)} m from the temple)`);
+    }
+  },
+);
+
 finish('all remote site checks passed');

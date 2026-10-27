@@ -39,7 +39,7 @@ export const templeOf = (buildings: readonly Building[]): Building | undefined =
 /** Houses of any size (`house_*`). */
 export const isHouse = (b: Pick<Building, 'type'>): boolean => b.type.startsWith('house_');
 
-/** Built (stage 2); the opposite of `isOpenSite` in sim/construction. */
+/** Built (stage 2). A finished building can still be an open site while an upgrade is under way (`isOpenSite` in sim/construction). */
 export const isFinished = (b: Building): boolean => b.stage >= 2;
 
 /** Beds a house gains from its upgrade level (0 for any other building). */

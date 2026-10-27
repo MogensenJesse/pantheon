@@ -625,6 +625,7 @@ async function main(): Promise<void> {
           ui: gameplay.hand,
           world: village.sim,
           pick: overviewUi.pickAtMouse,
+          hovered: overviewUi.hovered,
           groundY: terrain.getWorldY,
           open: skills.isOpen,
           energy: () => state.energy,

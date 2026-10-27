@@ -6,12 +6,15 @@
 // a toast and stays armed, so a click that missed can be tried again.
 //
 // The orb's hand sits first on the same bar as a tool (`OverviewTool`): armed, it takes the clicks to lift and
-// to put down and stays armed for the next one; while it holds something it takes them whatever is armed.
+// to put down and stays armed for the next one; while it holds something it takes every click, and no other
+// power can be armed until it is put down or put back (`clickOwner`, `canArm`).
 
 import { abilityById } from '../../abilities/abilities';
 import { type AbilityView, refusalText } from '../../abilities/abilityView';
 import type { CursorAim } from '../../abilities/builderPowers';
 import type { CastResult } from '../../abilities/caster';
+import { putDownFirstText } from '../../hand/handText';
+import { canArm, clickOwner } from '../../hand/overviewAim';
 import type { Overview } from '../../overview/overviewController';
 import { createBuilderBar } from '../abilities';
 import { getHudSlot, h, isModalPanelOpen, isPanelOpen, notify, registerHotkey } from '../kit';
@@ -49,7 +52,8 @@ export interface OverviewPowers {
   dispose: () => void;
 }
 
-const SLOT_KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6'] as const;
+/** The keys of the bar's slots: the hand and the two weather powers. */
+const SLOT_KEYS = ['Digit1', 'Digit2', 'Digit3'] as const;
 
 export function createOverviewPowers(deps: OverviewPowersDeps): OverviewPowers {
   const { overview, tool } = deps;
@@ -59,8 +63,9 @@ export function createOverviewPowers(deps: OverviewPowersDeps): OverviewPowers {
   hint.hidden = true;
   getHudSlot('hints').appendChild(hint);
 
-  /** The tool takes the clicks: armed, or full while nothing else is armed. */
-  const toolLive = () => !!tool && (armed === tool.id || (armed === null && tool.busy()));
+  const toolBusy = () => tool?.busy() ?? false;
+  /** The tool takes the clicks: armed, or full. */
+  const toolLive = () => clickOwner(armed, tool?.id, toolBusy()) === 'tool';
   /** What the bar shows as armed. */
   const shownArmed = () => armed ?? (tool?.busy() ? tool.id : null);
 
@@ -76,8 +81,13 @@ export function createOverviewPowers(deps: OverviewPowersDeps): OverviewPowers {
     if (text !== null && hint.textContent !== text) hint.textContent = text;
   };
 
+  /** Something is up that leaving the overview has to put away (an armed power, the hand's rings, the hint). */
+  let untidy = false;
+
   const arm = (id: string | null) => {
+    if (id !== null && !canArm(id, tool?.id, toolBusy())) return;
     armed = id;
+    if (id !== null) untidy = true;
     showHint();
   };
 
@@ -88,6 +98,10 @@ export function createOverviewPowers(deps: OverviewPowersDeps): OverviewPowers {
 
   const choose = (id: string) => {
     if (overview.phase() !== 'overview') return;
+    if (!canArm(id, tool?.id, toolBusy())) {
+      notify({ text: putDownFirstText, kind: 'warning', key: 'hand-busy' });
+      return;
+    }
     arm(armed === id ? null : id);
   };
 
@@ -106,11 +120,12 @@ export function createOverviewPowers(deps: OverviewPowersDeps): OverviewPowers {
   const offClick = overview.onClick(
     () => {
       if (isModalPanelOpen()) return false;
-      if (tool && toolLive()) {
+      const owner = clickOwner(armed, tool?.id, toolBusy());
+      if (owner === 'tool' && tool) {
         tool.click();
         return true;
       }
-      if (armed === null) return false;
+      if (owner !== 'power' || armed === null) return false;
       const result = deps.cast(armed, aim());
       if (result.ok) {
         arm(null);
@@ -125,7 +140,7 @@ export function createOverviewPowers(deps: OverviewPowersDeps): OverviewPowers {
   // Esc puts back what the hand holds, then puts an armed power away, before it leaves the overview.
   const offEscape = overview.addEscapeGuard(() => {
     if (isPanelOpen()) return false;
-    if (tool?.busy() && toolLive() && tool.escape()) {
+    if (tool?.busy() && tool.escape()) {
       showHint();
       return true;
     }
@@ -149,9 +164,12 @@ export function createOverviewPowers(deps: OverviewPowersDeps): OverviewPowers {
     ),
   );
 
-  // Leaving the overview puts the power away (what the hand holds stays held).
+  // Leaving the overview puts the power away (what the hand holds stays held). The overview's frame does not
+  // run once it is left, so a timer sees to it; it does nothing while there is nothing to put away.
   const leave = () => {
     if (overview.phase() === 'overview') return false;
+    if (!untidy) return true;
+    untidy = false;
     if (armed !== null) arm(null);
     tool?.frame(false);
     showHint();
@@ -159,6 +177,7 @@ export function createOverviewPowers(deps: OverviewPowersDeps): OverviewPowers {
   };
   const offFrame = overview.onFrame(() => {
     if (leave()) return;
+    untidy = true;
     tool?.frame(toolLive());
     showHint();
   });

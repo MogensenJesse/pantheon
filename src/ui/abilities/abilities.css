@@ -1,11 +1,11 @@
 /*
- * src/ui/abilities/abilities.css — the village powers' bar in the overview. Quiet and mythic, all
- * tokens; hidden while the player has no power.
+ * src/ui/abilities/abilities.css — the powers bar in the village overview (the orb's hand and the weather
+ * powers). Quiet and mythic, all tokens; hidden while the player has no power.
  */
 
 .ab-bar {
   position: fixed;
-  /* Bottom right, above the autosave indicator: the middle of the bottom edge belongs to the energy bar. */
+  /* Placed by `.ab-bar--overview` below: the bar only exists in the overview. */
   right: 1.5rem;
   bottom: 3.5rem;
   display: flex;

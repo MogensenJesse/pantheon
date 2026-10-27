@@ -1,7 +1,7 @@
 // src/ui/abilities/builderBar.ts — the bar of arch II powers in the village overview
 //
-// The same slots as the roam ability bar (name, cost, a ring that empties as the cooldown runs), but here a
-// slot is a button: click it, or press its number, and the power is armed. The overview takes it from there.
+// A row of slots (name, cost, a ring that empties as the cooldown runs); a slot is a button: click it, or press
+// its number, and the power is armed. The overview takes it from there (the orb's hand sits first on the bar).
 
 import type { AbilityView } from '../../abilities/abilityView';
 import { createSlotBar } from './slotBar';

@@ -1,4 +1,4 @@
-// src/world/village/assets/placeholder/buildingKit.ts — house, workshop, granary and farmstead placeholder geometry
+// src/world/village/assets/placeholder/buildingKit.ts — house, workshop, granary, farmstead and shrine placeholder geometry
 import type { BufferGeometry } from 'three';
 import { hasWindowGlow, type VillageAssetMeta, type VillageStage } from '../../model/assetKeys.ts';
 import { type Detail, type LodGeometries, lodsOf, windowGlowQuad } from './kitUtil.ts';

@@ -4,7 +4,6 @@
 // The hand itself is `src/hand/handRuntime.ts`; this only shows it and presses its keys.
 
 import type { Camera } from 'three';
-import { VILLAGE } from '../../config/village';
 import type { Delivery, DropOutcome, HandRuntime, PickOutcome } from '../../hand/handRuntime';
 import {
   deliveryText,
@@ -17,11 +16,7 @@ import {
 import type { Place } from '../../hand/handTypes';
 import { createHint, h, keycap, notify, registerHotkey } from '../kit';
 import { createMarkerLayer } from '../overlay';
-
-/** Metres above the ground the ring over a tree sits (about the trunk's middle), and over a field. */
-const RING_LIFT_M = 1.6;
-const FIELD_RING_LIFT_M = 0.4;
-const TREE_RING_M = 2.4;
+import { newRing, targetRing, zoneRing } from './handRings';
 
 export interface HandUiDeps {
   runtime: HandRuntime;
@@ -29,13 +24,16 @@ export interface HandUiDeps {
   groundY: (x: number, z: number) => number;
   /** The hand shows and answers its key: the skill tree is open and nothing else owns the orb. */
   enabled: () => boolean;
-  /** Where the orb is on the ground. */
-  orbPlace: () => { x: number; z: number };
   /** Told about every delivery (the bus event, the sparkles); `at` is where it was put down when that was not the orb. */
   onDelivered: (delivery: Delivery, at?: Place) => void;
-  /** Key to lift and put down. */
+  /** Key to lift and put down (a `KeyboardEvent.code`; F by default). */
   code?: string;
 }
+
+const DEFAULT_CODE = 'KeyF';
+
+/** The label of a key on a keycap: `KeyF` is F, `Digit3` is 3. */
+const keyName = (code: string) => code.replace(/^(?:Key|Digit)/, '');
 
 export interface HandUi {
   /** Once per fixed step. */
@@ -48,7 +46,7 @@ export interface HandUi {
   putDown: (at?: Place) => DropOutcome;
   /** Puts the held thing back on purpose (the overview's Esc): the effort is lost. */
   putBack: () => boolean;
-  /** The game takes the held thing away (a cutscene, the overview, the finale). */
+  /** The game takes the held thing away (the finale, a cutscene). */
   cancel: () => boolean;
   dispose: () => void;
 }
@@ -57,7 +55,9 @@ export function initHandUi(deps: HandUiDeps): HandUi {
   const { runtime } = deps;
   const rings = createMarkerLayer(deps.camera, 'po-ring');
   const label = h('span');
-  const hint = createHint([keycap('F'), ' ', label]);
+  const code = deps.code ?? DEFAULT_CODE;
+  const hint = createHint([keycap(keyName(code)), ' ', label]);
+  const ring = newRing();
   let lastText = '';
 
   const lift = (at?: Place): PickOutcome => {
@@ -85,7 +85,7 @@ export function initHandUi(deps: HandUiDeps): HandUi {
     if (runtime.held()) putDown();
     else lift();
   };
-  const offKey = registerHotkey(deps.code ?? 'KeyF', press, 'Lift or put down', {
+  const offKey = registerHotkey(code, press, 'Lift or put down', {
     whenPanelOpen: false,
   });
 
@@ -106,15 +106,12 @@ export function initHandUi(deps: HandUiDeps): HandUi {
       const target = on ? runtime.target() : null;
       const zone = on && held ? runtime.zone() : null;
       if (target) {
-        const field = target.area;
-        const lift = field ? FIELD_RING_LIFT_M : RING_LIFT_M;
-        const size = field ? 2 * Math.max(field.halfW, field.halfD) : TREE_RING_M;
-        rings.add(target.x, deps.groundY(target.x, target.z) + lift, target.z, size);
+        const r = targetRing(target, ring);
+        rings.add(r.x, deps.groundY(r.x, r.z) + r.liftM, r.z, r.sizeM);
       }
-      if (zone && zone.zone !== 'none') {
-        const b = zone.building;
-        const size = 2 * Math.max(b.halfW, b.halfD) + VILLAGE.HAND.ZONE_MARGIN_M;
-        rings.add(b.x, deps.groundY(b.x, b.z) + 0.3, b.z, size).state = 'is-active';
+      if (zone && zoneRing(zone, ring)) {
+        rings.add(ring.x, deps.groundY(ring.x, ring.z) + ring.liftM, ring.z, ring.sizeM).state =
+          'is-active';
       }
       rings.flush();
       const text = on ? hintText(target, held, zone) : '';

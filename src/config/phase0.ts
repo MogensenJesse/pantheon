@@ -79,7 +79,7 @@ export const PHASE0 = {
     ELDER_MEET_HOLD_S: 10,
     /** Villagers who must believe for the "help the village believe" step. */
     CONVERTS_GOAL: 5,
-    /** A Sign counts as lighting the temple fire within this distance (m) of the temple... */
+    /** A tree put down within this distance (m) of the temple counts as lighting the temple fire... */
     FIRE_TEMPLE_M: 15,
     /** ...at dusk: this much of the day before sunset, until this much after it. */
     DUSK_BEFORE_SUNSET: 0.13,

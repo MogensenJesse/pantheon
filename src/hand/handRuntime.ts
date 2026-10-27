@@ -6,7 +6,7 @@
 // site, and pays the witnesses. Any other end of a hold (`cancel`) leaves the world as it was.
 
 import { VILLAGE } from '../config/village.ts';
-import type { Building, Field } from '../world/village/model/types.ts';
+import type { Building, Field, RemoteSite } from '../world/village/model/types.ts';
 import { type Stock, shortages } from '../world/village/sim/economy.ts';
 import { type CarryPose, carryPoseOf, createCarryHeading } from './carryPose.ts';
 import { createDeedLedger, type DeedLedger, type DeedWorld } from './deeds.ts';
@@ -21,6 +21,7 @@ import {
   reachOf,
 } from './handRules.ts';
 import {
+  type DropZone,
   GOOD_OF,
   type HandCandidate,
   type HandEnergy,
@@ -52,6 +53,8 @@ export interface HandVillage {
       within: (x: number, z: number, radiusM: number, out: number[]) => number[];
     };
     readonly buildings: readonly Building[];
+    /** The restorations and outposts far outside the village; wood put down at one is the crew's work. */
+    readonly remoteSites: readonly RemoteSite[];
     readonly fields: readonly Pick<
       Field,
       'id' | 'x' | 'z' | 'rotY' | 'halfW' | 'halfD' | 'growth'
@@ -68,6 +71,8 @@ export interface HandVillage {
   takeHarvest: (fieldId: number) => number;
   /** Counts wood brought to an open site as work; returns the seconds given. */
   haul: (siteId: number, wood: number) => number;
+  /** Counts wood brought to an unfinished remote site as the crew's work; returns the seconds given. */
+  haulRemote: (siteId: number, wood: number) => number;
   carry: HandCarry;
 }
 
@@ -100,8 +105,10 @@ export interface HandPorts {
   /** The skill tree's factors on reach and on cost (1 when it has none). */
   reachMul?: () => number;
   costMul?: () => number;
-  /** True while the hand may not be used (a cutscene, a mode that owns the orb): a hold ends and nothing can be lifted. */
+  /** True while the hand may not be used (a cutscene): a hold ends and nothing can be lifted. */
   blocked?: () => boolean;
+  /** False while nobody is looking at what the hand would take (the roam hand is off): `update` then skips its look. */
+  active?: () => boolean;
 }
 
 /** What a delivery came to. */
@@ -111,7 +118,7 @@ export interface Delivery {
   amount: number;
   /** How much of it the store had room for (all of it at a site, where it is work). */
   kept: number;
-  zone: 'store' | 'site';
+  zone: DropZone;
   x: number;
   z: number;
   /** Villagers whose belief rose, and those who reached full belief by it. */
@@ -148,7 +155,7 @@ export interface HandRuntime {
   drop: (at?: Place) => DropOutcome;
   /** The player puts the held thing back on purpose: the world is as it was and the effort is lost. False when nothing is held. */
   putBack: () => boolean;
-  /** The game takes the held thing away (a save, a cutscene): the world is as it was and the energy comes back. */
+  /** The game takes the held thing away (the finale, a cutscene, shutting down): the world is as it was and the energy comes back. */
   cancel: () => boolean;
   /** Once per fixed step. Says why a hold ended by itself. */
   update: (dt: number) => Lost | null;
@@ -161,44 +168,75 @@ export interface HandRuntime {
   readonly deeds: DeedLedger;
 }
 
+/** What the hand could take, collected one look at a time in objects that are kept and reused. */
+function createCandidateBuffer() {
+  const objects: HandCandidate[] = [];
+  const list: HandCandidate[] = [];
+  return {
+    list,
+    add: (
+      kind: HandCandidate['kind'],
+      id: number,
+      x: number,
+      z: number,
+      area?: HandCandidate['area'],
+    ) => {
+      let c = objects[list.length];
+      if (!c) {
+        c = { kind, id, x, z };
+        objects.push(c);
+      }
+      c.kind = kind;
+      c.id = id;
+      c.x = x;
+      c.z = z;
+      c.area = area;
+      list.push(c);
+    },
+    clear: () => {
+      list.length = 0;
+    },
+  };
+}
+
 export function createHandRuntime(ports: HandPorts): HandRuntime {
   const { village, energy } = ports;
-  const { forest, buildings, economy, fields } = village.sim;
+  const { forest, buildings, remoteSites, economy, fields } = village.sim;
   const hand = createHand(energy);
   const deeds = createDeedLedger(ports.deeds);
   const heading = createCarryHeading();
   const near: number[] = [];
   const sheepNear: { id: number; x: number; z: number }[] = [];
+  // The 10 Hz look at the orb keeps its answer in `cached`, so it has a buffer of its own: the looks at a
+  // point (the overview's cursor, a lift) must not overwrite what `target()` hands out.
+  const orbLook = createCandidateBuffer();
+  const pointLook = createCandidateBuffer();
   let cached: HandCandidate | null = null;
   let sinceAim = Number.POSITIVE_INFINITY;
 
   const reachMul = () => ports.reachMul?.() ?? 1;
   const costMul = () => ports.costMul?.() ?? 1;
 
-  /** The thing nearest `at` within reach. */
-  const aim = (at: Place): HandCandidate | null => {
+  /** The thing nearest `at` within reach; the answer lives in `look` until the next look with it. */
+  const aim = (at: Place, look: ReturnType<typeof createCandidateBuffer>): HandCandidate | null => {
     if (ports.blocked?.()) return null;
+    look.clear();
     forest.within(at.x, at.z, reachOf('tree', reachMul()), near);
-    const candidates: HandCandidate[] = near.map((id) => {
+    for (const id of near) {
       const tree = forest.info(id);
-      return { kind: 'tree', id, x: tree.x, z: tree.z };
-    });
+      look.add('tree', id, tree.x, tree.z);
+    }
     for (const f of fields) {
-      if (!isRipe(f.growth)) continue;
-      const area = { halfW: f.halfW, halfD: f.halfD, rotY: f.rotY };
-      candidates.push({ kind: 'wheat', id: f.id, x: f.x, z: f.z, area });
+      // A field is its own area: it has the half sizes and the turn.
+      if (isRipe(f.growth)) look.add('wheat', f.id, f.x, f.z, f);
     }
     if (ports.animals) {
-      for (const s of ports.animals.sheepWithin(
-        at.x,
-        at.z,
-        reachOf('sheep', reachMul()),
-        sheepNear,
-      )) {
-        candidates.push({ kind: 'sheep', id: s.id, x: s.x, z: s.z });
+      const reach = reachOf('sheep', reachMul());
+      for (const s of ports.animals.sheepWithin(at.x, at.z, reach, sheepNear)) {
+        look.add('sheep', s.id, s.x, s.z);
       }
     }
-    return pickTarget(candidates, at, reachMul());
+    return pickTarget(look.list, at, reachMul());
   };
 
   /** What can still be given for a held thing: a tree still standing, a field still ripe, a sheep still in the hand. */
@@ -241,15 +279,15 @@ export function createHandRuntime(ports: HandPorts): HandRuntime {
   return {
     held: () => hand.held(),
     target: () => (hand.held() ? null : cached),
-    targetAt: (at) => (hand.held() ? null : aim(at)),
+    targetAt: (at) => (hand.held() ? null : aim(at, pointLook)),
     zone: (at = ports.orb()) => {
       const held = hand.held();
-      return held ? classifyDrop(GOOD_OF[held.kind], at, buildings) : null;
+      return held ? classifyDrop(GOOD_OF[held.kind], at, buildings, remoteSites) : null;
     },
     pick: (at = ports.orb()) => {
       if (ports.blocked?.()) return { ok: false, reason: 'blocked' };
       if (hand.held()) return { ok: false, reason: 'busy' };
-      const target = aim(at);
+      const target = aim(at, pointLook);
       if (!target) return { ok: false, reason: 'none' };
       const picked = hand.pick(target, costOf(target.kind, costMul()));
       if (picked !== 'ok') return { ok: false, reason: picked };
@@ -271,7 +309,7 @@ export function createHandRuntime(ports: HandPorts): HandRuntime {
       const held = hand.held();
       if (!held) return { kind: 'empty' };
       const good = GOOD_OF[held.kind];
-      const zone = classifyDrop(good, at, buildings);
+      const zone = classifyDrop(good, at, buildings, remoteSites);
       if (zone.zone === 'none') {
         putBack();
         return { kind: 'released' };
@@ -289,6 +327,7 @@ export function createHandRuntime(ports: HandPorts): HandRuntime {
       // The stores keep what fits; a site takes wood as work (food never lands on a site). Either way the deed counts.
       let kept = amount;
       if (zone.zone === 'site') village.haul(zone.building.id, amount);
+      else if (zone.zone === 'remote') village.haulRemote(zone.site.id, amount);
       else kept = good === 'wood' ? economy.addWood(amount) : economy.addFood(amount);
       const seen = deeds.perform({
         kind: 'deliver',
@@ -329,7 +368,7 @@ export function createHandRuntime(ports: HandPorts): HandRuntime {
       sinceAim += dt;
       if (sinceAim >= AIM_EVERY_S) {
         sinceAim = 0;
-        cached = aim(ports.orb());
+        cached = ports.active && !ports.active() ? null : aim(ports.orb(), orbLook);
       }
       return null;
     },

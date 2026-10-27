@@ -1,32 +1,25 @@
 // src/ui/overview/overviewHand.ts — the orb's hand in the village overview
 //
 // The overview's orb is the cursor, so the hand is a tool on the powers bar: arm it, click a tree, a ripe
-// field or a sheep to lift it, click the temple, a store or a build site to put it down. A click outside every
+// field or a sheep to lift it, click the temple, a store, a build site or a crew's camp to put it down. A click outside every
 // drop zone lets nothing go (a mis-click must not cost the effort); Esc puts the held thing back and that does.
 // What is held is kept across the overview toggle, so while it is held the hand takes the clicks armed or not.
 // The hand itself is `src/hand/handRuntime.ts`; the toasts and the sparkles are `ui/hand/handUi.ts`.
 
 import type { Camera } from 'three';
 import type { AbilityView } from '../../abilities/abilityView';
-import { VILLAGE } from '../../config/village';
 import { costOf } from '../../hand/handRules';
 import type { HandRuntime } from '../../hand/handRuntime';
 import { notHereText, overviewHintEmpty, overviewHintFull } from '../../hand/handText';
+import type { Place } from '../../hand/handTypes';
 import { type OverviewHandWorld, overviewPlace } from '../../hand/overviewAim';
 import type { Overview } from '../../overview/overviewController';
 import type { Selection } from '../../overview/overviewPick';
+import { newRing, targetRing, zoneRing } from '../hand/handRings';
 import type { HandUi } from '../hand/handUi';
 import { notify } from '../kit';
 import { createMarkerLayer } from '../overlay';
 import type { OverviewTool } from './overviewPowers';
-
-/** Where the hand's rings hang (m above the ground): over a tree, a field and a sheep's back. */
-const TREE_RING_LIFT_M = 1.6;
-const FIELD_RING_LIFT_M = 0.4;
-const SHEEP_RING_LIFT_M = 0.6;
-const TREE_RING_M = 2.4;
-const SHEEP_RING_M = 1.4;
-const BUILDING_RING_LIFT_M = 0.3;
 
 export const OVERVIEW_HAND_ID = 'hand';
 
@@ -36,8 +29,10 @@ export interface OverviewHandDeps {
   runtime: HandRuntime;
   ui: HandUi;
   world: OverviewHandWorld;
-  /** What is under the mouse (the overview's own pick). */
+  /** What is under the mouse, picked now (for a click). */
   pick: () => Selection | null;
+  /** What the overview's own frame found under the mouse (for the rings, which look every frame). */
+  hovered: () => Selection | null;
   groundY: (x: number, z: number) => number;
   /** The hand is on the bar: the skill tree is open. */
   open: () => boolean;
@@ -54,13 +49,12 @@ export interface OverviewHand {
 export function createOverviewHand(deps: OverviewHandDeps): OverviewHand {
   const { overview, runtime, ui } = deps;
   const rings = createMarkerLayer(deps.camera, 'po-ring');
+  const ring = newRing();
+  /** Where the hand acts this frame; a click makes its own so that what it hands on is never reused. */
+  const look = { x: 0, z: 0 };
 
-  const ground = () => {
-    const g = overview.hoverPoint();
-    return g ? { x: g.x, z: g.z } : null;
-  };
-  const placeFor = (mode: 'lift' | 'drop') =>
-    overviewPlace(mode, deps.pick(), ground(), deps.world);
+  const placeAt = (mode: 'lift' | 'drop', pick: Selection | null, out: Place) =>
+    overviewPlace(mode, pick, overview.hoverPoint(), deps.world, out);
 
   // The cheapest and the dearest lift, as the slot's cost.
   const costText = () => {
@@ -97,7 +91,7 @@ export function createOverviewHand(deps: OverviewHandDeps): OverviewHand {
       busy: () => deps.open() && runtime.held() !== null,
       click: () => {
         if (runtime.held()) {
-          const at = placeFor('drop');
+          const at = placeAt('drop', deps.pick(), { x: 0, z: 0 });
           if (!at) return;
           if (runtime.zone(at)?.zone === 'none') {
             notify({ text: notHereText, kind: 'warning', key: 'hand-not-here' });
@@ -105,7 +99,7 @@ export function createOverviewHand(deps: OverviewHandDeps): OverviewHand {
           }
           ui.putDown(at);
         } else {
-          const at = placeFor('lift');
+          const at = placeAt('lift', deps.pick(), { x: 0, z: 0 });
           if (at) ui.lift(at);
         }
       },
@@ -114,30 +108,22 @@ export function createOverviewHand(deps: OverviewHandDeps): OverviewHand {
         rings.begin();
         if (live && deps.open()) {
           if (runtime.held()) {
-            const at = placeFor('drop');
+            const at = placeAt('drop', deps.hovered(), look);
             const zone = at ? runtime.zone(at) : null;
-            if (zone && zone.zone !== 'none') {
-              const b = zone.building;
-              const size = 2 * Math.max(b.halfW, b.halfD) + VILLAGE.HAND.ZONE_MARGIN_M;
-              rings.add(b.x, deps.groundY(b.x, b.z) + BUILDING_RING_LIFT_M, b.z, size).state =
-                'is-active';
+            if (zone && zoneRing(zone, ring)) {
+              rings.add(
+                ring.x,
+                deps.groundY(ring.x, ring.z) + ring.liftM,
+                ring.z,
+                ring.sizeM,
+              ).state = 'is-active';
             }
           } else {
-            const at = placeFor('lift');
+            const at = placeAt('lift', deps.hovered(), look);
             const target = at ? runtime.targetAt(at) : null;
             if (target) {
-              const area = target.area;
-              const lift = area
-                ? FIELD_RING_LIFT_M
-                : target.kind === 'sheep'
-                  ? SHEEP_RING_LIFT_M
-                  : TREE_RING_LIFT_M;
-              const size = area
-                ? 2 * Math.max(area.halfW, area.halfD)
-                : target.kind === 'sheep'
-                  ? SHEEP_RING_M
-                  : TREE_RING_M;
-              rings.add(target.x, deps.groundY(target.x, target.z) + lift, target.z, size);
+              const r = targetRing(target, ring);
+              rings.add(r.x, deps.groundY(r.x, r.z) + r.liftM, r.z, r.sizeM);
             }
           }
         }

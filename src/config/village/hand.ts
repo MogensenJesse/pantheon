@@ -37,6 +37,8 @@ export const HAND_PARTS = {
     BURST_HEIGHT_M: 1.2,
     /** A drop counts on a building when it lands within this many metres of its footprint. */
     ZONE_MARGIN_M: 3,
+    /** Wood put down within this many metres of a remote site's camp or place counts as the crew's work there. */
+    REMOTE_DROP_M: 8,
     /** What the village makes of a deed. A lift and a delivery are paid on their own cooldowns. */
     DEED: {
       /** Villagers outdoors and awake within this distance (m) of the deed see it. */

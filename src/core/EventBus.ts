@@ -1,6 +1,6 @@
 // src/core/EventBus.ts
 
-import type { HandKind } from '../hand/handTypes';
+import type { DropZone, HandKind } from '../hand/handTypes';
 import type { VillageBuildingType } from '../world/village/model/assetKeys';
 
 export interface GameEvents {
@@ -60,7 +60,7 @@ export interface GameEvents {
     what: HandKind;
     /** Wood or food that arrived (wood hauled to a site counts as wood). */
     amount: number;
-    zone: 'store' | 'site';
+    zone: DropZone;
     x: number;
     z: number;
     /** How many villagers were impressed by the delivery, and how many reached full belief by it. */

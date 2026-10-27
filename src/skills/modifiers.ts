@@ -53,7 +53,7 @@ export interface Modifiers {
   weatherChanceMul: number;
   /** Multiplies how strong (peak rain) and how wide a storm front is (the places of power: the storm ward). */
   stormStrengthMul: number;
-  /** The highest upgrade level houses / granaries and workshops / farmsteads may reach (the tree raises them). */
+  /** The highest upgrade level houses / granaries and workshops / farmsteads and shrines may reach (the tree raises them). */
   houseTier: number;
   storeTier: number;
   workTier: number;

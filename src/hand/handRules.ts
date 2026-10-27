@@ -6,7 +6,7 @@
 
 import { VILLAGE } from '../config/village.ts';
 import { distXZ } from '../core/math/geom.ts';
-import type { Building } from '../world/village/model/types.ts';
+import type { Building, RemoteSite } from '../world/village/model/types.ts';
 import { isOpenSite } from '../world/village/sim/construction.ts';
 import type {
   Good,
@@ -75,11 +75,15 @@ const STORE_TYPES: ReadonlySet<Building['type']> = new Set([
   'well',
 ]);
 
-/** What a drop came to. A store takes the good into the stock; a site takes wood as builder work. */
+/**
+ * What a drop came to. A store takes the good into the stock; a build site takes wood as builder work, and so
+ * does a remote site (`x`, `z` is the middle of the circle the drop landed in: its camp or its place).
+ */
 export type Drop =
   | { zone: 'none' }
   | { zone: 'store'; building: Building }
-  | { zone: 'site'; building: Building };
+  | { zone: 'site'; building: Building }
+  | { zone: 'remote'; site: RemoteSite; x: number; z: number };
 
 /** Whether `at` lies on a building's footprint or within `marginM` of it. */
 export function insideBuilding(b: Building, at: Place, marginM: number): boolean {
@@ -93,14 +97,41 @@ export function insideBuilding(b: Building, at: Place, marginM: number): boolean
   );
 }
 
+/** The unfinished remote site (if any) whose camp or place `at` lies within `radiusM` of; the nearer middle wins. */
+function remoteZone(
+  at: Place,
+  sites: readonly RemoteSite[],
+  radiusM: number,
+): Extract<Drop, { zone: 'remote' }> | null {
+  let best: Extract<Drop, { zone: 'remote' }> | null = null;
+  let bestD = radiusM;
+  for (const site of sites) {
+    if (site.stage >= 2) continue;
+    const camp = distXZ(site.campX, site.campZ, at.x, at.z);
+    if (camp <= bestD) {
+      best = { zone: 'remote', site, x: site.campX, z: site.campZ };
+      bestD = camp;
+    }
+    const place = distXZ(site.x, site.z, at.x, at.z);
+    if (place < bestD) {
+      best = { zone: 'remote', site, x: site.x, z: site.z };
+      bestD = place;
+    }
+  }
+  return best;
+}
+
 /**
  * What putting `good` down at `at` comes to. Wood prefers an open site (it counts as work for the builders)
  * and otherwise goes to a store; food only goes to a store. Of several buildings the nearest middle wins.
+ * Wood put down at an unfinished remote site (far outside the village) is work for its crew; a building zone
+ * is looked at first.
  */
 export function classifyDrop(
   good: Good,
   at: Place,
   buildings: readonly Building[],
+  remoteSites: readonly RemoteSite[] = [],
   marginM = H.ZONE_MARGIN_M,
 ): Drop {
   let site: Building | null = null;
@@ -121,6 +152,7 @@ export function classifyDrop(
   }
   if (site) return { zone: 'site', building: site };
   if (store) return { zone: 'store', building: store };
+  if (good === 'wood') return remoteZone(at, remoteSites, H.REMOTE_DROP_M) ?? { zone: 'none' };
   return { zone: 'none' };
 }
 
@@ -130,7 +162,7 @@ export function meetsNeed(
   drop: Drop,
   short: Readonly<{ food: boolean; wood: boolean }>,
 ): boolean {
-  if (drop.zone === 'site') return true;
+  if (drop.zone === 'site' || drop.zone === 'remote') return true;
   return drop.zone === 'store' && short[good];
 }
 

@@ -16,7 +16,7 @@ export interface SlotBarOptions {
   onChoose?: (id: string) => void;
   /** The name written in a slot (default: the power's name). */
   nameOf?: (view: AbilityView, index: number) => string;
-  /** The word in a slot's corner: the wait left, a refusal, or a channel running. */
+  /** The word in a slot's corner: the wait left, or why the power is not ready. */
   noteOf: (view: AbilityView) => string;
   /** Sets the data attributes that style a slot's state. */
   mark: (slot: HTMLElement, view: AbilityView) => void;

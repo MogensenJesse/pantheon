@@ -26,6 +26,12 @@ export const GOOD_OF: Readonly<Record<HandKind, Good>> = {
   sheep: 'food',
 };
 
+/**
+ * Where a delivery landed: a store takes the good into the stock; a build site or a remote site (a place being
+ * restored, an outpost) takes wood as builder work.
+ */
+export type DropZone = 'store' | 'site' | 'remote';
+
 /** Something the hand could take, and where it is. */
 export interface HandCandidate {
   kind: HandKind;
@@ -51,7 +57,7 @@ export interface Held {
 export type Release =
   /** Put down in a zone: the village changed and the energy stays spent. */
   | 'delivered'
-  /** The game took it away (a save, a cutscene, a mode change): the energy is given back. */
+  /** The game took it away (the finale, a cutscene or other block, the hand being shut down): the energy is given back. */
   | 'forced'
   /** The player let go outside any zone: the thing goes back and the energy is lost. */
   | 'voluntary';

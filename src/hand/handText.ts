@@ -21,6 +21,7 @@ export function refusalText(reason: Extract<PickOutcome, { ok: false }>['reason'
 export function deliveryText(d: Delivery): string {
   const watched = d.impressed > 0 ? ' The villagers are impressed.' : '';
   if (d.zone === 'site') return `Wood hauled to the builders.${watched}`;
+  if (d.zone === 'remote') return `Wood hauled to the crew at the camp.${watched}`;
   if (d.kept <= 0) return `The store is full, but the village saw it.${watched}`;
   const full =
     d.kept < d.amount ? ` (the store is full: ${Math.floor(d.kept)} of ${d.amount})` : '';
@@ -46,7 +47,8 @@ export function hintText(
 ): string {
   if (held) {
     if (!zone || zone.zone === 'none') return 'let go (the effort is lost)';
-    return zone.zone === 'site' ? 'haul the wood to the builders' : 'put it down';
+    if (zone.zone === 'site') return 'haul the wood to the builders';
+    return zone.zone === 'remote' ? 'haul the wood to the crew at the camp' : 'put it down';
   }
   return target ? `pull up the ${THING[target.kind]}` : '';
 }
@@ -55,7 +57,11 @@ export function hintText(
 export const overviewHintEmpty =
   'Click a tree, ripe wheat or a sheep to lift it · Esc to put the hand away';
 export const overviewHintFull =
-  'Click the temple, a store or a build site to put it down · Esc puts it back (the effort is lost)';
+  "Click the temple, a store, a build site or a crew's camp to put it down · Esc puts it back (the effort is lost)";
+
+/** Choosing another power while the hand is full: it comes first. */
+export const putDownFirstText = 'Put it down first (Esc puts it back), then choose another power.';
 
 /** A click with a full hand that landed on no drop zone: nothing was let go. */
-export const notHereText = 'Put it down at the temple, a store or a build site. Esc puts it back.';
+export const notHereText =
+  "Put it down at the temple, a store, a build site or a crew's camp. Esc puts it back.";

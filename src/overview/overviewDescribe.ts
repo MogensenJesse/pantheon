@@ -15,7 +15,12 @@ import {
   Role,
   type Villagers,
 } from '../world/village/model/types.ts';
-import { chopMul } from '../world/village/sim/buildingEffects.ts';
+import {
+  farmsteadGrowth,
+  farmsteadYield,
+  shrineShare,
+  workshopShare,
+} from '../world/village/sim/buildingEffects.ts';
 import { foodPerDay } from '../world/village/sim/economy.ts';
 import { stageOf } from '../world/village/sim/hunger.ts';
 import { type Prayer, prayerLeftS } from '../world/village/sim/prayers.ts';
@@ -398,7 +403,7 @@ function describeBuilding(id: number, world: DescribeWorld): Description | null 
     };
   }
   if (b.type === 'workshop') {
-    const chop = Math.round((chopMul(world.buildings) - 1) * 100);
+    const chop = Math.round(workshopShare(b.level) * 100);
     return {
       title: name,
       subtitle: up.subtitle ?? 'Holds wood for building',
@@ -421,8 +426,11 @@ function describeBuilding(id: number, world: DescribeWorld): Description | null 
       rows: [
         ...up.rows,
         { label: 'Fields in reach', value: String(fields) },
-        { label: 'Growth', value: `${Math.round(reach.GROWTH_PER_LEVEL * b.level * 100)}% faster` },
-        { label: 'Harvest', value: `${reach.YIELD_PER_LEVEL * b.level} more food` },
+        {
+          label: 'Growth, each field',
+          value: `${Math.round(farmsteadGrowth(b.level) * 100)}% faster`,
+        },
+        { label: 'Harvest, each field', value: `${farmsteadYield(b.level)} more food` },
       ],
       bar: up.bar,
       upgrade: up.upgrade,
@@ -430,11 +438,11 @@ function describeBuilding(id: number, world: DescribeWorld): Description | null 
     };
   }
   if (b.type === 'shrine') {
-    const perMinute = VILLAGE.EFFECTS.SHRINE.FAITH_PER_LEVEL * b.level * 60;
+    const perMinute = shrineShare(b.level) * modifiers.faithMul * 60;
     return {
       title: name,
       subtitle: up.subtitle ?? 'Gathers faith by itself',
-      rows: [...up.rows, { label: 'Faith', value: `${perMinute.toFixed(1)} a minute` }],
+      rows: [...up.rows, { label: 'Faith from this', value: `${perMinute.toFixed(1)} a minute` }],
       bar: up.bar,
       upgrade: up.upgrade,
       goTo: { x: b.x, z: b.z },

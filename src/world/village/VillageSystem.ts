@@ -67,7 +67,7 @@ export interface VillageSystemOptions {
 
 /** DEV cheats that go through the system so the renderer follows. */
 export interface VillageDevApi {
-  /** Add faith; Echo and the powers' costs use the same call. */
+  /** Add faith; Echo, the powers' costs and prayers answered use the same call. */
   addFaith: (amount: number) => void;
   /** Add wood or food to the stores (kept up to what they hold); returns what was kept. */
   addWood: (amount: number) => number;
@@ -95,7 +95,7 @@ export interface VillageSystemContext {
   playerDistance: () => number;
   /** Day-cycle phase 0..1 the village is running on (0.25 sunrise, 0.75 sunset). */
   dayPhase: () => number;
-  /** Raise one villager's belief (the powers do this); true when it just reached 1. */
+  /** Raise one villager's belief (the hand's deeds do this); true when it just reached 1. */
   addBelief: (villager: number, amount: number) => boolean;
   /** Add faith (Echo leaves some behind with each orb picked up). */
   addFaith: (amount: number) => void;
@@ -104,12 +104,14 @@ export interface VillageSystemContext {
   /**
    * The orb's hand (story-mechanics/HAND.md): each is one call between steps. `uprootTree` pulls a standing tree
    * out of the ground (the view shows a stump) and returns its wood; `takeHarvest` reaps a ripe field and returns
-   * the food; `haul` counts wood brought to an open site as work and returns the seconds given. The caller
-   * puts wood and food in the stores (`sim.economy.addWood/addFood`).
+   * the food; `haul` counts wood brought to an open site as work and returns the seconds given, and `haulRemote`
+   * does the same for an unfinished remote site (a restoration or an outpost). The caller puts wood and food in
+   * the stores (`sim.economy.addWood/addFood`).
    */
   uprootTree: (id: number) => number;
   takeHarvest: (fieldId: number) => number;
   haul: (siteId: number, wood: number) => number;
+  haulRemote: (siteId: number, wood: number) => number;
   /**
    * What the hand shows while it holds a tree or a sheaf of wheat: view only, the sim keeps the tree standing
    * (and the wheat on its field) until `uprootTree` or `takeHarvest`. For a tree `lift` hides it and shows a
@@ -138,7 +140,7 @@ export interface VillageSystemContext {
   startRestoration: (kind: string, x: number, z: number) => 'ok' | 'busy' | 'no-route' | 'no-crew';
   /** The whole village prays together at dusk while this is on (the story's last night). */
   setGathering: (on: boolean) => void;
-  /** Hold a villager still, facing (x, z), for a few seconds (the powers do this). */
+  /** Hold a villager still, facing (x, z), for a few seconds (the hand's deeds do this). */
   notice: (villager: number, x: number, z: number, seconds: number) => boolean;
   /** Fixed-step simulation; `clockS` is the game clock the weather runs on. */
   update: (dt: number, playerPosition: Vector3, clockS: number) => void;
@@ -364,6 +366,11 @@ export async function initVillageSystem(
     },
     haul: (siteId, wood) => {
       const seconds = sim.haul(siteId, wood, events);
+      applyEvents();
+      return seconds;
+    },
+    haulRemote: (siteId, wood) => {
+      const seconds = sim.haulRemote(siteId, wood, events);
       applyEvents();
       return seconds;
     },

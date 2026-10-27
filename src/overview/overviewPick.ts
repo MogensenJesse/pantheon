@@ -3,6 +3,7 @@
 // by the mouse ray against its box (a roof is hit before the ground behind it); then a field, by the
 // ground point.
 
+import type { VillageBuildingType } from '../world/village/model/assetKeys.ts';
 import type { Selection } from '../world/village/model/selection.ts';
 import type { Building, Field, Villagers } from '../world/village/model/types.ts';
 
@@ -42,18 +43,22 @@ export const VILLAGER_BODY_M = 1;
 /** A building's box is this much bigger all round (m), so a small hut is not a needle at a distance. */
 const BUILDING_MARGIN_M = 0.5;
 
+/** About how tall a finished building is (m), floor, walls, roof and chimney, as the stand-in kit draws them. */
+const FULL_HEIGHT_M: Readonly<Record<VillageBuildingType, number>> = {
+  temple: 9,
+  well: 2.2,
+  house_a: 4,
+  house_b: 4.5,
+  house_c: 5,
+  workshop: 4.5,
+  granary: 4.3,
+  farmstead: 3.8,
+  shrine: 4.5,
+};
+
 /** About how tall a building is (m), by type and how far it is built. */
-export function buildingHeightM(type: string, stage: number): number {
-  const full =
-    type === 'temple'
-      ? 9
-      : type === 'well'
-        ? 2.2
-        : type === 'house_a'
-          ? 4
-          : type === 'house_b'
-            ? 4.5
-            : 5;
+export function buildingHeightM(type: VillageBuildingType, stage: number): number {
+  const full = FULL_HEIGHT_M[type];
   if (stage >= 2) return full;
   return stage === 1 ? full * 0.5 : 0.6;
 }

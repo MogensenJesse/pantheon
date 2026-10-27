@@ -142,6 +142,21 @@ await check('the crew builds it in two stages, then it delivers wood without a c
   );
 });
 
+await check('wood hauled by the hand builds an outpost on its own, shorter, schedule', () => {
+  const sim = rich();
+  const spot = spotFor(sim, 'lumber');
+  assert.equal(sim.startOutpost('lumber', spot.x, spot.z, []), 'ok');
+  const site = sim.remoteSites[0]!;
+  const per = VILLAGE.HAND.WORK_PER_WOOD_S;
+  const events: VillageEvent[] = [];
+  sim.haulRemote(site.id, O.SITE_WORK_S[0]! / per, events);
+  assert.equal(site.stage, 1);
+  sim.haulRemote(site.id, O.SITE_WORK_S[1]! / per, events);
+  assert.equal(site.stage, 2);
+  const stages = events.flatMap((e) => (e.kind === 'remoteStageCompleted' ? [e.stage] : []));
+  assert.deepEqual(stages, [1, 2]);
+});
+
 await check('a fishing hut delivers food, never over the stores', () => {
   const sim = rich();
   const spot = spotFor(sim, 'fishing');

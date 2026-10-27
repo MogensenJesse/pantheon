@@ -32,7 +32,7 @@
   box-shadow: 0 0 0.9rem rgba(var(--ui-energy-glow-rgb), 0.9);
 }
 
-/* The ring a power would reach: a thin circle, steadier while the power runs. */
+/* A ring on what the hand would lift or where it would put a thing down, and a build site's reach: a thin circle. */
 .po-ring {
   border: 1px solid rgba(var(--ui-energy-rgb), 0.55);
   border-radius: 50%;
