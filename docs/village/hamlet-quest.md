@@ -16,7 +16,7 @@ A hamlet is founded finished (`foundHamlet`: temple, `VILLAGE.HAMLET.HOUSES` hou
 - The temple's crown orb and beam follow the share of believers in a hamlet (`VillageView.frame`); `VillageHud` shows "N believe" once the first villager believes.
 
 ## How belief is won: the orb's hand
-Villagers believe because they see the orb's deeds (design: `story-mechanics/HAND.md`; code: `src/hand/`). Murmur, Dream and Sign no longer exist.
+Villagers believe because they see the orb's deeds (design: `story-mechanics/HAND.md`; code and numbers: [hand.md](hand.md), `src/hand/`). Murmur, Dream and Sign no longer exist.
 - `hand/deeds.ts` (pure, reaches the village through `DeedWorld`: pool, `addBelief`, `notice`, `canBelieve`): a deed is a lift or a delivery. Villagers outdoors, awake and alive within `HAND.DEED.WITNESS_M` see it, stop and look (`sim.notice`), and gain belief: a little awe at a lift, more at a delivery, more again when the delivery meets an open need. Each villager has a cooldown per kind of deed (in memory, not saved). Numbers: `VILLAGE.HAND` (`config/village/hand.ts`).
 - The elder is gated in the same place: `canBelieve(i)` is false for him until his quest step, and the payout skips anyone it is false for (they still stop and look).
 - `addBelief` rounds a run of small payouts to exactly 1 (`NEARLY_BELIEVING`), so the last one converts.

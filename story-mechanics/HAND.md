@@ -1,6 +1,6 @@
 # The hand: uproot, lift, drop (design)
 
-Status: designed, being built in milestones H0 to H7 (this page is H0). Built so far: the sim inputs (H1), the pure core in `src/hand/` with `check:hand` (H2a), and the roam hand with trees: the **F** key, the carried tree, deeds that win belief, and the DEV hook `window.__pantheonHand` (H2b), then ripe wheat (H2c: lift a field at 90% growth or more, a stand-in pile hangs from the orb, the field is reaped at the drop), then sheep (H2d: a sheep hangs from the orb, is consumed at the drop for `ANIMAL_FOOD.sheep` food and comes back after 90 to 180 s; sheep exist once the village is converted), then the end of Murmur, Dream and Sign (H3b: the conversion quest is finished on deeds alone, the skill nodes `dream` and `sign` became `long_reach` and `deep_grip`, save version 18), then the same hand in the overview (H4: the first slot of the powers bar), then the end of Blessing, Kindle and Provide (H5: `blessings` left the saved village, save version 19, golden hashes re-pinned after proof). Every number is a placeholder, tuned after a playtest. The village, belief and the conversion quest it changes are in `docs/village/` and `QUESTS.md`; where this page disagrees with the code, the code wins until the milestone that changes it has landed.
+Status: built in milestones H0 to H7 (code notes: `docs/village/hand.md`). Built: the sim inputs (H1), the pure core in `src/hand/` with `check:hand` (H2a), and the roam hand with trees: the **F** key, the carried tree, deeds that win belief, and the DEV hook `window.__pantheonHand` (H2b), then ripe wheat (H2c: lift a field at 90% growth or more, a stand-in pile hangs from the orb, the field is reaped at the drop), then sheep (H2d: a sheep hangs from the orb, is consumed at the drop for `ANIMAL_FOOD.sheep` food and comes back after 90 to 180 s; sheep exist once the village is converted), then the end of Murmur, Dream and Sign (H3b: the conversion quest is finished on deeds alone, the skill nodes `dream` and `sign` became `long_reach` and `deep_grip`, save version 18), then the same hand in the overview (H4: the first slot of the powers bar), then the end of Blessing, Kindle and Provide (H5: `blessings` left the saved village, save version 19, golden hashes re-pinned after proof), then building effects (H6: the Farmstead and the Shrine, the workshop's level, the faith multiplier, plot types opened by the skill tree; derived, nothing saved, save version still 19). Every number is a placeholder, tuned after a playtest. The village, belief and the conversion quest it changes are in `docs/village/` and `QUESTS.md`; where this page disagrees with the code, the code wins until the milestone that changes it has landed.
 
 ## The idea
 
@@ -29,7 +29,7 @@ The hand opens with the skill tree, the moment Murmur used to.
 
 ## The rule that keeps it safe: the village changes only at delivery
 
-Pickup is a hold in the view. The tree is still standing in the sim, the wheat is still on the field, the sheep is only out of its flock. The single drop call does the real work: it uproots the tree (straight to a stump, which regrows as usual), harvests the field, and credits the stores. So saving, pausing, a cutscene, Esc, losing pointer lock or an overview toggle never corrupts anything: a **forced cancel** puts the item back and refunds the energy. A voluntary release outside a zone puts it back but forfeits the energy, so grab-and-release cannot be farmed.
+Pickup is a hold in the view. The tree is still standing in the sim, the wheat is still on the field, the sheep is only out of its flock. The single drop call does the real work: it uproots the tree (straight to a stump, which regrows as usual), harvests the field, and credits the stores. So pausing, a cutscene, Esc, losing pointer lock or an overview toggle never corrupts anything: a **forced cancel** puts the item back and refunds the energy, and a save writes the energy of a hold back as unspent (nothing of the hold itself is saved). A voluntary release outside a zone puts it back but forfeits the energy, so grab-and-release cannot be farmed.
 
 Sheep stay **cosmetic**: never saved, never read by the sim. A delivered sheep is consumed and respawns after a while, and the sim receives a capped food gift (`economy.addFood`). Sheep first; hens later (they flee the orb from 5 m and run fast).
 
@@ -54,12 +54,13 @@ Blessing, Kindle and Provide are removed (built, H5). Call rain, Clear skies and
 
 ## Building effects and the faith economy
 
-Levels start to matter. Effects are **derived** from finished buildings and their levels each step (a pure pass, no saved state), so they leave saves and goldens alone when absent.
-- **Farmstead** (new plot-only building): fields within its radius grow faster and yield more, per level.
-- **Workshop**: its level speeds the woodcutters.
-- **Shrine** (new plot-only building): faith per second per level.
-- A **faith multiplier** (`faithMul`) from the skill tree applies to the believer income, in the hamlet and in the sandbox.
-- **Plot types are unlocked by the skill tree** (Travian-style): one arch II node per type, chained and gated by existing milestones. Today every plot type appears once ten buildings are finished; a locked type shows "locked" until its node is taken.
+Levels matter now (built, H6). Effects are **derived** from finished buildings and their levels each step (`sim/buildingEffects.ts`, a pure pass, no saved state), so they leave saves and goldens alone when absent.
+- **Farmstead** (plot-only): fields within 70 m grow 25% faster and give one food more per harvest, per level (capped; farmsteads stack).
+- **Workshop**: each level above 1 adds a quarter to the woodcutters' speed (it also speeds sapling growth, accepted for now).
+- **Shrine** (plot-only): 0.03 faith per second per level, capped.
+- **Fervour**, a skill node: all faith income x1.25, in the hamlet and in the sandbox.
+- **Plot types are opened by the skill tree** (Travian-style): the node Farmsteads (after Good soil) and the node Shrines (after Seedkeeper, once five prayers are answered). Houses, workshops and granaries are open to everyone. A closed type is hidden in the "Mark a place" row. Fine works (two ranks, needs a building raised to level 2) lets farmsteads and shrines rise to levels 2 and 3.
+- The name **Shrine** overlaps with the energy shrines on the map (`PHASE0.SHRINE`); the building is the village's own. Rename it in one string if that confuses.
 
 New building types are placeholders (the house kit stands in) until the creator models them. The model list is in `PHASE_0_TODO.md` ("The hand"). Market (surplus into faith) and Beacon (wider orb presence) are named ideas, not in this scope.
 
@@ -68,5 +69,5 @@ New building types are placeholders (the house kit stands in) until the creator 
 - All numbers: reach, costs, belief per deed, witness radius, cooldown, wood to work, wheat and sheep food, respawn time, effects per level.
 - Whether carrying should also slow the orb or drain energy (not now: energy is charged at pickup only).
 - Hens: a calming rule while the hand is out, or left alone.
-- Which building types come after Farmstead and Shrine.
+- Which building types come after Farmstead and Shrine (Market: surplus into faith; Beacon: a wider orb presence).
 - The look of the carried tree, the sheaf and the held sheep (all stand-ins, GPU checklist in `PHASE_0_TODO.md`).

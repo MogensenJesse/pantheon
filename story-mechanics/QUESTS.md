@@ -14,7 +14,7 @@ One page for every quest, so the story, the objectives and the gates read as one
 | Phase | Name | Goal | Built as |
 |---|---|---|---|
 | 0 | God Particle | Fill the energy bar and wake all five landmarks | gate + guide line |
-| 1 | Whisper | Win five believers, the temple fire, the offering, the elder | the conversion quest |
+| 1 | Whisper | Win five believers by the orb's deeds (the hand), the temple fire, the offering, the elder | the conversion quest |
 | 2 | Spirit | Grow the village, restore the five places | restoration objectives, teaching quests, favours, milestones, then the final act |
 | 3 | Deity | Repel Verath's first incursion (50 followers) | not built; drafted in [VERATH_ACT.md](VERATH_ACT.md) |
 | 4 | Regional God | Claim three settlements | not built |

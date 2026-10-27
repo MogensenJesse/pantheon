@@ -29,7 +29,7 @@ Hauling visuals for the villagers (carrying logs and sacks to the store; the orb
 - island-mountain has 6 orbs (33 energy); about 20 more are to be placed in the editor (`PHASE_0_TODO.md`).
 - The village phase goal (restoring the five places of power) is built; its open items (numbers, models) are in `PHASE_2_RESTORATION.md`.
 - More village interaction (milestones, upgrade levels, player plots, prayers, hearten, outposts) is designed in `VILLAGE_INTERACTION.md`.
-- The hand, deeds, the removal of Murmur, Dream, Sign, Blessing, Kindle and Provide, and the Farmstead and faith buildings are designed in `HAND.md` and built in milestones H0 to H7; the open numbers are listed there.
+- The hand, deeds, the removal of Murmur, Dream, Sign, Blessing, Kindle and Provide, and the Farmstead and Shrine are built (milestones H0 to H7, docs in `HAND.md` and `docs/village/hand.md`); the open numbers and the models are listed in `HAND.md` and `PHASE_0_TODO.md` ("The hand"). Not built: hens for the hand, the Market and Beacon buildings.
 - The island's last act (Verath's trader and his Offer, the Deity-phase goal) is a draft in `VERATH_ACT.md`; its open questions are listed there.
 - The game after the first island (world map, fog of war, authored islands, what the player does on the map, when an island counts as done) is a draft in `WORLD_MAP.md`; its open questions are listed there.
 - Ambient life (`docs/ambient.md`) is built with stand-in models; what is open is a look on a real GPU and the models (`PHASE_0_TODO.md`, "Animals and ambient life"). Not built: the finale flare of the places' life, the grass gust atlas for trees, animal LODs, quality-tier counts for the specks.

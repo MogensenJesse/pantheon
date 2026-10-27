@@ -135,7 +135,7 @@ interface RoundTrip {
   make: (restore?: ReturnType<VillageSim['serialize']>) => VillageSim;
   before: number;
   after: number;
-  /** Acts at given steps of a run (belief, deaths, blessings...). */
+  /** Acts at given steps of a run (belief, deaths, the hand...). */
   script?: (sim: VillageSim) => (step: number, events: VillageEvent[]) => void;
   fed?: boolean;
   rain?: (step: number) => number;
