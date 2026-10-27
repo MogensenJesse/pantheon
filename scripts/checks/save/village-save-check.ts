@@ -17,6 +17,7 @@ import type { VillageSim } from '../../../src/world/village/sim/villageSim.ts';
 import { check, finish } from '../lib/check.ts';
 import { fakeGame } from '../lib/saveFixtures.ts';
 import {
+  convertVillage,
   DT,
   dayPhaseAt,
   type LoadedMap,
@@ -244,8 +245,7 @@ for (const [before, after] of splitsOf(HAMLET_SPLITS, 1)) {
 // the claims rebuilt from it, the elder, the graveyard and the hunger clock all come back).
 const famineScript = (sim: VillageSim) => (step: number, events: VillageEvent[]) => {
   if (step === 0) {
-    for (let i = 0; i < sim.villagers.count; i++) sim.addBelief(i, 1, events);
-    sim.convertVillage(events);
+    convertVillage(sim, events);
     sim.economy.drainFood();
   }
 };
@@ -368,12 +368,13 @@ const handScript = (sim: VillageSim) => (step: number, events: VillageEvent[]) =
   if (step === Math.round(0.12 * HOUR_STEPS)) {
     const field = sim.fields[0]!;
     field.growth = 1;
-    sim.takeHarvest(field.id);
+    assert.ok(sim.takeHarvest(field.id) > 0, 'the ripe field gave food');
   }
   if (step === Math.round(0.2 * HOUR_STEPS)) {
     sim.startSiteNow(events);
     const site = sim.buildings.find((b) => b.stage < 2);
-    if (site) sim.haul(site.id, 2, events);
+    assert.ok(site, 'a site was started');
+    assert.ok(sim.haul(site.id, 2, events) > 0, 'the wood went into the site as work');
   }
 };
 const HAND_SPLITS: [number, number][] = [

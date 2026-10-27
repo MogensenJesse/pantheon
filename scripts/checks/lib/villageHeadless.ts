@@ -227,13 +227,58 @@ export function stepSim(sim: VillageSim, opts: StepOptions): VillageEvent[] {
 export const hoursSim = (sim: VillageSim, hours: number, onStep?: StepOptions['onStep']) =>
   stepSim(sim, { seconds: hours * 3600, onStep });
 
-/** Everyone in the hamlet believes and the village is converted: it grows. */
-export function convertVillage(sim: VillageSim): VillageSim {
-  const events: VillageEvent[] = [];
+/** Everyone in the hamlet believes and the village is converted: it grows. `events` collects what that raised. */
+export function convertVillage(sim: VillageSim, events: VillageEvent[] = []): VillageSim {
   for (let i = 0; i < sim.villagers.count; i++) sim.addBelief(i, 1, events);
   sim.convertVillage(events);
   return sim;
 }
+
+/** A grown, converted hamlet, built once; `restore` makes a fresh sim from it for each check. */
+export interface GrownVillage {
+  state: VillageSimState;
+  restore: (opts?: { modifiers?: Modifiers }) => VillageSim;
+}
+
+/** A hamlet converted and fed for `days` days (two by default), saved so every check starts from the same village. */
+export function grownVillage(map: LoadedMap, days = 2): GrownVillage {
+  const sim = convertVillage(makeSim(map, { mode: 'hamlet' }));
+  stepSim(sim, { seconds: days * DAY_S, fed: true });
+  const state = sim.serialize();
+  return {
+    state,
+    restore: (opts = {}) =>
+      makeSim(map, { mode: 'hamlet', restore: structuredClone(state), ...opts }),
+  };
+}
+
+/** A restored grown village with faith and wood to spare. */
+export function richVillage(grown: GrownVillage, opts: { modifiers?: Modifiers } = {}): VillageSim {
+  const sim = grown.restore(opts);
+  sim.faith.faith = 500;
+  sim.economy.addWood(500);
+  return sim;
+}
+
+/** A building with the fields a rule reads; the rest are those of a finished, plain house. */
+export const buildingOf = (type: string, over: Partial<Building> = {}): Building =>
+  ({
+    id: 1,
+    type,
+    x: 0,
+    z: 0,
+    rotY: 0,
+    halfW: 2,
+    halfD: 2,
+    plinthTopY: 0,
+    plinthBaseY: 0,
+    stage: 2,
+    progress: 0,
+    level: 1,
+    upgrade: 0,
+    ring: 0,
+    ...over,
+  }) as Building;
 
 export function countRole(sim: VillageSim, role: number): number {
   let n = 0;

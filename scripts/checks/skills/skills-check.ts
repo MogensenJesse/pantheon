@@ -193,10 +193,17 @@ await check('parseSkills accepts a good slice and refuses damaged ones', () => {
 await check(
   'the hand nodes change the reach and the cost, and the old Dream and Sign are gone',
   () => {
+    // The numbers are the tree's own: this check is about what taking a node does, not what it is worth.
+    const effectOf = (id: string, key: 'handReachMul' | 'handCostMul'): number => {
+      const effect = SKILL_NODES.find((n) => n.id === id)?.effects.find((e) => e.key === key);
+      assert.ok(effect && 'mul' in effect, `${id} multiplies ${key}`);
+      return effect.mul;
+    };
     const s = take(opened(2), 'long_reach', 'deep_grip');
     const m = modifiersOf(s);
-    assert.equal(m.handReachMul, 1.6);
-    assert.equal(m.handCostMul, 0.6);
+    assert.equal(m.handReachMul, effectOf('long_reach', 'handReachMul'));
+    assert.equal(m.handCostMul, effectOf('deep_grip', 'handCostMul'));
+    assert.ok(m.handReachMul > 1 && m.handCostMul < 1, 'further and cheaper');
     assert.deepEqual(modifiersOf(opened(2)).handReachMul, 1, 'neutral until taken');
     assert.deepEqual(grantedAbilities(s), [], 'they are a change to the hand, not a power');
     for (const id of ['dream', 'sign']) {

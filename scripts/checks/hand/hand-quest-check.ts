@@ -10,7 +10,7 @@ import {
   type DeedWorld,
   witnessesWithin,
 } from '../../../src/hand/deeds.ts';
-import { classifyDrop, createHand, meetsNeed } from '../../../src/hand/handRules.ts';
+import { classifyDrop, meetsNeed } from '../../../src/hand/handRules.ts';
 import {
   CONVERSION_QUEST,
   elderOpenToBelief,
@@ -21,7 +21,7 @@ import { Activity, Role, type VillageEvent } from '../../../src/world/village/mo
 import { shortages } from '../../../src/world/village/sim/economy.ts';
 import type { VillageSim } from '../../../src/world/village/sim/villageSim.ts';
 import { check, finish } from '../lib/check.ts';
-import { meter } from '../lib/handFixtures.ts';
+import { handOn } from '../lib/handFixtures.ts';
 import { world as questWorld } from '../lib/questFixtures.ts';
 import {
   DAY_S,
@@ -391,12 +391,18 @@ await check(
     };
     assert.equal(run(), run());
 
+    // A hand that is built and updated every step but never asked to lift anything leaves the sim alone.
     const plain = makeSim(map, { mode: 'hamlet' });
     stepSim(plain, { seconds: 90 });
     const idle = makeSim(map, { mode: 'hamlet' });
-    const ledger = createDeedLedger({ villagers: idle.villagers, addBelief: () => false });
-    createHand(meter(100).energy);
-    stepSim(idle, { seconds: 90, onStep: () => ledger.update(DT) });
+    const w = handOn(idle);
+    stepSim(idle, {
+      seconds: 90,
+      onStep: () => {
+        w.hand.update(DT);
+      },
+    });
+    assert.equal(w.log.length, 0, 'the hand asked the view for nothing');
     assert.equal(
       savedHash(idle),
       savedHash(plain),

@@ -401,15 +401,16 @@ await check(
 );
 
 await check(
-  'the hand and the sim: a lift and cancel leave the world byte for byte, a delivery changes it once',
+  'the hand and the sim: a lift and cancel leave the world byte for byte, a delivery takes one tree and adds its wood',
   () => {
     const run = (script: (w: ReturnType<typeof handOn>) => void) => {
       const sim = morningHamlet(30);
       script(handOn(sim));
-      return JSON.stringify({
-        forest: sim.forest.serialize(),
-        economy: sim.economy.stock,
-      });
+      return {
+        world: JSON.stringify({ forest: sim.forest.serialize(), economy: sim.economy.stock }),
+        standing: sim.forest.counts().standing,
+        wood: sim.economy.stock.wood,
+      };
     };
     const idle = run(() => {});
     const lifted = run((w) => {
@@ -417,7 +418,11 @@ await check(
       w.hand.pick();
       w.hand.cancel();
     });
-    assert.equal(lifted, idle, 'a lift that was cancelled leaves trees and stores as they were');
+    assert.equal(
+      lifted.world,
+      idle.world,
+      'a lift that was cancelled leaves trees and stores as they were',
+    );
     const delivered = run((w) => {
       const t = templeOf(w.sim);
       w.moveTo(w.treeAt(treeNearTemple(w.sim)));
@@ -425,7 +430,8 @@ await check(
       w.moveTo(t);
       w.hand.drop();
     });
-    assert.notEqual(delivered, idle, 'a delivery does change them');
+    assert.equal(delivered.standing, idle.standing - 1, 'the tree left the forest');
+    assert.ok(delivered.wood > idle.wood, 'and its wood is in the stores');
   },
 );
 // --- wheat ---

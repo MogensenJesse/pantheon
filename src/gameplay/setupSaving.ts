@@ -12,6 +12,7 @@ import type { DayCycleContext } from '../core/reveal/DayCycle';
 import { state } from '../core/state/gameState';
 import type { OrbSystemContext } from '../entities/energyOrb/orbSystem';
 import type { PlayerControllerContext } from '../entities/PlayerController';
+import { withHeldEnergy } from '../hand/handRules';
 import type { LandmarkState } from '../landmarks/landmarks';
 import type { QuestsState } from '../quests/questLog';
 import { getActiveCycle } from '../rendering/sky/lightingCurves';
@@ -68,14 +69,9 @@ export interface Saving {
 
 export function setupSaving(deps: SavingDeps): Saving {
   const playClock = createPlayClock(deps.playSecondsAtStart);
-  /** The game state as it is saved: what the hand holds has not changed the world yet, so its energy is not spent. */
-  const heldCounted = () => {
-    const held = deps.energyOnHold?.() ?? 0;
-    return held > 0 ? { ...state, energy: Math.min(state.energyCap, state.energy + held) } : state;
-  };
   const capture = () =>
     captureGame({
-      game: heldCounted(),
+      game: withHeldEnergy(state, deps.energyOnHold?.() ?? 0),
       dayCycle: deps.dayCycle,
       player: deps.player,
       camera: deps.lookInput,

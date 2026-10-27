@@ -1,6 +1,6 @@
-// scripts/checks/village/upgrades-check.ts — headless checks of the arch II skills in the village: each node's
+// scripts/checks/village/village-skills-check.ts — headless checks of the arch II skills in the village: each node's
 // effect on the sim, and the forest rule the workshop will feed.
-// Run: node --experimental-strip-types scripts/checks/village/upgrades-check.ts
+// Run: node --experimental-strip-types scripts/checks/village/village-skills-check.ts
 import assert from 'node:assert/strict';
 import { VILLAGE } from '../../../src/config/village.ts';
 import { type Modifiers, neutralModifiers } from '../../../src/skills/modifiers.ts';
@@ -268,4 +268,4 @@ await check(
   },
 );
 
-finish('all upgrade checks passed');
+finish('all village skill checks passed');

@@ -49,7 +49,7 @@ The tree opens at the Whisper transition, not before: the first transformation i
 
 Unbuilt ideas:
 - Arch I: Remembrance (reveal explored areas, needs a fog of war), Eternal (passive faith generation +25%).
-- A third arch, The World, unlocking at Deity: influence borders visible to rivals, cheaper buildings, a larger village radius, Wrath and Mercy (Smite or Blessing doubled, shifting morality), Legacy (keep one building on ascension).
+- A third arch, The World, unlocking at Deity: influence borders visible to rivals, cheaper buildings, a larger village radius, Wrath and Mercy (a smite or a mercy power doubled, shifting morality), Legacy (keep one building on ascension).
 
 ---
 

@@ -24,7 +24,7 @@ Hauling visuals for the villagers (carrying logs and sacks to the store; the orb
 
 - The story: the words of the elder meeting, the conversion quest and every other quest (text is placeholder, see `PHASE_0_TODO.md`).
 - The quest numbers (`PHASE0.QUEST`) and the hamlet's size (`VILLAGE.HAMLET`) are first numbers, tunable after playing.
-- UI details: the final look of the save screens, the skill tree panel, the ability bar and the radial menu are quiet first passes to refine.
+- UI details: the final look of the save screens, the skill tree panel, the powers bar and the hand's rings and hints are quiet first passes to refine.
 - Whether the stale AO and grass patch under felled trees is visible enough to fix (needs a look on a live GPU).
 - island-mountain has 6 orbs (33 energy); about 20 more are to be placed in the editor (`PHASE_0_TODO.md`).
 - The village phase goal (restoring the five places of power) is built; its open items (numbers, models) are in `PHASE_2_RESTORATION.md`.

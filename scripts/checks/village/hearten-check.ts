@@ -7,8 +7,8 @@ import type { VillageEvent } from '../../../src/world/village/model/types.ts';
 import { createHearten, heartenProblem } from '../../../src/world/village/sim/hearten.ts';
 import { check, finish } from '../lib/check.ts';
 import {
-  convertVillage,
   DAY_S,
+  grownVillage,
   loadMap,
   makeSim,
   savedHash,
@@ -18,11 +18,8 @@ import {
 
 const H = VILLAGE.HEARTEN;
 const map = loadMap('island-mountain');
-const grown = () => {
-  const sim = convertVillage(makeSim(map, { mode: 'hamlet' }));
-  stepSim(sim, { seconds: DAY_S, fed: true });
-  return sim;
-};
+const day = grownVillage(map, 1);
+const grown = () => day.restore();
 
 await check('the lift lasts, then a cooldown, then the villager is free again', () => {
   const h = createHearten();

@@ -1,6 +1,6 @@
 # Quests: the engine, the quests that ship, and the last night
 
-How quests run in the game. The design (what each quest is for, who speaks, why) is in [story-mechanics/QUESTS.md](../../story-mechanics/QUESTS.md); the conversion quest, belief and the conversion powers are in [hamlet-quest.md](hamlet-quest.md).
+How quests run in the game. The design (what each quest is for, who speaks, why) is in [story-mechanics/QUESTS.md](../../story-mechanics/QUESTS.md); the conversion quest and belief are in [hamlet-quest.md](hamlet-quest.md), and the deeds of the orb's hand that win it in [hand.md](hand.md).
 
 ## The engine
 - `src/quests/quest.ts` (pure, node-runnable): a quest is `QuestDef { id, kind, available?, intro?, steps }`; a step is `{ id, text, hidden?, goal?, advance(progress, event, ctx), reward? }` and a reward is `{ sparks?, beat?, fragment? }`. `QuestState { step, progress, done }` is plain data. `stepQuest(def, state, event, ctx)` feeds one event and one snapshot of the world and returns the new state and `QuestEffects { sparks, beats, fragments, completed, questDone }`. A step completes once, so nothing is rewarded twice, and finishing one cascades a `tick` so a step that is already true completes at once. `objectiveOf` gives the line to show; `parseQuest(raw, def)` accepts a saved state or says it is damaged.

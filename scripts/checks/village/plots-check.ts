@@ -15,10 +15,11 @@ import type { VillageSim } from '../../../src/world/village/sim/villageSim.ts';
 import type { PlotResult } from '../../../src/world/village/sim/villageSimTypes.ts';
 import { check, finish } from '../lib/check.ts';
 import {
-  convertVillage,
   DAY_S,
+  grownVillage,
   loadMap,
   makeSim,
+  richVillage,
   savedHash,
   stepSim,
 } from '../lib/villageHeadless.ts';
@@ -27,17 +28,11 @@ const map = loadMap('island-mountain');
 const { seed } = map;
 
 /** A grown, converted village, made once and restored from for each check. */
-const grown = (() => {
-  const sim = convertVillage(makeSim(map, { mode: 'hamlet' }));
-  stepSim(sim, { seconds: 2 * DAY_S, fed: true });
-  return sim.serialize();
-})();
+const grown = grownVillage(map);
 /** The skill tree has opened every plot type. */
 const everything = { ...neutralModifiers(), plotFarmstead: 1, plotShrine: 1 };
 const rich = (modifiers: Modifiers = everything): VillageSim => {
-  const sim = makeSim(map, { mode: 'hamlet', restore: structuredClone(grown), modifiers });
-  sim.faith.faith = 500;
-  sim.economy.addWood(500);
+  const sim = richVillage(grown, { modifiers });
   // The planner keeps its sites open; finish them so the cap is free for the player's plots.
   for (const b of sim.buildings.filter((x) => x.stage < 2 || x.upgrade > 0)) {
     sim.haul(b.id, 1000, []);

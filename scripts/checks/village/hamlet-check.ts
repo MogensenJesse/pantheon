@@ -12,7 +12,7 @@ import {
 } from '../../../src/world/village/sim/belief.ts';
 import type { VillageSim } from '../../../src/world/village/sim/villageSim.ts';
 import { check, finish } from '../lib/check.ts';
-import { DAY_S, loadMap, makeSim, simulate } from '../lib/villageHeadless.ts';
+import { dayPhaseAt, loadMap, makeSim, simulate } from '../lib/villageHeadless.ts';
 
 const { HAMLET, FAITH } = VILLAGE;
 
@@ -40,7 +40,6 @@ await check('faith comes only from believers', () => {
 // --- the hamlet itself ---
 
 const map = loadMap('island-mountain');
-const DAY = (t: number) => (0.3 + t / DAY_S) % 1;
 const make = (
   mode: 'hamlet' | 'sandbox' = 'hamlet',
   restore?: ReturnType<VillageSim['serialize']>,
@@ -82,7 +81,7 @@ await check(
 await check('a hamlet that nobody converts stays exactly as it is, with no faith income', () => {
   const sim = make();
   const before = sim.stats();
-  simulate(sim, { hours: 2, phase: DAY, vigil: false, presence: true });
+  simulate(sim, { hours: 2, phase: dayPhaseAt, vigil: false, presence: true });
   const after = sim.stats();
   assert.equal(after.buildings, before.buildings);
   assert.equal(after.villagers, before.villagers);
@@ -97,7 +96,7 @@ await check('faith flows from believers only: their count times the rate', () =>
   const events: VillageEvent[] = [];
   for (const i of [0, 1, 2]) sim.addBelief(i, 1, events);
   assert.equal(sim.believers(), 3);
-  simulate(sim, { hours: 0.2, phase: DAY, vigil: false, presence: false });
+  simulate(sim, { hours: 0.2, phase: dayPhaseAt, vigil: false, presence: false });
   assert.ok(Math.abs(sim.faith.rate - 3 * FAITH.PER_BELIEVER_PER_SEC) < 1e-9, `${sim.faith.rate}`);
   assert.ok(sim.faith.faith > FAITH.START);
   assert.equal(sim.converted, false);
@@ -148,7 +147,7 @@ await check(
     for (let i = 0; i < 7; i++) sim.addBelief(i, 1, events);
     assert.ok(sim.convertVillage(events));
     const before = sim.stats();
-    simulate(sim, { hours: 3, phase: DAY, vigil: false, presence: true });
+    simulate(sim, { hours: 3, phase: dayPhaseAt, vigil: false, presence: true });
     const after = sim.stats();
     assert.ok(
       after.buildings > before.buildings,
@@ -179,7 +178,7 @@ await check('sandbox mode still grows by itself from the first minute', () => {
     'a foundation is open at the start',
   );
   const before = sandbox.stats().buildings;
-  simulate(sandbox, { hours: 1, phase: DAY, vigil: false, presence: true });
+  simulate(sandbox, { hours: 1, phase: dayPhaseAt, vigil: false, presence: true });
   assert.ok(sandbox.stats().buildings > before);
   assert.ok(sandbox.faith.rate > 0, 'the flat base rate');
 });

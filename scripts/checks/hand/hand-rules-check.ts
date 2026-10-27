@@ -4,6 +4,7 @@
 import assert from 'node:assert/strict';
 import { VILLAGE } from '../../../src/config/village.ts';
 import { insideFootprint } from '../../../src/core/math/geom.ts';
+import type { Delivery } from '../../../src/hand/handPorts.ts';
 import {
   classifyDrop,
   costOf,
@@ -12,13 +13,16 @@ import {
   meetsNeed,
   pickTarget,
   reachOf,
+  withHeldEnergy,
 } from '../../../src/hand/handRules.ts';
+import { deliveryText, hintText, lostText, refusalText } from '../../../src/hand/handText.ts';
 import type { HandCandidate } from '../../../src/hand/handTypes.ts';
 import { canArm, clickOwner, overviewPlace } from '../../../src/hand/overviewAim.ts';
 import { shortages } from '../../../src/world/village/sim/economy.ts';
 import { isRipe } from '../../../src/world/village/sim/fieldsDesk.ts';
 import { check, finish } from '../lib/check.ts';
-import { building, meter, remoteSite, tree } from '../lib/handFixtures.ts';
+import { meter, remoteSite, tree } from '../lib/handFixtures.ts';
+import { buildingOf } from '../lib/villageHeadless.ts';
 
 const H = VILLAGE.HAND;
 
@@ -36,7 +40,7 @@ await check('aim: the nearest thing within the reach of its kind, and nothing ou
     'a sheep has its own, shorter reach',
   );
   assert.equal(pickTarget([], at), null);
-  assert.ok(pickTarget([tree(2, 3)], at, 1)?.id === 2);
+  assert.equal(pickTarget([tree(2, 3)], at, 1)?.id, 2);
   assert.equal(
     pickTarget([tree(2, 3)], at, 0.4),
     null,
@@ -80,11 +84,11 @@ await check('aim: a field is an area, measured to its edge and turned with it', 
 
 // --- where it may be put down ---
 
-const temple = building({ id: 1, type: 'temple', halfW: 5, halfD: 5 });
-const site = building({ id: 2, type: 'house_b', x: 20, stage: 0 });
-const granary = building({ id: 3, type: 'granary', x: -20 });
-const upgrading = building({ id: 4, type: 'workshop', z: 20, upgrade: 100 });
-const house = building({ id: 5, type: 'house_a', x: 40 });
+const temple = buildingOf('temple', { id: 1, halfW: 5, halfD: 5 });
+const site = buildingOf('house_b', { id: 2, x: 20, stage: 0 });
+const granary = buildingOf('granary', { id: 3, x: -20 });
+const upgrading = buildingOf('workshop', { id: 4, z: 20, upgrade: 100 });
+const house = buildingOf('house_a', { id: 5, x: 40 });
 const all = [temple, site, granary, upgrading, house];
 
 await check('drop zones: wood to a store or, better, to a site; food only to a store', () => {
@@ -120,7 +124,7 @@ await check('drop zones: the margin, houses, unfinished stores and the nearest o
   assert.equal(insideFootprint(frame, 15, 10), false, 'and it is 2 m wide in x');
   assert.equal(insideFootprint(frame, 15, 10, 4.5), true, 'a margin grows it on every side');
   assert.equal(classifyDrop('wood', { x: 40, z: 0 }, all).zone, 'none', 'a house is not a store');
-  const unbuilt = building({ id: 6, type: 'granary', x: 60, stage: 1 });
+  const unbuilt = buildingOf('granary', { id: 6, x: 60, stage: 1 });
   assert.equal(
     classifyDrop('food', { x: 60, z: 0 }, [unbuilt]).zone,
     'none',
@@ -131,17 +135,16 @@ await check('drop zones: the margin, houses, unfinished stores and the nearest o
     'site',
     'but a site for wood',
   );
-  const near = building({ id: 7, type: 'house_c', x: 6, stage: 0 });
-  const far = building({ id: 8, type: 'house_c', x: 9, stage: 0 });
+  const near = buildingOf('house_c', { id: 7, x: 6, stage: 0 });
+  const far = buildingOf('house_c', { id: 8, x: 9, stage: 0 });
   const d = classifyDrop('wood', { x: 7, z: 0 }, [far, temple, near]);
   assert.ok(
     d.zone === 'site' && d.building.id === 7,
     'a site wins over the temple, the nearest site wins',
   );
   // turned buildings: a long side along z
-  const turned = building({
+  const turned = buildingOf('granary', {
     id: 9,
-    type: 'granary',
     x: 0,
     z: 0,
     halfW: 6,
@@ -310,5 +313,67 @@ await check('overview powers: the hand takes every click while it holds somethin
   assert.equal(canArm(hand, hand, true), true, 'the hand itself may be armed or put away');
   assert.equal(canArm('call_rain', undefined, true), false);
 });
+
+// --- what a save counts, and the words ---
+
+await check(
+  'a save counts the energy of a hold as unspent, up to the cap, and changes nothing else',
+  () => {
+    const state = { energy: 40, energyCap: 100, other: 'kept' };
+    assert.equal(withHeldEnergy(state, 0), state, 'nothing held: the very same state');
+    assert.deepEqual(withHeldEnergy(state, 15), { energy: 55, energyCap: 100, other: 'kept' });
+    assert.equal(withHeldEnergy(state, 80).energy, 100, 'never above the cap');
+    assert.equal(state.energy, 40, 'the live state is not touched');
+  },
+);
+
+await check(
+  'the words: a delivery, a hint, a refusal and a lost hold each say what happened',
+  () => {
+    const delivery = (over: Partial<Delivery>): Delivery => ({
+      what: 'tree',
+      amount: 10,
+      kept: 10,
+      zone: 'store',
+      x: 0,
+      z: 0,
+      impressed: 0,
+      converted: 0,
+      ...over,
+    });
+    assert.equal(deliveryText(delivery({})), 'Wood for the stores: +10.');
+    assert.match(
+      deliveryText(delivery({ what: 'wheat', kept: 4, amount: 6 })),
+      /^Food .*\+4 \(the store is full: 4 of 6\)/,
+    );
+    assert.match(deliveryText(delivery({ kept: 0 })), /store is full, but the village saw it/);
+    assert.match(deliveryText(delivery({ zone: 'site' })), /builders/);
+    assert.match(deliveryText(delivery({ zone: 'remote' })), /crew at the camp/);
+    assert.match(deliveryText(delivery({ impressed: 2 })), /impressed/);
+    assert.doesNotMatch(deliveryText(delivery({ impressed: 0 })), /impressed/);
+
+    const held = { kind: 'tree' as const, id: 1, x: 0, z: 0, cost: 5 };
+    const site = buildingOf('house_a', { stage: 1 });
+    assert.equal(hintText(null, null, null), '', 'nothing near: no hint');
+    assert.equal(hintText(tree(1, 2), null, null), 'pull up the tree');
+    assert.match(hintText(null, held, { zone: 'none' }), /let go/);
+    assert.match(hintText(null, held, { zone: 'site', building: site }), /builders/);
+    assert.match(
+      hintText(null, held, { zone: 'remote', site: remoteSite({}), x: 0, z: 0 }),
+      /camp/,
+    );
+    assert.equal(
+      hintText(null, held, { zone: 'store', building: buildingOf('granary') }),
+      'put it down',
+    );
+
+    assert.equal(refusalText('busy'), '', 'a busy hand needs no word');
+    assert.match(refusalText('energy'), /energy/);
+    assert.equal(lostText('blocked', 'tree'), '');
+    for (const what of ['tree', 'wheat', 'sheep'] as const) {
+      assert.match(lostText('gone', what), /energy returns/i, what);
+    }
+  },
+);
 
 finish('all hand rules checks passed');

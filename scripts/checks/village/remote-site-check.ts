@@ -8,9 +8,9 @@ import { findCoarseRoute } from '../../../src/world/village/sim/coarseRoute.ts';
 import type { VillageSim } from '../../../src/world/village/sim/villageSim.ts';
 import { check, finish } from '../lib/check.ts';
 import {
-  convertVillage,
   DAY_S,
   dayPhaseAt,
+  grownVillage,
   loadMap,
   makeSim,
   savedHash,
@@ -37,13 +37,8 @@ function farPlace(): { x: number; z: number } {
 const place = farPlace();
 
 /** A grown, converted village (two days of hand-fed growth), made once and restored from for each check. */
-const grown = (() => {
-  const sim = convertVillage(makeSim(map, { mode: 'hamlet' }));
-  stepSim(sim, { seconds: 2 * DAY_S, fed: true });
-  return sim.serialize();
-})();
-const grownVillage = (): VillageSim =>
-  makeSim(map, { mode: 'hamlet', restore: structuredClone(grown) });
+const grown = grownVillage(map);
+const grownSim = (): VillageSim => grown.restore();
 
 const crewOf = (sim: VillageSim): number[] => {
   const { villagers: p } = sim;
@@ -57,14 +52,14 @@ await check('a hamlet that has not converted has no builders to send', () => {
 });
 
 await check('a place that cannot be walked to is refused, and a place is begun once', () => {
-  const sim = grownVillage();
+  const sim = grownSim();
   assert.equal(sim.startRemoteSite('tree', seed.x + 6000, seed.z, []), 'no-route');
   assert.equal(sim.startRemoteSite('tree', place.x, place.z, []), 'ok');
   assert.equal(sim.startRemoteSite('tree', place.x, place.z, []), 'busy');
 });
 
 await check('the crew walks out, camps through the night, finishes the work and walks home', () => {
-  const sim = grownVillage();
+  const sim = grownSim();
   const start: VillageEvent[] = [];
   assert.equal(sim.startRemoteSite('tree', place.x, place.z, start), 'ok');
   assert.ok(start.some((e) => e.kind === 'remoteStarted'));
@@ -128,7 +123,7 @@ await check('the crew walks out, camps through the night, finishes the work and 
 });
 
 await check('a crew sent out at dusk rests through the night and works the next morning', () => {
-  const sim = grownVillage();
+  const sim = grownSim();
   // Let the evening come (day phase 0.8), then send the crew.
   const duskS = 2 * DAY_S + (0.8 - 0.3) * DAY_S;
   stepSim(sim, { seconds: duskS - 2 * DAY_S, from: 2 * DAY_S, fed: true });
@@ -145,7 +140,7 @@ await check('a crew sent out at dusk rests through the night and works the next 
 });
 
 await check('a trip in progress survives a save and a load', () => {
-  const sim = grownVillage();
+  const sim = grownSim();
   sim.startRemoteSite('tree', place.x, place.z, []);
   const splitS = 2 * DAY_S + 120;
   // Two minutes in, the crew is still on its way.
@@ -165,7 +160,7 @@ await check('a trip in progress survives a save and a load', () => {
 });
 
 await check('a crew is made up again when its members are lost', () => {
-  const sim = grownVillage();
+  const sim = grownSim();
   sim.startRemoteSite('tree', place.x, place.z, []);
   const first = crewOf(sim);
   // They die one by one (as if of hunger): free builders take their place.
@@ -184,7 +179,7 @@ await check('a crew is made up again when its members are lost', () => {
 await check(
   'wood hauled by the hand is the crew’s work: stages and the walk home come out as they would',
   () => {
-    const sim = grownVillage();
+    const sim = grownSim();
     assert.equal(sim.startRemoteSite('tree', place.x, place.z, []), 'ok');
     const site = sim.remoteSites[0]!;
     const crew = crewOf(sim);

@@ -8,10 +8,11 @@ import { outpostOf, outpostSiteKind } from '../../../src/world/village/sim/outpo
 import type { VillageSim } from '../../../src/world/village/sim/villageSim.ts';
 import { check, finish } from '../lib/check.ts';
 import {
-  convertVillage,
   DAY_S,
+  grownVillage,
   loadMap,
   makeSim,
+  richVillage,
   savedHash,
   stepSim,
 } from '../lib/villageHeadless.ts';
@@ -20,17 +21,8 @@ const O = VILLAGE.OUTPOSTS;
 const map = loadMap('island-mountain');
 const { seed, sampler } = map;
 
-const grown = (() => {
-  const sim = convertVillage(makeSim(map, { mode: 'hamlet' }));
-  stepSim(sim, { seconds: 2 * DAY_S, fed: true });
-  return sim.serialize();
-})();
-const rich = (): VillageSim => {
-  const sim = makeSim(map, { mode: 'hamlet', restore: structuredClone(grown) });
-  sim.faith.faith = 500;
-  sim.economy.addWood(500);
-  return sim;
-};
+const grown = grownVillage(map);
+const rich = (): VillageSim => richVillage(grown);
 
 /** The first spot, going out from the village, where the sim accepts an outpost of `kind` and the crew can walk. */
 function spotFor(sim: VillageSim, kind: string, skip = 0): { x: number; z: number } {

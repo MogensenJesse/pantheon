@@ -2,7 +2,7 @@
 
 Design: `story-mechanics/VILLAGE_INTERACTION.md`. Numbers: `VILLAGE.HEARTEN` (`src/config/village/hearten.ts`, placeholders). Pure rules in `world/village/sim/hearten.ts`; the sim hook is `sim.heartenVillager`.
 
-The hand of this game, kept small on purpose: the player **touches one villager** from the overview's info panel. Nothing is picked up, carried or thrown, and there is no good/evil score.
+A single touch, kept small on purpose: the player **touches one villager** from the overview's info panel. Unlike the orb's hand ([hand](hand.md)), which carries trees, wheat and sheep, nothing here is picked up, carried or thrown, and there is no good/evil score.
 
 ## What a touch does
 - Costs `HEARTEN.FAITH` faith.

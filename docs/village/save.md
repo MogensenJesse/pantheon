@@ -38,5 +38,7 @@ There are no migrations: a changed shape bumps the version and older saves are r
 
 No version bump for the building effects, the Farmstead and the Shrine, the faith multiplier or the locked plot types: their effects are derived each step from the buildings, the new building types are ordinary buildings (types are not validated) and the new skill nodes and modifiers are not saved (`parseSkills` knows the node ids). The held thing of the orb's hand is never saved.
 
+`golden.json` has no scenario for the building effects or the hand, on purpose: with none of those buildings present the sim is exactly as before (so the old scenarios still pin it), and the effects themselves are pinned where they are read, by `check:village-effects`, `check:village-economy` and `check:hand`.
+
 ## Checks
 `npm run check:save-village` (`scripts/checks/save/village-save-check.ts`, slow-ish: a village saved midway and restored must end identical to one that ran straight on; scenarios for famine, forest, rain with burial and mourning, the hand; one split per scenario by default, `--full` runs the whole set). Remote sites (`remoteSites`: route, stage, progress) and the per-villager crew arrays (`crew`, `crewPhase`, `routeCur`) are part of the sim state; see [remote-sites](remote-sites.md). `check:village-golden` (on demand, not in `check:fast`/`check:all`) pins `sim.serialize()` hashes for several scenarios (`scripts/checks/village/golden.json`, `-- --update` after a deliberate change).

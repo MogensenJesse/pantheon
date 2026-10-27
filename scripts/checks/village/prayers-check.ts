@@ -14,8 +14,8 @@ import {
 } from '../../../src/world/village/sim/prayers.ts';
 import { check, finish } from '../lib/check.ts';
 import {
-  convertVillage,
   DAY_S,
+  grownVillage,
   loadMap,
   makeSim,
   savedHash,
@@ -165,11 +165,8 @@ await check('a saved prayers state is checked', () => {
 // --- in the village ---
 
 const map = loadMap('island-mountain');
-const grown = () => {
-  const sim = convertVillage(makeSim(map, { mode: 'hamlet' }));
-  stepSim(sim, { seconds: DAY_S, fed: true });
-  return sim;
-};
+const day = grownVillage(map, 1);
+const grown = () => day.restore();
 const prayerEvents = (log: readonly VillageEvent[]) =>
   log.filter((e) => e.kind.startsWith('prayer')).map((e) => e.kind);
 

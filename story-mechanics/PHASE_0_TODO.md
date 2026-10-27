@@ -115,6 +115,9 @@ To look at on a real GPU (convert a village, or `__pantheonVillage.convertNow()`
 - [ ] A held sheep: the pose, whether the legs read as lifted, the missing blob shadow, and the spot left in the flock; a new sheep walking into view after it respawns.
 - [ ] The ring and the hint on what would be lifted and on where it would be put down: legible by day, at dusk and in the overview (both the field rings and the building rings).
 - [ ] The sparkles of a drop, also at the overview cursor; the overview cursor while it carries something.
+- [ ] Hauling to a remote camp: drop a tree at a restoration or an outpost camp. Is the ring at the camp (a fixed size) legible and centred, does the crew's work visibly jump, and does the place complete cleanly when the hauled wood fills the last stage?
+- [ ] The carried tree may swing or snap when the overview closes while it holds something (the heading follows the orb again): see how it looks, and whether it clips the new camera.
+- [ ] The ring sizes moved: roam and overview now share one set (`ui/hand/handRings.ts`) and the building rings were widened to the real drop zone (the margin counts on every side). Check they still look right on a house, a granary, a field and a sheep.
 - [ ] A hitch the first time a tree is lifted (the batches and the materials are made before the warm-up; if it hitches, say which).
 - [ ] Farmstead and Shrine stand-ins (the house kit: a low open barn, a small stone hall): their footprints against the lanes and the fields, the planks while they are built or raised, levels 2 and 3 (no visible change yet), and that a farmstead does not look like a house from the overview.
 - [ ] That the faith effect reads: a shrine at level 3 and Fervour make the faith number move visibly faster.
@@ -126,7 +129,7 @@ Models, optional until you want them (stand-ins hold the places):
 - [ ] Carry props for the hand: a log bundle (a tree cut small, today the tree itself is drawn small), a sheaf of wheat (a pile stands in), a sack. Hens are not liftable yet.
 
 Decide and tune:
-- [ ] Playtest the numbers in `src/config/village/hand.ts` (reach, energy cost per kind, belief per deed, witness radius, cooldowns, wood to work, food per sheaf and per sheep) and `src/config/village/effects.ts` (the farmstead's reach and bonus, the workshop's axes, the shrine's faith). The conversion takes about 13 minutes of deeds at the placeholder numbers.
+- [ ] Playtest the numbers in `src/config/village/hand.ts` (reach, energy cost per kind, belief per deed, witness radius, cooldowns, wood to work, food per sheaf and per sheep) and `src/config/village/effects.ts` (the farmstead's reach and bonus, the workshop's axes, the shrine's faith). The conversion took about 13 minutes of deeds when measured once at the placeholder numbers (`hand-quest-check` prints its own count).
 - [ ] Whether carrying should slow the orb or drain energy (today energy is only charged at the lift).
 - [ ] The name **Shrine** for the building (it overlaps with the energy shrines of the map); which building types come next.
 - [ ] Words: the hand's lines (`src/hand/handText.ts`), the node texts for Farmsteads, Shrines, Fine works and Fervour (`src/skills/skillTree.ts`).

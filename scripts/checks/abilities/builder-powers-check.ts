@@ -11,11 +11,10 @@ import { type BuilderWorld, createBuilderPowers } from '../../../src/abilities/b
 import { createAbilityCaster } from '../../../src/abilities/caster.ts';
 import { VILLAGE } from '../../../src/config/village.ts';
 import { WEATHER } from '../../../src/config/weather.ts';
-import type { VillageEvent } from '../../../src/world/village/model/types.ts';
 import type { VillageSim } from '../../../src/world/village/sim/villageSim.ts';
 import { createWeather, forcedWeatherProblem } from '../../../src/world/weather/weather.ts';
 import { check, finish } from '../lib/check.ts';
-import { loadMap, makeSim } from '../lib/villageHeadless.ts';
+import { convertVillage, loadMap, makeSim } from '../lib/villageHeadless.ts';
 
 const P = VILLAGE.WEATHER_POWERS;
 const map = loadMap('island-mountain');
@@ -23,10 +22,7 @@ const def = (id: string) => abilityById(id) as AbilityDef;
 
 /** A converted village with the powers wired to it, as the game wires them. */
 function setup() {
-  const sim: VillageSim = makeSim(map, { mode: 'hamlet' });
-  const events: VillageEvent[] = [];
-  for (let i = 0; i < sim.villagers.count; i++) sim.addBelief(i, 1, events);
-  sim.convertVillage(events);
+  const sim: VillageSim = convertVillage(makeSim(map, { mode: 'hamlet' }));
   sim.economy.addWood(Number.POSITIVE_INFINITY);
   sim.addFaith(500);
   const weather = createWeather({

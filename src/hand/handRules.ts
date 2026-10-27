@@ -166,6 +166,17 @@ export interface Hand {
   release: (how: Release) => Held | null;
 }
 
+/**
+ * The game state as a save sees it: a hold has paid its energy but changed no part of the world yet, so the
+ * save counts that energy as still unspent (a restored game starts with nothing in the hand).
+ */
+export function withHeldEnergy<S extends { energy: number; energyCap: number }>(
+  state: S,
+  held: number,
+): S {
+  return held > 0 ? { ...state, energy: Math.min(state.energyCap, state.energy + held) } : state;
+}
+
 export function createHand(energy: HandEnergy): Hand {
   let held: Held | null = null;
   return {

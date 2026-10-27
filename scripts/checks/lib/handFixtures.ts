@@ -62,24 +62,6 @@ export const meter = (start: number) => {
   return { state, energy };
 };
 
-export const building = (over: Partial<Building>): Building => ({
-  id: 1,
-  type: 'house_a',
-  x: 0,
-  z: 0,
-  rotY: 0,
-  halfW: 2,
-  halfD: 2,
-  plinthTopY: 0,
-  plinthBaseY: 0,
-  stage: 2,
-  progress: 0,
-  level: 1,
-  upgrade: 0,
-  ring: 0,
-  ...over,
-});
-
 export const tree = (id: number, x: number, z = 0): HandCandidate => ({ kind: 'tree', id, x, z });
 
 /** A remote site (a restoration or an outpost) as the hand sees it: only where it is and how far along. */
