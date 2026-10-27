@@ -1,20 +1,20 @@
 /*
- * src/ui/abilities/abilities.css — the powers bar in the village overview (the orb's hand and the weather
- * powers). Quiet and mythic, all tokens; hidden while the player has no power.
+ * src/ui/overview/powerBar.css — the powers bar in the village overview (the orb's hand and the weather
+ * powers), bottom middle. Quiet and mythic, all tokens; hidden while the player has no power.
  */
 
-.ab-bar {
+.ov-powers {
   position: fixed;
-  /* Placed by `.ab-bar--overview` below: the bar only exists in the overview. */
-  right: 1.5rem;
-  bottom: 3.5rem;
+  left: 50%;
+  bottom: 1.5rem;
+  transform: translateX(-50%);
   display: flex;
   gap: var(--ui-space-3);
   pointer-events: none;
 }
 
 /* One slot: a ring that empties as the cooldown runs, the name and cost, and a word when not ready. */
-.ab-slot {
+.ov-power {
   position: relative;
   display: grid;
   grid-template-columns: auto 1fr;
@@ -27,62 +27,52 @@
   border-radius: var(--ui-radius-md);
   background: rgba(var(--ui-surface-rgb), 0.7);
   color: var(--ui-hud-text);
+  font: inherit;
   font-size: var(--ui-text-sm);
+  text-align: left;
   text-shadow: var(--ui-text-shadow);
+  pointer-events: auto;
+  cursor: pointer;
 }
-.ab-slot[data-ready="true"] {
+.ov-power[data-ready="true"] {
   border-color: rgba(var(--ui-energy-rgb), 0.6);
   color: rgb(var(--ui-energy-bright-rgb));
 }
-.ab-slot[data-ready="false"] {
+.ov-power[data-ready="false"] {
   opacity: 0.7;
 }
-.ab-slot__ring {
+.ov-power[data-armed="true"] {
+  border-color: rgb(var(--ui-energy-bright-rgb));
+  box-shadow: 0 0 0.8rem rgba(var(--ui-energy-glow-rgb), 0.45);
+}
+.ov-power__ring {
   position: absolute;
   inset: 0;
   border-radius: var(--ui-radius-md);
   /* Dark sweep over the slot: the covered fraction is the cooldown left. */
   background: conic-gradient(
-    var(--ui-backdrop) calc(var(--ab-cooldown, 0) * 360deg),
+    var(--ui-backdrop) calc(var(--ov-cooldown, 0) * 360deg),
     transparent 0
   );
   pointer-events: none;
 }
-.ab-slot__icon {
+.ov-power__icon {
   grid-area: icon;
   display: grid;
   place-items: center;
 }
-.ab-slot__name {
+.ov-power__name {
   grid-area: name;
 }
-.ab-slot__cost {
+.ov-power__cost {
   grid-area: cost;
   font-size: var(--ui-text-xs);
   color: var(--ui-hint-text);
 }
-.ab-slot__note {
+.ov-power__note {
   grid-area: note;
   min-height: 1em;
   font-size: var(--ui-text-xs);
   font-style: italic;
   color: var(--ui-warning-text);
-}
-
-/* The arch II bar in the village overview: bottom middle, and its slots can be clicked. */
-.ab-bar--overview {
-  right: auto;
-  left: 50%;
-  bottom: 1.5rem;
-  transform: translateX(-50%);
-}
-.ab-slot--button {
-  pointer-events: auto;
-  cursor: pointer;
-  font: inherit;
-  text-align: left;
-}
-.ab-slot--button[data-armed="true"] {
-  border-color: rgb(var(--ui-energy-bright-rgb));
-  box-shadow: 0 0 0.8rem rgba(var(--ui-energy-glow-rgb), 0.45);
 }

@@ -4,7 +4,8 @@
 // The hand itself is `src/hand/handRuntime.ts`; this only shows it and presses its keys.
 
 import type { Camera } from 'three';
-import type { Delivery, DropOutcome, HandRuntime, PickOutcome } from '../../hand/handRuntime';
+import type { Delivery, DropOutcome, PickOutcome } from '../../hand/handPorts';
+import type { HandRuntime } from '../../hand/handRuntime';
 import {
   deliveryText,
   goneText,

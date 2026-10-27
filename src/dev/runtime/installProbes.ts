@@ -121,11 +121,11 @@ export function installProbes(src: ProbeSources): () => void {
   );
   if (village) {
     disposers.push(initVillageProbe(village));
-    if (gameplay.handRuntime && gameplay.hand) {
+    if (gameplay.handRuntime && gameplay.handUi) {
       disposers.push(
         initHandProbe({
           runtime: gameplay.handRuntime,
-          ui: gameplay.hand,
+          ui: gameplay.handUi,
           sim: village.sim,
           sheep: src.animals.hand,
           teleport,

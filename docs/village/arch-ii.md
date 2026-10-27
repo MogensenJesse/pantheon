@@ -24,8 +24,8 @@ New `Modifiers` fields (`bedsPerHouseAdd`, `woodPerTreeAdd`, `fieldYieldAdd`, `s
 - **Call rain** (`sky`): a front centred on the cursor (`weather.addFront`).
 - **Clear skies** (`sky`): a hole in the weather around the cursor (`weather.clearSkies`).
 - Hearten is not a power on the bar: it is a button on a villager's info panel (`docs/village/hearten.md`).
-- `builderPowers.ts` (pure) resolves the ground point under the cursor (`CursorAim { ground }`) and performs through `BuilderWorld { weather, clock, windDirectionDeg }`. `initGameplay` builds it, passes faith to the caster (`abilities.setFaith`, spend = `village.addFaith(-n)`). The village powers are cast from the overview's bar (`ui/abilities/builderBar.ts`); the roam view has no power bar.
-- **Overview bar** (`ui/overview/overviewPowers.ts`, bar in `ui/abilities/builderBar.ts`): the hand first, then the two powers at the bottom of the overview; click one or press its number to arm it (a hint says what to click), the next click casts at what is under the cursor and selects nothing, a refused cast says why and stays armed, Esc puts it away first (`overview.addEscapeGuard`), leaving the overview disarms.
+- `builderPowers.ts` (pure) resolves the ground point under the cursor (`CursorAim { ground }`) and performs through `BuilderWorld { weather, clock, windDirectionDeg }`. `initGameplay` builds it, passes faith to the caster (`abilities.setFaith`, spend = `village.addFaith(-n)`). The village powers are cast from the overview's bar (`ui/overview/powerBar.ts`); the roam view has no power bar.
+- **Overview bar** (`ui/overview/overviewPowers.ts`, bar in `ui/overview/powerBar.ts`): the hand first, then the two powers at the bottom of the overview; click one or press its number to arm it (a hint says what to click), the next click casts at what is under the cursor and selects nothing, a refused cast says why and stays armed, Esc puts it away first (`overview.addEscapeGuard`), leaving the overview disarms.
 
 ## Save
 `ProfileState.powers { cooldowns, weather }` (`PowersState`): the running cooldowns (`caster.cooldowns/restore`) and the called fronts and clear zones.

@@ -12,6 +12,7 @@ import {
   type DeedWorld,
   witnessesWithin,
 } from '../../../src/hand/deeds.ts';
+import type { HandAnimals, HandPorts } from '../../../src/hand/handPorts.ts';
 import {
   classifyDrop,
   costOf,
@@ -21,11 +22,7 @@ import {
   pickTarget,
   reachOf,
 } from '../../../src/hand/handRules.ts';
-import {
-  createHandRuntime,
-  type HandAnimals,
-  type HandPorts,
-} from '../../../src/hand/handRuntime.ts';
+import { createHandRuntime } from '../../../src/hand/handRuntime.ts';
 import type { HandCandidate, HandEnergy } from '../../../src/hand/handTypes.ts';
 import { canArm, clickOwner, overviewPlace } from '../../../src/hand/overviewAim.ts';
 import {

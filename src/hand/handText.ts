@@ -1,7 +1,7 @@
 // src/hand/handText.ts — the words the hand uses (pure: no DOM, node-runnable; placeholder text)
 
+import type { Delivery, Lost, PickOutcome } from './handPorts.ts';
 import type { Drop } from './handRules.ts';
-import type { Delivery, Lost, PickOutcome } from './handRuntime.ts';
 import type { HandCandidate, HandKind, Held } from './handTypes.ts';
 
 /** Why a lift did not happen; empty when the player needs no word about it. */

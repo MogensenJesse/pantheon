@@ -16,8 +16,8 @@ import type { CastResult } from '../../abilities/caster';
 import { putDownFirstText } from '../../hand/handText';
 import { canArm, clickOwner } from '../../hand/overviewAim';
 import type { Overview } from '../../overview/overviewController';
-import { createBuilderBar } from '../abilities';
 import { getHudSlot, h, isModalPanelOpen, isPanelOpen, notify, registerHotkey } from '../kit';
+import { createPowerBar } from './powerBar';
 
 /** A tool on the bar that is not a cast: it takes clicks until it is put away (the orb's hand). */
 export interface OverviewTool {
@@ -105,7 +105,7 @@ export function createOverviewPowers(deps: OverviewPowersDeps): OverviewPowers {
     arm(armed === id ? null : id);
   };
 
-  const bar = createBuilderBar({
+  const bar = createPowerBar({
     list: () => {
       const own = deps.list();
       const slot = tool?.view();

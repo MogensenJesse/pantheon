@@ -1,6 +1,6 @@
 // src/core/EventBus.ts
 
-import type { Delivery } from '../hand/handRuntime';
+import type { Delivery } from '../hand/handPorts';
 import type { VillageBuildingType } from '../world/village/model/assetKeys';
 
 export interface GameEvents {

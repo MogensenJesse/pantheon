@@ -37,7 +37,7 @@ import type { Cinematic } from '../rendering/cinematic';
 import { modifiers } from '../skills/modifiers';
 import type { SkillRuntime } from '../skills/skillRuntime';
 import { type HandUi, initHandUi } from '../ui/hand/handUi';
-import { initPowerOverlay } from '../ui/overlay';
+import { initBeliefPips } from '../ui/overlay';
 import { initQuestUi } from '../ui/quests';
 import { initSkillUi } from '../ui/skills';
 import type { MapTerrainContext } from '../world/MapTerrainBuilder';
@@ -87,7 +87,7 @@ export interface Gameplay {
   quest: QuestRuntime | null;
   /** The orb's hand; null without a village. */
   handRuntime: HandRuntime | null;
-  hand: HandUi | null;
+  handUi: HandUi | null;
   landmarks: LandmarkRuntime;
   /** Starts and finishes the restoration of the places of power. */
   restoration: RestorationRuntime;
@@ -124,7 +124,7 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
   const hamlet = !!village && village.sim.mode === 'hamlet';
   const nameReturned = () => quest?.isDone(FINALE_QUEST.id) ?? false;
   // The hand is built below, after the quest it asks about the elder; the finale sets down what it holds.
-  let hand: HandUi | null = null;
+  let handUi: HandUi | null = null;
   // The last night: a beam from each place, the rune over the temple and the cutscene that lights them.
   const temple = village ? templeOf(village.sim.buildings) : undefined;
   const finale =
@@ -159,7 +159,7 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
               landmarks.places.length > 0 && landmarks.restoredCount() >= landmarks.places.length,
           },
           playFinale: (done) => {
-            hand?.cancel();
+            handUi?.cancel();
             if (finale) finale.play(done);
             else done();
           },
@@ -209,7 +209,7 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
       })
     : null;
   const burstOrigin = new Vector3();
-  hand = handRuntime
+  handUi = handRuntime
     ? initHandUi({
         runtime: handRuntime,
         camera: deps.camera,
@@ -240,8 +240,8 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
   });
   // Casting anything is done by the village powers: without a village there is nothing to cast.
   if (village) abilities.setPerformer((def, target) => builder?.perform(def, target) ?? false);
-  const powerOverlay = village
-    ? initPowerOverlay({
+  const offBeliefPips = village
+    ? initBeliefPips({
         camera: deps.camera,
         villagers: village.sim.villagers,
         orbPosition: orbPlace,
@@ -297,7 +297,7 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
   return {
     quest,
     handRuntime,
-    hand,
+    handUi,
     landmarks,
     restoration,
     landmarkLights,
@@ -310,7 +310,7 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
     playCutscene: finale ? finale.play : null,
     update: (dt) => {
       abilities.update(dt);
-      hand?.update(dt);
+      handUi?.update(dt);
       quest?.update(dt);
       syncVillageSkills(dt);
       energyRegen.update(dt);
@@ -322,12 +322,12 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
       shrineZones.update(zoneClock, energyRegen.inActiveZone());
     },
     dispose: () => {
-      hand?.dispose();
+      handUi?.dispose();
       restoration.dispose();
       offVillagerDied();
       skillUi();
       questUi();
-      powerOverlay();
+      offBeliefPips();
       quest?.dispose();
       finale?.dispose();
       shrineZones.dispose();

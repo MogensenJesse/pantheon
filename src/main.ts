@@ -614,15 +614,15 @@ async function main(): Promise<void> {
     animalHand: life.animals.hand,
   });
   // The hand carries its tree with the orb as it is drawn.
-  const offHandHook = gameplay.hand ? frameTick.addRenderHook(gameplay.hand.frame) : () => {};
+  const offHandHook = gameplay.handUi ? frameTick.addRenderHook(gameplay.handUi.frame) : () => {};
   // The hand lifts and puts down from the overview too, with the orb as the cursor.
   const overviewHand =
-    overviewUi && village && gameplay.hand && gameplay.handRuntime
+    overviewUi && village && gameplay.handUi && gameplay.handRuntime
       ? createOverviewHand({
           overview,
           camera,
           runtime: gameplay.handRuntime,
-          ui: gameplay.hand,
+          ui: gameplay.handUi,
           world: village.sim,
           pick: overviewUi.pickAtMouse,
           hovered: overviewUi.hovered,

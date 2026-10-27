@@ -1,4 +1,4 @@
-// src/ui/overlay/powerOverlay.ts — what belief looks like in the world
+// src/ui/overlay/beliefPips.ts — what belief looks like in the world
 //
 //   a faint pip above each believer (and each villager with some belief) near the orb, brighter the
 //   more they believe. Nothing is shown while a panel is open.
@@ -8,7 +8,7 @@ import type { Villagers } from '../../world/village/model/types';
 import { isModalPanelOpen } from '../kit';
 import { createMarkerLayer } from './worldMarkers';
 
-export interface PowerOverlayDeps {
+export interface BeliefPipsDeps {
   camera: Camera;
   villagers: Villagers;
   /** Where the orb is. */
@@ -22,7 +22,7 @@ export interface PowerOverlayDeps {
 
 const HEAD_M = 2.15;
 
-export function initPowerOverlay(deps: PowerOverlayDeps): () => void {
+export function initBeliefPips(deps: BeliefPipsDeps): () => void {
   const pips = createMarkerLayer(deps.camera, 'po-pip');
   let frame = 0;
 
