@@ -21,6 +21,7 @@ import { createEconomy, foodPerDay } from './economy.ts';
 import { createFaithState, type FaithInputs, stepFaith } from './faith.ts';
 import { createFieldsDesk } from './fieldsDesk.ts';
 import { createForest, forestProblem, type TreeInfo } from './forest.ts';
+import { createFounding } from './founding.ts';
 import { doorWorld as doorWorldOf } from './geometry.ts';
 import { createGraveyard } from './graveyard.ts';
 import { createHearten, type HeartenResult } from './hearten.ts';
@@ -65,7 +66,7 @@ import {
   stepPrayers,
 } from './prayers.ts';
 import { createRingModel, measureContour } from './ringModel.ts';
-import { cellIndex, createSiteGrid, OCCUPANT, stampBuilding, stampFootprint } from './siteGrid.ts';
+import { cellIndex, createSiteGrid, OCCUPANT, stampBuilding } from './siteGrid.ts';
 import { createSitesDesk } from './sitesDesk.ts';
 import { seatBuilding } from './siting.ts';
 import { createSupportBuildings, FIELD_BLOCK_MARGIN_M } from './support.ts';
@@ -96,7 +97,7 @@ export type {
 } from './villageSimTypes.ts';
 export { villageStateProblem };
 
-const { PLAN, VILLAGERS, HAMLET } = VILLAGE;
+const { PLAN } = VILLAGE;
 const SPAWN_CHECK_S = 2;
 /** The crew of a remote site leaves the village's paths at this share of the village radius. */
 const GATE_SHARE = 0.8;
@@ -425,60 +426,18 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     }
   };
 
-  // Founding: the temple and its plaza, the well's spot and the plaza loop.
-  const foundTemple = () => {
-    const temple0 = place('temple', 2, seed.x, seed.z, seed.rotY);
-    stampFootprint(
-      grid,
-      OCCUPANT.PLAZA,
-      temple0.x,
-      temple0.z,
-      temple0.rotY,
-      temple0.halfW,
-      temple0.halfD,
-      PLAN.PLAZA_M,
-    );
-    stampBuilding(grid, temple0, PLAN.SPACING_M);
-    support.reserveWell();
-    network.layPlaza(temple0);
-    syncPathWear();
-  };
-
-  // A sandbox village: the first houses (the first one built, the second a foundation), and the first
-  // villagers.
-  const foundVillage = () => {
-    foundTemple();
-    planWithRetries('house', 2, 6);
-    planWithRetries('house', 0, 6);
-    graveyard.reserve();
-    for (let n = 0; n < VILLAGERS.START; n++) population.spawn();
-    syncPathWear();
-  };
-
-  // A hamlet: everything finished at once (the houses, the fields, the well), and the people with no
-  // builders among them, since there is nothing to build until the village converts. The first priest
-  // is the elder.
-  const foundHamlet = () => {
-    foundTemple();
-    for (let n = 0; n < HAMLET.HOUSES; n++) planWithRetries('house', 2, 6);
-    support.seedHamlet([], HAMLET.FIELDS);
-    graveyard.reserve();
-    for (let n = 0; n < HAMLET.VILLAGERS; n++) population.spawn({ builders: false });
-    syncPathWear();
-    for (let i = 0; i < villagers.count; i++) {
-      if (villagers.role[i] === Role.Priest) {
-        elder = i;
-        break;
-      }
-    }
-    // Aera is the first idler (the youngest hand with no trade), whoever else the village holds.
-    for (let i = 0; i < villagers.count; i++) {
-      if (i !== elder && villagers.role[i] === Role.Idler) {
-        aera = i;
-        break;
-      }
-    }
-  };
+  const founding = createFounding({
+    seed,
+    grid,
+    villagers,
+    place,
+    planWithRetries,
+    support,
+    network,
+    graveyard,
+    population,
+    syncPathWear,
+  });
 
   /** Put a saved village back. Everything founding would build is in the state, so nothing is laid again. */
   const restoreState = (s: VillageSimState) => {
@@ -522,8 +481,11 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
   };
 
   if (options.restore) restoreState(options.restore);
-  else if (mode === 'hamlet') foundHamlet();
-  else foundVillage();
+  else if (mode === 'hamlet') {
+    const folk = founding.foundHamlet();
+    elder = folk.elder;
+    aera = folk.aera;
+  } else founding.foundVillage();
 
   const believerCount = () => countBelievers(villagers.belief, villagers.count);
 
