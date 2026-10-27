@@ -2,11 +2,11 @@
 
 Design: `story-mechanics/VILLAGE_INTERACTION.md`. Numbers: `VILLAGE.HEARTEN` (`src/config/village/hearten.ts`, placeholders). Pure rules in `world/village/sim/hearten.ts`; the sim hook is `sim.heartenVillager`.
 
-The hand of this game, kept small on purpose: the player **touches one villager** from the overview's info panel. Nothing is picked up, carried or thrown, and there is no good/evil score.
+A single touch, kept small on purpose: the player **touches one villager** from the overview's info panel. Unlike the orb's hand ([hand](hand.md)), which carries trees, wheat and sheep, nothing here is picked up, carried or thrown, and there is no good/evil score.
 
 ## What a touch does
 - Costs `HEARTEN.FAITH` faith.
-- Lifts the villager's work rate (`BOOST`) for `DURATION_DAYS` (it multiplies the blessing boost through `workBoost`).
+- Lifts the villager's work rate (`BOOST`) for `DURATION_DAYS` (`workBoost` is just this boost).
 - Gives back a lapsed belief and answers a prayer they voiced (`restoreBeliefOf`: someone who never believed is lifted but **not** converted; belief is won through the conversion quest).
 - Cannot be repeated on that villager for `COOLDOWN_DAYS` from the touch.
 Refusals (`HeartenResult`): `unknown` (no such or a dying villager), `cooldown`, `faith`.

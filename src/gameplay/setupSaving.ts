@@ -12,6 +12,7 @@ import type { DayCycleContext } from '../core/reveal/DayCycle';
 import { state } from '../core/state/gameState';
 import type { OrbSystemContext } from '../entities/energyOrb/orbSystem';
 import type { PlayerControllerContext } from '../entities/PlayerController';
+import { withHeldEnergy } from '../hand/handRules';
 import type { LandmarkState } from '../landmarks/landmarks';
 import type { QuestsState } from '../quests/questLog';
 import { getActiveCycle } from '../rendering/sky/lightingCurves';
@@ -51,6 +52,8 @@ export interface SavingDeps {
   powers: () => PowersState;
   clocks: () => FrameClocks;
   village: VillageSystemContext | null;
+  /** Energy the orb's hand has paid for something it still holds: a save counts it as unspent, since the world still has the thing. */
+  energyOnHold?: () => number;
   /** False while something owns the mouse and the lock is released on purpose (the village overview). */
   canPause?: () => boolean;
 }
@@ -68,7 +71,7 @@ export function setupSaving(deps: SavingDeps): Saving {
   const playClock = createPlayClock(deps.playSecondsAtStart);
   const capture = () =>
     captureGame({
-      game: state,
+      game: withHeldEnergy(state, deps.energyOnHold?.() ?? 0),
       dayCycle: deps.dayCycle,
       player: deps.player,
       camera: deps.lookInput,

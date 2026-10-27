@@ -88,12 +88,19 @@ export interface Forest {
   chop: (id: number, dt: number, dirX: number, dirZ: number, events: VillageEvent[]) => number;
   /** Fell a standing tree at once (DEV, tests); returns the wood it would give, 0 when it was not standing. */
   fell: (id: number, dirX: number, dirZ: number, events: VillageEvent[]) => number;
+  /**
+   * Pull a standing tree out of the ground (the orb's hand): it goes straight to a stump, with no fall, and
+   * the wood it would have given is returned (0 when it was not standing). It regrows like a felled tree.
+   */
+  uproot: (id: number, events: VillageEvent[]) => number;
   /** Advance falls, stumps and saplings. */
   update: (dt: number, inputs: ForestInputs, events: VillageEvent[]) => void;
   /** Trees (ids) that are not standing: the view shows these as stumps, saplings or falling trees. */
   readonly changed: ReadonlySet<number>;
   /** The `n` standing trees nearest a point. */
   nearest: (x: number, z: number, n: number) => number[];
+  /** Fills `out` with the standing trees within `radiusM` of a point, in id order (no sorting, no allocation). */
+  within: (x: number, z: number, radiusM: number, out: number[]) => number[];
   counts: () => ForestCounts;
   serialize: () => ForestState;
   restore: (state: ForestState) => void;
@@ -123,7 +130,7 @@ export function forestProblem(state: unknown, count: number): string | null {
   return null;
 }
 
-/** What skills and blessings change about the forest (all optional; the defaults leave it as it was). */
+/** What skills and buildings change about the forest (all optional; the defaults leave it as it was). */
 export interface ForestRules {
   /** Wood added to what a felled tree gives (Sharp axes). */
   woodAdd?: () => number;
@@ -133,7 +140,7 @@ export interface ForestRules {
   evergreen?: () => boolean;
   /** What rain adds to growth at full rain (the base plus Rain-reader, times Downpour). */
   rainBoost?: () => number;
-  /** Multiplies how fast a tree is chopped, or a sapling grows (a Blessing on it). */
+  /** Multiplies how fast a tree is chopped, or a sapling grows (a workshop's level). */
   treeBoost?: (id: number) => number;
 }
 
@@ -195,6 +202,15 @@ export function createForest(trees: readonly TreeInfo[], rules: ForestRules = {}
     },
     fell: (id, dirX, dirZ, events) =>
       state[id] === TreeState.Standing ? fellTree(id, dirX, dirZ, events) : 0,
+    uproot: (id, events) => {
+      if (state[id] !== TreeState.Standing) return 0;
+      setState(id, TreeState.Stump);
+      chopped[id] = 0;
+      partial.delete(id);
+      changed.add(id);
+      events.push({ kind: 'treeUprooted', tree: id });
+      return yieldOf(trees[id]!) + woodAdd();
+    },
     update: (dt, inputs, events) => {
       // In id order, so a restored forest (saved sorted) goes on exactly like the one that was saved.
       order.length = 0;
@@ -236,6 +252,16 @@ export function createForest(trees: readonly TreeInfo[], rules: ForestRules = {}
       }
       found.sort((a, b) => a.d - b.d || a.id - b.id);
       return found.slice(0, count).map((f) => f.id);
+    },
+    within: (x, z, radiusM, out) => {
+      out.length = 0;
+      const r2 = radiusM * radiusM;
+      for (let id = 0; id < n; id++) {
+        if (state[id] !== TreeState.Standing) continue;
+        const t = trees[id]!;
+        if ((t.x - x) ** 2 + (t.z - z) ** 2 <= r2) out.push(id);
+      }
+      return out;
     },
     counts: () => {
       let falling = 0;

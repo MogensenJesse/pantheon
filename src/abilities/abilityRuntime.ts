@@ -1,8 +1,8 @@
 // src/abilities/abilityRuntime.ts — the cast pipeline wired to the running game
 //
 // Energy is spent through core/energy.ts, which never touches the latched cap reveal, so casting does
-// not undo the sunrise. What a power does lives with the system it changes (abilities/powers.ts) and is
-// hooked in with `setPerformer`.
+// not undo the sunrise. What a power does lives with the system it changes (abilities/builderPowers.ts) and
+// is hooked in with `setPerformer`.
 
 import { bus } from '../core/EventBus';
 import { energyMeter } from '../core/energy';
@@ -27,13 +27,11 @@ export function initAbilities(
 ): AbilityRuntime {
   let performer: ((def: AbilityDef, target: AbilityTarget) => boolean) | null = null;
   let faithSource: { amount: () => number; spend: (amount: number) => void } | null = null;
-  // Murmur is there from the moment the tree opens; the other powers come from nodes.
+  // The arch II powers come with the village; a node can grant others.
   const isGranted = (id: string) => {
     const def = abilityById(id);
     return (
-      skills.isAbilityGranted(id) ||
-      (skills.isOpen() && def?.grantedAtOpen === true) ||
-      (skills.isVillageOpen() && def?.grantedWithVillage === true)
+      skills.isAbilityGranted(id) || (skills.isVillageOpen() && def?.grantedWithVillage === true)
     );
   };
   const caster = createAbilityCaster({

@@ -87,6 +87,7 @@ import { initSkills } from './skills/skillRuntime';
 import { initHUD } from './ui/HUD';
 import { initUiKit, type NotifyKind, notify } from './ui/kit';
 import { ensurePlayMapSelected } from './ui/MapSelectScreen';
+import { createOverviewHand } from './ui/overview/overviewHand';
 import {
   createOverviewPlots,
   OUTPOST_MILESTONE,
@@ -109,7 +110,7 @@ import {
   initTerrainAtlases,
   type TerrainTextureSet,
 } from './world/terrain';
-import { templeOf } from './world/village/model/buildings';
+import { plotTypeOpen, templeOf } from './world/village/model/buildings';
 import { initVillageSystem, resolveSeed } from './world/village/VillageSystem';
 import { villageDevState } from './world/village/villageDevState';
 import { buildWorld } from './world/WorldBuilder';
@@ -609,14 +610,35 @@ async function main(): Promise<void> {
     savedQuests: boot?.profile.quests,
     cinematic,
     closeOverview: () => overview.setActive(false, true),
+    overviewActive: overview.isActive,
+    animalHand: life.animals.hand,
   });
+  // The hand carries its tree with the orb as it is drawn.
+  const offHandHook = gameplay.handUi ? frameTick.addRenderHook(gameplay.handUi.frame) : () => {};
+  // The hand lifts and puts down from the overview too, with the orb as the cursor.
+  const overviewHand =
+    overviewUi && village && gameplay.handUi && gameplay.handRuntime
+      ? createOverviewHand({
+          overview,
+          camera,
+          runtime: gameplay.handRuntime,
+          ui: gameplay.handUi,
+          world: village.sim,
+          pick: overviewUi.pickAtMouse,
+          hovered: overviewUi.hovered,
+          groundY: terrain.getWorldY,
+          open: skills.isOpen,
+          energy: () => state.energy,
+          costMul: () => modifiers.handCostMul,
+        })
+      : null;
   // The arch II powers are cast from the overview with the orb as the cursor.
   const overviewPowers = overviewUi
     ? createOverviewPowers({
         overview,
         list: gameplay.builderList,
         cast: gameplay.castBuilder,
-        pick: overviewUi.pickAtMouse,
+        tool: overviewHand?.tool,
       })
     : null;
   const overviewPlots = village
@@ -627,6 +649,7 @@ async function main(): Promise<void> {
         groundY: terrain.getWorldY,
         plotsOpen: () => skills.hasMilestone(PLOT_MILESTONE),
         outpostsOpen: () => skills.hasMilestone(OUTPOST_MILESTONE),
+        plotTypeOpen: (type) => plotTypeOpen(type, modifiers),
       })
     : null;
   const saving = setupSaving({
@@ -647,6 +670,7 @@ async function main(): Promise<void> {
     }),
     clocks: frameTick.getClocks,
     village,
+    energyOnHold: () => gameplay.handRuntime?.energyOnHold() ?? 0,
     canPause: () => !overview.isActive(),
   });
   if (import.meta.env.DEV) {
@@ -706,9 +730,11 @@ async function main(): Promise<void> {
     unsubDevPanel();
     saving.dispose();
     overviewPowers?.dispose();
+    overviewHand?.dispose();
     overviewPlots?.dispose();
     overviewUi?.dispose();
     overview.dispose();
+    offHandHook();
     gameplay.dispose();
     disposeProgression();
     disposeLandmarkBoons();

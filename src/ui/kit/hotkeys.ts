@@ -7,8 +7,6 @@
 import { isPanelOpen } from './panels';
 
 export interface HotkeyOptions {
-  /** Called when the key is let go (for keys that are held, like the radial menu's). */
-  onUp?: () => void;
   /** Whether the key still works while a panel is open. Default true; false for keys that open a screen. */
   whenPanelOpen?: boolean;
 }
@@ -16,7 +14,6 @@ export interface HotkeyOptions {
 interface Binding {
   handler: () => void;
   label: string;
-  onUp?: () => void;
   whenPanelOpen: boolean;
 }
 
@@ -37,10 +34,6 @@ function onKeyDown(e: KeyboardEvent): void {
   binding.handler();
 }
 
-function onKeyUp(e: KeyboardEvent): void {
-  bindings.get(e.code)?.onUp?.();
-}
-
 /** Binds a `KeyboardEvent.code` (such as `KeyO`). Returns the function that removes the binding. */
 export function registerHotkey(
   code: string,
@@ -56,20 +49,17 @@ export function registerHotkey(
   const binding: Binding = {
     handler,
     label,
-    onUp: options.onUp,
     whenPanelOpen: options.whenPanelOpen ?? true,
   };
   bindings.set(code, binding);
   if (!listening) {
     document.addEventListener('keydown', onKeyDown);
-    document.addEventListener('keyup', onKeyUp);
     listening = true;
   }
   return () => {
     if (bindings.get(code) === binding) bindings.delete(code);
     if (bindings.size === 0 && listening) {
       document.removeEventListener('keydown', onKeyDown);
-      document.removeEventListener('keyup', onKeyUp);
       listening = false;
     }
   };

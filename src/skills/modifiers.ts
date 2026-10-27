@@ -18,6 +18,10 @@ export interface Modifiers {
   shrineAttuned: number;
   /** Energy per second regained anywhere (Renewal). */
   flatRegenPerSec: number;
+  /** Multiplies how far the orb's hand reaches (Long reach). */
+  handReachMul: number;
+  /** Multiplies the energy a lift costs (Deep grip). */
+  handCostMul: number;
 
   // --- arch II, the village. Read by the village sim and the energy regeneration. ---
   /** Beds added to every house (Wider beds). */
@@ -49,9 +53,18 @@ export interface Modifiers {
   weatherChanceMul: number;
   /** Multiplies how strong (peak rain) and how wide a storm front is (the places of power: the storm ward). */
   stormStrengthMul: number;
-  /** The highest upgrade level houses / granaries and workshops may reach (the tree raises them). */
+  /**
+   * The highest upgrade level each group may reach (the tree raises them): houses; stores (granaries and
+   * workshops); works (farmsteads and shrines, `UpgradeGroup` `'works'`).
+   */
   houseTier: number;
   storeTier: number;
+  workTier: number;
+  /** 1 once the player may mark a farmstead / a shrine as a plot (Farmsteads, Shrines), 0 before. */
+  plotFarmstead: number;
+  plotShrine: number;
+  /** Multiplies all the faith the village gathers (Fervour). */
+  faithMul: number;
   /** Energy per second per believer (Devotion). */
   energyPerBeliever: number;
   /** 1 once the temple restores energy around it (Devotion), 0 before. */
@@ -71,6 +84,8 @@ export function neutralModifiers(): Modifiers {
     orbFaithTrail: 0,
     shrineAttuned: 0,
     flatRegenPerSec: 0,
+    handReachMul: 1,
+    handCostMul: 1,
     bedsPerHouseAdd: 0,
     woodPerTreeAdd: 0,
     fieldYieldAdd: 0,
@@ -88,6 +103,10 @@ export function neutralModifiers(): Modifiers {
     stormStrengthMul: 1,
     houseTier: 1,
     storeTier: 1,
+    workTier: 1,
+    plotFarmstead: 0,
+    plotShrine: 0,
+    faithMul: 1,
     energyPerBeliever: 0,
     templeRegen: 0,
   };

@@ -1,6 +1,8 @@
 // scripts/checks/overview/overview-check.ts — headless checks of the overview camera's rules and of what a click picks.
 import assert from 'node:assert/strict';
 import { PHASE0 } from '../../../src/config/phase0.ts';
+import { insideFootprint } from '../../../src/core/math/geom.ts';
+import { describe, describeWorldOf } from '../../../src/overview/overviewDescribe.ts';
 import {
   canEnterOverview,
   clampDistance,
@@ -12,14 +14,16 @@ import {
   rayGroundHit,
   rayPlaneHit,
 } from '../../../src/overview/overviewMath.ts';
+import { pickTarget, rayBuildingHit, sameSelection } from '../../../src/overview/overviewPick.ts';
+import { neutralModifiers, setModifiers } from '../../../src/skills/modifiers.ts';
+import type { Building } from '../../../src/world/village/model/types.ts';
 import {
-  insideField,
-  pickTarget,
-  rayBuildingHit,
-  sameSelection,
-} from '../../../src/overview/overviewPick.ts';
+  chopMul,
+  fieldBonus,
+  shrineFaith,
+} from '../../../src/world/village/sim/buildingEffects.ts';
 import { check, finish } from '../lib/check.ts';
-import { loadMap, makeSim } from '../lib/villageHeadless.ts';
+import { buildingOf, loadMap, makeSim } from '../lib/villageHeadless.ts';
 
 const O = PHASE0.OVERVIEW;
 const near = (a: number, b: number, eps = 1e-6) =>
@@ -189,7 +193,7 @@ await check('a click picks a villager before a building before a field, else not
   );
 
   const field = hamlet.fields[0]!;
-  assert.ok(insideField(field, field.x, field.z));
+  assert.ok(insideFootprint(field, field.x, field.z));
   assert.deepEqual(
     pickTarget({
       mouse: { x: 0, y: 0 },
@@ -236,5 +240,62 @@ await check('two selections are the same only when kind and target match', () =>
   assert.ok(!sameSelection({ kind: 'villager', index: 1 }, { kind: 'villager', index: 2 }));
   assert.ok(sameSelection(null, null));
 });
+
+// --- the panel of a building says what the sim does ---
+
+/** The panel of `b`, standing in the hamlet (with the buildings it brings). */
+function panelOf(b: Building) {
+  const world = describeWorldOf(hamlet);
+  const panel = describe(
+    { kind: 'building', id: b.id },
+    { ...world, buildings: [b, ...world.buildings] },
+  );
+  assert.ok(panel, 'the building has a panel');
+  return (label: string) => panel.rows.find((r) => r.label === label)?.value;
+}
+
+await check('a farmstead panel gives what one field feels, as the sim counts it', () => {
+  const field = hamlet.fields[0]!;
+  const bonusOf = (f: { x: number; z: number }, farm: Building) =>
+    fieldBonus(f, [farm], { growthMul: 1, yieldAdd: 0 });
+  for (const level of [1, 3]) {
+    const farm = buildingOf('farmstead', { id: 9001, x: field.x + 12, z: field.z, level });
+    const row = panelOf(farm);
+    const felt = bonusOf(field, farm);
+    assert.equal(row('Growth, each field'), `${Math.round((felt.growthMul - 1) * 100)}% faster`);
+    assert.equal(row('Harvest, each field'), `${felt.yieldAdd} more food`);
+    const inReach = hamlet.fields.filter((f) => bonusOf(f, farm).yieldAdd > 0).length;
+    assert.equal(row('Fields in reach'), String(inReach));
+  }
+});
+
+await check(
+  'a workshop panel says how much faster its level makes the axes, and is silent at level 1',
+  () => {
+    assert.equal(panelOf(buildingOf('workshop', { id: 9002, level: 1 }))('Woodcutters'), undefined);
+    const at = (level: number) => {
+      const shop = buildingOf('workshop', { id: 9002, level });
+      return panelOf(shop)('Woodcutters') === `${Math.round((chopMul([shop]) - 1) * 100)}% faster`;
+    };
+    assert.ok(at(2) && at(3));
+  },
+);
+
+await check(
+  'a shrine panel gives its own faith a minute, with the faith factor of the skills',
+  () => {
+    const shrine = buildingOf('shrine', { id: 9003, level: 2 });
+    const perMinute = (factor: number) => {
+      setModifiers({ ...neutralModifiers(), faithMul: factor });
+      try {
+        return panelOf(shrine)('Faith from this');
+      } finally {
+        setModifiers(neutralModifiers());
+      }
+    };
+    assert.equal(perMinute(1), `${(shrineFaith([shrine]) * 60).toFixed(1)} a minute`);
+    assert.equal(perMinute(1.5), `${(shrineFaith([shrine]) * 1.5 * 60).toFixed(1)} a minute`);
+  },
+);
 
 finish('all overview checks passed');

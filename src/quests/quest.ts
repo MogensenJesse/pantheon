@@ -7,6 +7,7 @@
 // twice. The quests themselves are in `content/`.
 
 import { isCount, isCountInt, isRecord } from '../core/guards.ts';
+import type { HandKind } from '../hand/handTypes.ts';
 import type { VillageBuildingType } from '../world/village/model/assetKeys.ts';
 import type { OutpostKind } from '../world/village/sim/outposts.ts';
 
@@ -14,7 +15,8 @@ export type QuestEvent =
   /** Nothing happened: ask again (the world may have changed). */
   | { type: 'tick' }
   | { type: 'elderMet' }
-  | { type: 'signCast'; nearTemple: boolean; dusk: boolean }
+  /** The orb's hand put `what` down in the village; `nearTemple` and `dusk` say where and when. */
+  | { type: 'deed'; what: HandKind; nearTemple: boolean; dusk: boolean }
   | { type: 'offered'; amount: number }
   /** The player placed a plot (not the planner's own sites). */
   | { type: 'plotPlaced' }

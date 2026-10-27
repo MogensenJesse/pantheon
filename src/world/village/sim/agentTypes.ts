@@ -65,7 +65,7 @@ export interface AgentsOptions {
   graveSite: () => SitePlan | null;
   /** Multiplies how fast builders build (a skill). */
   builderRateMul: () => number;
-  /** How much faster this villager works: a blessing on their house (1 when none). */
+  /** How much faster this villager works: Hearten while it lasts (1 when none). */
   workBoost: (villager: number) => number;
   /** Builder-seconds delivered to a site. */
   onWork: (site: Building, seconds: number) => void;

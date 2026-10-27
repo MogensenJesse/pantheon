@@ -8,10 +8,11 @@ import { outpostOf, outpostSiteKind } from '../../../src/world/village/sim/outpo
 import type { VillageSim } from '../../../src/world/village/sim/villageSim.ts';
 import { check, finish } from '../lib/check.ts';
 import {
-  convertVillage,
   DAY_S,
+  grownVillage,
   loadMap,
   makeSim,
+  richVillage,
   savedHash,
   stepSim,
 } from '../lib/villageHeadless.ts';
@@ -20,17 +21,8 @@ const O = VILLAGE.OUTPOSTS;
 const map = loadMap('island-mountain');
 const { seed, sampler } = map;
 
-const grown = (() => {
-  const sim = convertVillage(makeSim(map, { mode: 'hamlet' }));
-  stepSim(sim, { seconds: 2 * DAY_S, fed: true });
-  return sim.serialize();
-})();
-const rich = (): VillageSim => {
-  const sim = makeSim(map, { mode: 'hamlet', restore: structuredClone(grown) });
-  sim.faith.faith = 500;
-  sim.economy.addWood(500);
-  return sim;
-};
+const grown = grownVillage(map);
+const rich = (): VillageSim => richVillage(grown);
 
 /** The first spot, going out from the village, where the sim accepts an outpost of `kind` and the crew can walk. */
 function spotFor(sim: VillageSim, kind: string, skip = 0): { x: number; z: number } {
@@ -140,6 +132,21 @@ await check('the crew builds it in two stages, then it delivers wood without a c
     Math.abs(extra - O.WOOD_PER_SEC * 100) < O.WOOD_PER_SEC * 100 * 0.2,
     `${extra} wood in 100 s`,
   );
+});
+
+await check('wood hauled by the hand builds an outpost on its own, shorter, schedule', () => {
+  const sim = rich();
+  const spot = spotFor(sim, 'lumber');
+  assert.equal(sim.startOutpost('lumber', spot.x, spot.z, []), 'ok');
+  const site = sim.remoteSites[0]!;
+  const per = VILLAGE.HAND.WORK_PER_WOOD_S;
+  const events: VillageEvent[] = [];
+  sim.haulRemote(site.id, O.SITE_WORK_S[0]! / per, events);
+  assert.equal(site.stage, 1);
+  sim.haulRemote(site.id, O.SITE_WORK_S[1]! / per, events);
+  assert.equal(site.stage, 2);
+  const stages = events.flatMap((e) => (e.kind === 'remoteStageCompleted' ? [e.stage] : []));
+  assert.deepEqual(stages, [1, 2]);
 });
 
 await check('a fishing hut delivers food, never over the stores', () => {

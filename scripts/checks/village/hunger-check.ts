@@ -21,7 +21,14 @@ import {
 import { footprintFree, OCCUPANT } from '../../../src/world/village/sim/siteGrid.ts';
 import { createVillagerPool, removeVillager } from '../../../src/world/village/sim/villagerPool.ts';
 import { check, finish } from '../lib/check.ts';
-import { DAY_S, hoursSim, loadMap, makeSim, withYield } from '../lib/villageHeadless.ts';
+import {
+  convertVillage,
+  DAY_S,
+  hoursSim,
+  loadMap,
+  makeSim,
+  withYield,
+} from '../lib/villageHeadless.ts';
 
 const H = VILLAGE.HUNGER;
 const E = VILLAGE.ECONOMY;
@@ -270,11 +277,7 @@ await check('plots: rows of graves inside the plot first, then on beyond it', ()
 /** A hamlet (converted or not) where no food is made: the fields and the shore give nothing. */
 function famine(converted: boolean) {
   const sim = makeSim(map, { mode: 'hamlet' });
-  if (converted) {
-    const events: VillageEvent[] = [];
-    for (let i = 0; i < sim.villagers.count; i++) sim.addBelief(i, 1, events);
-    sim.convertVillage(events);
-  }
+  if (converted) convertVillage(sim);
   sim.economy.drainFood();
   return sim;
 }

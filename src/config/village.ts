@@ -3,6 +3,8 @@
 // The values are kept by topic in village/*.ts and put together here, so `VILLAGE.<KEY>` is one record.
 
 import { ECONOMY_PARTS } from './village/economy.ts';
+import { EFFECTS_PARTS } from './village/effects.ts';
+import { HAND_PARTS } from './village/hand.ts';
 import { HEARTEN_PARTS } from './village/hearten.ts';
 import { LAYOUT } from './village/layout.ts';
 import { LIFE } from './village/life.ts';
@@ -16,9 +18,11 @@ export const VILLAGE = {
   ...LAYOUT,
   ...LIFE,
   ...ECONOMY_PARTS,
+  ...EFFECTS_PARTS,
   ...POWERS,
   ...PRAYERS_PARTS,
   ...HEARTEN_PARTS,
+  ...HAND_PARTS,
   ...OUTPOSTS_PARTS,
   ...RESTORATION_PARTS,
   ...UPGRADES_PARTS,

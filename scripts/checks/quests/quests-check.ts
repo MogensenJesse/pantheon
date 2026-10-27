@@ -81,7 +81,7 @@ await check(
   'nothing happens before the meeting; the meeting starts the quest and gives a spark and its beat',
   () => {
     const run = runChain();
-    run.send({ type: 'signCast', nearTemple: true, dusk: true });
+    run.send({ type: 'deed', what: 'tree', nearTemple: true, dusk: true });
     run.send({ type: 'offered', amount: OFFERING });
     run.send({ type: 'tick' }, world({ converts: 99, elderBelieves: true }));
     assert.equal(run.state.step, 0, 'still waiting for the elder');
@@ -115,16 +115,19 @@ await check('converts made before the step began count at once', () => {
 });
 
 await check(
-  'the temple fire needs a Sign near the temple at dusk: not by day, not far away',
+  'the temple fire needs wood from the hand near the temple at dusk: not food, not by day, not far away',
   () => {
     const run = runChain();
     run.send({ type: 'elderMet' }, world({ converts: CONVERTS }));
     assert.equal(run.state.step, stepIndex('fire'));
-    run.send({ type: 'signCast', nearTemple: true, dusk: false });
-    run.send({ type: 'signCast', nearTemple: false, dusk: true });
-    assert.equal(run.state.step, 2, 'neither counts');
-    const r = run.send({ type: 'signCast', nearTemple: true, dusk: true });
+    run.send({ type: 'deed', what: 'tree', nearTemple: true, dusk: false });
+    run.send({ type: 'deed', what: 'tree', nearTemple: false, dusk: true });
+    run.send({ type: 'deed', what: 'wheat', nearTemple: true, dusk: true });
+    run.send({ type: 'deed', what: 'sheep', nearTemple: true, dusk: true });
+    assert.equal(run.state.step, stepIndex('fire'), 'none of these counts');
+    const r = run.send({ type: 'deed', what: 'tree', nearTemple: true, dusk: true });
     assert.deepEqual(r.effects.completed, ['fire']);
+    assert.equal(r.effects.beats.length, 1);
     assert.equal(run.state.step, stepIndex('offering'));
   },
 );
@@ -132,7 +135,7 @@ await check(
 await check('the offering fills from what is given, in pieces, and gives its spark once', () => {
   const run = runChain();
   run.send({ type: 'elderMet' }, world({ converts: CONVERTS }));
-  run.send({ type: 'signCast', nearTemple: true, dusk: true });
+  run.send({ type: 'deed', what: 'tree', nearTemple: true, dusk: true });
   const piece = OFFERING / 10;
   for (let i = 0; i < 9; i++) run.send({ type: 'offered', amount: piece });
   assert.equal(run.state.step, stepIndex('offering'));
@@ -149,7 +152,7 @@ await check(
   () => {
     const run = runChain();
     run.send({ type: 'elderMet' }, world({ converts: CONVERTS }));
-    run.send({ type: 'signCast', nearTemple: true, dusk: true });
+    run.send({ type: 'deed', what: 'tree', nearTemple: true, dusk: true });
     run.send({ type: 'offered', amount: OFFERING });
     assert.equal(run.state.step, stepIndex('believe'));
     run.send({ type: 'tick' }, world({ converts: 11 }));
@@ -165,13 +168,13 @@ await check(
   () => {
     const run = runChain();
     const everything: [QuestEvent, QuestContext?][] = [
-      [{ type: 'signCast', nearTemple: true, dusk: true }],
+      [{ type: 'deed', what: 'tree', nearTemple: true, dusk: true }],
       [{ type: 'offered', amount: OFFERING }],
       [{ type: 'elderMet' }],
       [{ type: 'elderMet' }],
       [{ type: 'tick' }, world({ converts: CONVERTS + 1 })],
-      [{ type: 'signCast', nearTemple: true, dusk: true }],
-      [{ type: 'signCast', nearTemple: true, dusk: true }],
+      [{ type: 'deed', what: 'tree', nearTemple: true, dusk: true }],
+      [{ type: 'deed', what: 'tree', nearTemple: true, dusk: true }],
       [{ type: 'offered', amount: OFFERING }],
       [{ type: 'offered', amount: OFFERING }],
       [{ type: 'tick' }, world({ converts: 11, elderBelieves: true })],

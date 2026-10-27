@@ -232,6 +232,8 @@ export const life = {
     REVIEW_S: 2,
     /** Seconds an animal takes to grow into view when it arrives (a new arrival as the village grows). */
     ARRIVE_S: 2.5,
+    /** Seconds before an animal the orb's hand carried off is replaced (the village's headcount waits for it). */
+    RESPAWN_S: [90, 180],
     SHEEP: {
       /** One sheep per this many villagers, between `MIN` and `MAX` (a village of one still has a few). */
       PER_VILLAGERS: 6,

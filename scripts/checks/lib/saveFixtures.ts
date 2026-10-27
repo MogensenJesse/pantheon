@@ -38,7 +38,7 @@ export const fakeSources = (over: Partial<ProfileSources> = {}): ProfileSources 
   },
   powers: {
     state: () => ({
-      cooldowns: [['kindle', 12.5]],
+      cooldowns: [['call_rain', 12.5]],
       weather: {
         fronts: [{ x: 1, z: 2, dirX: -1, dirZ: 0, speed: 1, radius: 700, peak: 1, crossS: 4000 }],
         zones: [{ x: 3, z: 4, radius: 1200, edgeM: 225, fromS: 4000, untilS: 4600 }],

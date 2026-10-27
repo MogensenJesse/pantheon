@@ -39,6 +39,10 @@ export interface FaithInputs {
   presenceActive: boolean;
   /** Faith per second before the orb's presence: the flat base rate unless the village says otherwise. */
   baseRate?: number;
+  /** Faith per second added to the base before the presence and the multiplier (the shrines); default 0. */
+  bonusRate?: number;
+  /** Factor on all faith income (the skill tree); default 1. */
+  mul?: number;
 }
 
 /** Faith the next building site costs; each building already standing raises it slightly. */
@@ -60,8 +64,9 @@ export function stepFaith(state: FaithState, dt: number, inputs: FaithInputs): v
     falloff = clamp01((f.PRESENCE_RADIUS_M - inputs.playerDistM) / span);
   }
   state.boost01 = inputs.presenceActive ? state.dwell01 * falloff : 0;
-  const base = inputs.baseRate ?? f.BASE_PER_SEC;
-  state.rate = base * (1 + (f.PRESENCE_MUL - 1) * state.boost01);
+  const income =
+    ((inputs.baseRate ?? f.BASE_PER_SEC) + (inputs.bonusRate ?? 0)) * (inputs.mul ?? 1);
+  state.rate = income * (1 + (f.PRESENCE_MUL - 1) * state.boost01);
   state.faith += state.rate * dt;
   state.earned += state.rate * dt;
 }

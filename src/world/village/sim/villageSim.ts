@@ -3,7 +3,7 @@
 import { VILLAGE } from '../../../config/village.ts';
 import { modifiers } from '../../../skills/modifiers.ts';
 import type { VillageStage } from '../model/assetKeys.ts';
-import { isFinished, isHouse, PLOT_TYPES, templeOf } from '../model/buildings.ts';
+import { templeOf } from '../model/buildings.ts';
 import {
   type Building,
   type Field,
@@ -14,20 +14,14 @@ import {
 } from '../model/types.ts';
 import { type AgentInputs, createAgents } from './agents.ts';
 import { beliefShare, believerIncome, believes, countBelievers, raiseBelief } from './belief.ts';
-import { createBlessings } from './blessings.ts';
+import { chopMul, shrineFaith } from './buildingEffects.ts';
 import { findCoarseRoute, routeFromGate } from './coarseRoute.ts';
-import { applyWork, isOpenSite, remainingWork } from './construction.ts';
-import {
-  CHEAPEST_WOOD_COST,
-  createEconomy,
-  foodPerDay,
-  housingOf,
-  maxOpenSites,
-  pressureAllowsSite,
-  woodCostOf,
-} from './economy.ts';
-import { createFaithState, type FaithInputs, siteCost, stepFaith } from './faith.ts';
-import { createForest, forestProblem, type TreeInfo, TreeState } from './forest.ts';
+import { applyWork, isOpenSite } from './construction.ts';
+import { createEconomy, foodPerDay } from './economy.ts';
+import { createFaithState, type FaithInputs, stepFaith } from './faith.ts';
+import { createFieldsDesk } from './fieldsDesk.ts';
+import { createForest, forestProblem, type TreeInfo } from './forest.ts';
+import { createFounding } from './founding.ts';
 import { doorWorld as doorWorldOf } from './geometry.ts';
 import { createGraveyard } from './graveyard.ts';
 import { createHearten, type HeartenResult } from './hearten.ts';
@@ -59,7 +53,6 @@ import {
   type PlanContext,
   planBuilding,
   plotFacing,
-  validatePlot,
 } from './planner.ts';
 import { createPopulation } from './population.ts';
 import {
@@ -73,16 +66,11 @@ import {
   stepPrayers,
 } from './prayers.ts';
 import { createRingModel, measureContour } from './ringModel.ts';
-import { cellIndex, createSiteGrid, OCCUPANT, stampBuilding, stampFootprint } from './siteGrid.ts';
+import { cellIndex, createSiteGrid, OCCUPANT, stampBuilding } from './siteGrid.ts';
+import { createSitesDesk } from './sitesDesk.ts';
 import { seatBuilding } from './siting.ts';
 import { createSupportBuildings, FIELD_BLOCK_MARGIN_M } from './support.ts';
-import {
-  applyUpgradeWork,
-  beginUpgrade,
-  checkUpgrade,
-  tierCeiling,
-  upgradeCost,
-} from './upgrades.ts';
+import { applyUpgradeWork, tierCeiling } from './upgrades.ts';
 import { createVillageRngs } from './villageRng.ts';
 import {
   createVillagerPool,
@@ -92,8 +80,6 @@ import {
 } from './villagerPool.ts';
 import { villageStateProblem } from './villageSave.ts';
 import type {
-  PlotResult,
-  UpgradeStart,
   VillageMode,
   VillageSim,
   VillageSimOptions,
@@ -111,7 +97,7 @@ export type {
 } from './villageSimTypes.ts';
 export { villageStateProblem };
 
-const { PLAN, VILLAGERS, HAMLET } = VILLAGE;
+const { PLAN } = VILLAGE;
 const SPAWN_CHECK_S = 2;
 /** The crew of a remote site leaves the village's paths at this share of the village radius. */
 const GATE_SHARE = 0.8;
@@ -145,7 +131,8 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
   const mods = options.modifiers ?? modifiers;
   /** How much rain speeds growth, from the base rate of the thing that grows (Rain-reader and Downpour change it). */
   const rainBoostOf = (base: number) => Math.max(0, (base + mods.rainBoostAdd) * mods.rainBoostMul);
-  const blessings = createBlessings();
+  /** What the workshops' levels do for the woodcutters, worked out from the buildings at the start of each step. */
+  let chopFactor = 1;
   const prayers = createPrayersState();
   const hearten = createHearten();
   const forest = createForest(treeList, {
@@ -153,7 +140,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     stumpWaitMul: () => mods.stumpWaitMul,
     evergreen: () => mods.evergreen > 0,
     rainBoost: () => rainBoostOf(VILLAGE.FOREST.RAIN_BOOST),
-    treeBoost: (id) => blessings.boost('tree', id),
+    treeBoost: () => chopFactor,
   });
   const found = createWorkSpots(grid, options.trees ?? [], seed.x, seed.z);
   const reachable = (spot: WorkSpot) =>
@@ -171,6 +158,13 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
   const buildings: Building[] = [];
   const fields: Field[] = [];
   const remoteSites: RemoteSite[] = [];
+  const fieldsDesk = createFieldsDesk({
+    fields,
+    buildings,
+    mods,
+    rainBoostOf,
+    addFood: (food) => economy.addFood(food),
+  });
   let nextId = 1;
   let planTimer = 0;
   let spawnTimer = 0;
@@ -252,7 +246,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     graveSite: () => graveyard.site(),
     isStanding: forest.isStanding,
     builderRateMul: () => mods.builderRateMul,
-    workBoost: (i) => blessings.boost('house', villagers.home[i]!) * hearten.boost(i),
+    workBoost: (i) => hearten.boost(i),
     onChop: (tree, dt, dirX, dirZ) => {
       // A full wood store: the woodcutter waits at the tree rather than fell it for nothing.
       if (economy.stock.wood >= economy.caps().wood - 1e-6) return false;
@@ -412,122 +406,19 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     }
   };
 
-  /**
-   * Start a site. It costs faith and wood, and the village has to be short of beds: building runs
-   * ahead of the people only as far as the wood and the housing allow. `free` (DEV) skips all three.
-   */
-  const startSite = (events: VillageEvent[], free: boolean): boolean => {
-    if (buildings.length >= Math.floor(PLAN.MAX_BUILDINGS * mods.buildingCapMul)) return false;
-    const open = openSites().length;
-    if (free) {
-      if (open >= PLAN.MAX_ACTIVE_SITES) return false;
-    } else {
-      const housing = housingOf(buildings, villagers.count, mods.bedsPerHouseAdd);
-      if (open >= maxOpenSites(housing, PLAN.MAX_ACTIVE_SITES) || !pressureAllowsSite(housing)) {
-        return false;
-      }
-      if (faith.faith < siteCost(buildings.filter((b) => b.type !== 'temple').length)) return false;
-      // Not even the cheapest building is affordable: nothing to plan yet.
-      if (economy.stock.wood < CHEAPEST_WOOD_COST) return false;
-    }
-    const site = findSite(chooseNextKind(buildings, rngs.plan));
-    if (!site) return false;
-    if (!free) {
-      if (!economy.spendWood(woodCostOf(site.type!))) return false;
-      faith.faith -= siteCost(buildings.filter((b) => b.type !== 'temple').length);
-    }
-    const building = place(site.type!, 0, site.x, site.z, site.rotY, site.ring);
-    events.push({ kind: 'siteStarted', building });
-    return true;
-  };
-
-  /**
-   * What putting a building of `type` at (x, z) would come to, with no effect: the village must be converted
-   * and have room for another site, the spot must hold the planner's own rules, and the wood and faith must
-   * be there. `free` (DEV) skips the cap and the cost.
-   */
-  const plotCheck = (
-    type: Building['type'],
-    x: number,
-    z: number,
-    rotY: number,
-    free = false,
-  ): PlotResult => {
-    if (!PLOT_TYPES.includes(type)) return 'type';
-    if (!converted) return 'not-converted';
-    if (buildings.length >= Math.floor(PLAN.MAX_BUILDINGS * mods.buildingCapMul)) return 'full';
-    if (!free && openSites().length >= PLAN.MAX_ACTIVE_SITES) return 'cap';
-    const spot = validatePlot(context(), type, x, z, rotY);
-    if (!spot.ok) return spot.reason;
-    if (!free) {
-      if (economy.stock.wood < woodCostOf(type)) return 'wood';
-      if (faith.faith < siteCost(buildings.filter((b) => b.type !== 'temple').length)) {
-        return 'faith';
-      }
-    }
-    return 'ok';
-  };
-
-  /** The player marks a plot: a site starts there and the builders come to it. */
-  const placePlot = (
-    type: Building['type'],
-    x: number,
-    z: number,
-    rotY: number,
-    events: VillageEvent[],
-    free = false,
-  ): PlotResult => {
-    const result = plotCheck(type, x, z, rotY, free);
-    if (result !== 'ok') return result;
-    const spot = validatePlot(context(), type, x, z, rotY);
-    if (!free) {
-      economy.spendWood(woodCostOf(type));
-      faith.faith -= siteCost(buildings.filter((b) => b.type !== 'temple').length);
-    }
-    const ring = spot.ok ? spot.ring : -1;
-    events.push({ kind: 'siteStarted', building: place(type, 0, x, z, rotY, ring) });
-    return 'ok';
-  };
-
-  const activeUpgrades = () => buildings.filter((b) => isFinished(b) && b.upgrade > 0).length;
-
-  /**
-   * Begin the next upgrade of a finished building: it costs wood and faith, the tree must allow the level and
-   * only `UPGRADES.MAX_ACTIVE` upgrades run at once. `free` (DEV) skips the cost and the cap.
-   */
-  const upgradeBuilding = (id: number, events: VillageEvent[], free = false): UpgradeStart => {
-    const b = buildings.find((x) => x.id === id);
-    if (!b) return 'unsupported';
-    const check = checkUpgrade(b, mods);
-    if (!check.ok) return check.reason;
-    if (!free) {
-      if (activeUpgrades() >= VILLAGE.UPGRADES.MAX_ACTIVE) return 'cap';
-      const cost = upgradeCost(b);
-      if (faith.faith < cost.faith) return 'faith';
-      if (economy.stock.wood < cost.wood) return 'wood';
-      economy.spendWood(cost.wood);
-      faith.faith -= cost.faith;
-    }
-    beginUpgrade(b);
-    events.push({ kind: 'upgradeStarted', building: b });
-    return 'ok';
-  };
-
-  /** The planner's choice: the lowest level first, houses before stores, then the oldest. No random draw. */
-  const nextUpgrade = (): Building | null => {
-    let best: Building | null = null;
-    for (const b of buildings) {
-      if (!checkUpgrade(b, mods).ok) continue;
-      if (
-        !best ||
-        b.level < best.level ||
-        (b.level === best.level && Number(isHouse(best)) < Number(isHouse(b)))
-      ) {
-        best = b;
-      }
-    }
-    return best;
-  };
+  const { startSite, plotCheck, placePlot, upgradeBuilding, nextUpgrade } = createSitesDesk({
+    buildings,
+    mods,
+    faith,
+    economy,
+    villagerCount: () => villagers.count,
+    isConverted: () => converted,
+    openSites,
+    chooseKind: () => chooseNextKind(buildings, rngs.plan),
+    findSite,
+    context,
+    place,
+  });
 
   const complete = (site: Building, events: VillageEvent[]) => {
     for (const done of applyWork(site, Number.POSITIVE_INFINITY)) {
@@ -535,60 +426,18 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     }
   };
 
-  // Founding: the temple and its plaza, the well's spot and the plaza loop.
-  const foundTemple = () => {
-    const temple0 = place('temple', 2, seed.x, seed.z, seed.rotY);
-    stampFootprint(
-      grid,
-      OCCUPANT.PLAZA,
-      temple0.x,
-      temple0.z,
-      temple0.rotY,
-      temple0.halfW,
-      temple0.halfD,
-      PLAN.PLAZA_M,
-    );
-    stampBuilding(grid, temple0, PLAN.SPACING_M);
-    support.reserveWell();
-    network.layPlaza(temple0);
-    syncPathWear();
-  };
-
-  // A sandbox village: the first houses (the first one built, the second a foundation), and the first
-  // villagers.
-  const foundVillage = () => {
-    foundTemple();
-    planWithRetries('house', 2, 6);
-    planWithRetries('house', 0, 6);
-    graveyard.reserve();
-    for (let n = 0; n < VILLAGERS.START; n++) population.spawn();
-    syncPathWear();
-  };
-
-  // A hamlet: everything finished at once (the houses, the fields, the well), and the people with no
-  // builders among them, since there is nothing to build until the village converts. The first priest
-  // is the elder.
-  const foundHamlet = () => {
-    foundTemple();
-    for (let n = 0; n < HAMLET.HOUSES; n++) planWithRetries('house', 2, 6);
-    support.seedHamlet([], HAMLET.FIELDS);
-    graveyard.reserve();
-    for (let n = 0; n < HAMLET.VILLAGERS; n++) population.spawn({ builders: false });
-    syncPathWear();
-    for (let i = 0; i < villagers.count; i++) {
-      if (villagers.role[i] === Role.Priest) {
-        elder = i;
-        break;
-      }
-    }
-    // Aera is the first idler (the youngest hand with no trade), whoever else the village holds.
-    for (let i = 0; i < villagers.count; i++) {
-      if (i !== elder && villagers.role[i] === Role.Idler) {
-        aera = i;
-        break;
-      }
-    }
-  };
+  const founding = createFounding({
+    seed,
+    grid,
+    villagers,
+    place,
+    planWithRetries,
+    support,
+    network,
+    graveyard,
+    population,
+    syncPathWear,
+  });
 
   /** Put a saved village back. Everything founding would build is in the state, so nothing is laid again. */
   const restoreState = (s: VillageSimState) => {
@@ -614,7 +463,6 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     Object.assign(hunger, s.hunger);
     forest.restore(s.forest);
     graveyard.restore(s.graveyard);
-    blessings.restore(s.blessings);
     restorePrayers(prayers, s.prayers);
     hearten.restore(s.hearten);
     lastStage = stageOf(hunger, false, mods.hungerGraceMul);
@@ -633,8 +481,11 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
   };
 
   if (options.restore) restoreState(options.restore);
-  else if (mode === 'hamlet') foundHamlet();
-  else foundVillage();
+  else if (mode === 'hamlet') {
+    const folk = founding.foundHamlet();
+    elder = folk.elder;
+    aera = folk.aera;
+  } else founding.foundVillage();
 
   const believerCount = () => countBelievers(villagers.belief, villagers.count);
 
@@ -768,10 +619,13 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     update: (dt, inputs, events) => {
       sink = events;
       for (const field of fields) field.tenders = 0;
+      chopFactor = chopMul(buildings);
       faithInputs.playerDistM = inputs.playerDistM;
       faithInputs.presenceActive = inputs.presenceActive;
       // A hamlet earns only from its believers; a sandbox village earns the flat base rate.
       faithInputs.baseRate = mode === 'hamlet' ? believerIncome(believerCount()) : undefined;
+      faithInputs.bonusRate = shrineFaith(buildings);
+      faithInputs.mul = mods.faithMul;
       stepFaith(faith, dt, faithInputs);
       economy.update(buildings);
       if (stepHunger(hunger, dt, economy.hungry, mods.hungerGraceMul)) {
@@ -802,7 +656,6 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       }
       forestInputs.rain01 = rain;
       forest.update(dt, forestInputs, events);
-      blessings.update(dt);
       hearten.update(dt);
       for (const site of remoteSites) {
         const outpost = outpostOf(site.kind);
@@ -838,19 +691,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
           removeDead(i, events);
         }
       }
-      for (const field of fields) {
-        const rainBoost = rainBoostOf(VILLAGE.FIELDS.RAIN_BOOST);
-        const boost =
-          (1 + VILLAGE.FIELDS.TEND_BOOST * Math.min(3, field.tenders)) *
-          (1 + rainBoost * rain) *
-          blessings.boost('field', field.id);
-        field.growth = Math.min(1, field.growth + (dt / VILLAGE.FIELDS.GROW_S) * boost);
-        // A tended, ripe field is harvested and replanted.
-        if (field.growth >= 1 && field.tenders > 0) {
-          field.growth = 0;
-          economy.addFood(VILLAGE.ECONOMY.FIELD_YIELD + mods.fieldYieldAdd);
-        }
-      }
+      fieldsDesk.grow(dt, rain);
       // A hamlet that is not converted yet does not grow.
       if (!converted) return;
       planTimer += dt;
@@ -915,21 +756,6 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       faith.faith += amount;
       faith.earned += Math.max(0, amount);
     },
-    bless: (kind, id, seconds) => {
-      const ok =
-        kind === 'field'
-          ? fields.some((f) => f.id === id)
-          : kind === 'house'
-            ? buildings.some((b) => b.id === id && isHouse(b) && isFinished(b))
-            : id >= 0 &&
-              id < forest.count &&
-              (forest.state(id) === TreeState.Standing || forest.state(id) === TreeState.Sapling);
-      if (!ok) return false;
-      blessings.add(kind, id, seconds);
-      return true;
-    },
-    isBlessed: (kind, id) => blessings.boost(kind, id) > 1,
-    blessings: blessings.list,
     prayers,
     hearten: hearten.list,
     heartenLeft: hearten.leftOf,
@@ -959,13 +785,23 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       const b = buildings.find((x) => x.id === id);
       return b ? tierCeiling(b, mods) : 1;
     },
-    kindle: (siteId, events) => {
+    uprootTree: (id, events) => forest.uproot(id, events),
+    takeHarvest: fieldsDesk.takeHarvest,
+    haul: (siteId, wood, events) => {
       const site = buildings.find((b) => b.id === siteId);
-      if (!site || !isOpenSite(site)) return false;
-      workOn(site, remainingWork(site), events);
-      return true;
+      if (!site || !isOpenSite(site) || !(wood > 0)) return 0;
+      const seconds = wood * VILLAGE.HAND.WORK_PER_WOOD_S;
+      workOn(site, seconds, events);
+      return seconds;
     },
-    provide: (food) => economy.addFood(food) > 0,
+    haulRemote: (siteId, wood, events) => {
+      const site = remoteSites.find((r) => r.id === siteId);
+      if (!site || site.stage >= 2 || !(wood > 0)) return 0;
+      const seconds = wood * VILLAGE.HAND.WORK_PER_WOOD_S;
+      sink = events;
+      applyRemoteWork(site, seconds);
+      return seconds;
+    },
     fellNear: (x, z, n, events) => {
       let felled = 0;
       for (const id of forest.nearest(x, z, n)) {
@@ -1039,7 +875,6 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       hunger: { ...hunger },
       graveyard: graveyard.serialize(),
       forest: forest.serialize(),
-      blessings: blessings.serialize(),
       prayers: serializePrayers(prayers),
       hearten: hearten.serialize(),
       villagers: serializeVillagers(villagers),

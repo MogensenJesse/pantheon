@@ -10,6 +10,7 @@ import type { PerspectiveCamera } from 'three';
 import type { Overview } from '../../overview/overviewController';
 import type { MilestoneId } from '../../skills/milestones';
 import type { VillageBuildingType } from '../../world/village/model/assetKeys';
+import { BUILDING_LABELS } from '../../world/village/model/buildingInfo';
 import { PLOT_TYPES } from '../../world/village/model/buildings';
 import { OUTPOST_KINDS, type OutpostKind } from '../../world/village/sim/outposts';
 import type { OutpostResult, PlotResult } from '../../world/village/sim/villageSimTypes';
@@ -37,19 +38,21 @@ const OUTPOST_TOOLS: readonly PlaceTool[] = OUTPOST_KINDS.map((k) => `outpost:${
 const outpostKindOfTool = (tool: PlaceTool): OutpostKind | null =>
   tool.startsWith('outpost:') ? (tool.slice('outpost:'.length) as OutpostKind) : null;
 
-const PLOT_NAMES: Record<string, string> = {
-  house_a: 'Small house',
-  house_b: 'House',
-  house_c: 'Large house',
-  workshop: 'Workshop',
-  granary: 'Granary',
-  'outpost:lumber': 'Lumber camp',
-  'outpost:fishing': 'Fishing hut',
+const OUTPOST_LABELS: Readonly<Record<OutpostKind, string>> = {
+  lumber: 'Lumber camp',
+  fishing: 'Fishing hut',
+};
+
+/** What a tool is called on the bar and in its toasts. */
+const toolName = (tool: PlaceTool): string => {
+  const kind = outpostKindOfTool(tool);
+  return kind ? OUTPOST_LABELS[kind] : BUILDING_LABELS[tool as VillageBuildingType];
 };
 
 const REFUSALS: Record<Exclude<PlotResult, 'ok'>, string> = {
   type: 'That cannot be marked.',
   'not-converted': 'The village is not yet yours to shape.',
+  locked: 'The village has not learned to build that yet.',
   full: 'The village has all the buildings it can hold.',
   cap: 'The builders already have enough sites open.',
   outside: 'That is beyond the village.',
@@ -87,6 +90,8 @@ export interface OverviewPlotsDeps {
   /** Whether plots, and outposts, have been opened by their milestones. */
   plotsOpen: () => boolean;
   outpostsOpen: () => boolean;
+  /** Whether the skill tree has opened this building type for plots. */
+  plotTypeOpen: (type: VillageBuildingType) => boolean;
 }
 
 export interface OverviewPlots {
@@ -117,14 +122,16 @@ export function createOverviewPlots(deps: OverviewPlotsDeps): OverviewPlots {
   const isOutpost = (tool: PlaceTool): boolean => outpostKindOfTool(tool) !== null;
   /** What the player may use now: plots and outposts open separately. */
   const available = (tool: PlaceTool): boolean =>
-    isOutpost(tool) ? deps.outpostsOpen() : deps.plotsOpen();
+    isOutpost(tool)
+      ? deps.outpostsOpen()
+      : deps.plotsOpen() && deps.plotTypeOpen(tool as VillageBuildingType);
 
   const row = h('div', {
     class: 'ov-plots',
     attrs: { role: 'group', 'aria-label': 'Mark a place' },
   });
   const buttons = TOOLS.map((tool) =>
-    button(PLOT_NAMES[tool] ?? tool, () => choose(tool), { class: 'ov-plots__btn' }),
+    button(toolName(tool), () => choose(tool), { class: 'ov-plots__btn' }),
   );
   row.append(h('span', { class: 'ov-plots__label', text: 'Mark a place · P' }), ...buttons);
   getLayer('hud').appendChild(row);
@@ -137,7 +144,7 @@ export function createOverviewPlots(deps: OverviewPlotsDeps): OverviewPlots {
     turns = 0;
     hint.hidden = tool === null;
     if (tool !== null) {
-      const name = PLOT_NAMES[tool] ?? tool;
+      const name = toolName(tool);
       hint.textContent = isOutpost(tool)
         ? `${name}: click a place beyond the village · Esc to put it away`
         : `${name}: click to mark · R turns the door · Esc to put it away`;
@@ -152,7 +159,7 @@ export function createOverviewPlots(deps: OverviewPlotsDeps): OverviewPlots {
   const place = (tool: PlaceTool): boolean => {
     const ground = overview.hoverPoint();
     if (!ground) return false;
-    const name = PLOT_NAMES[tool] ?? tool;
+    const name = toolName(tool);
     const kind = outpostKindOfTool(tool);
     if (kind) {
       const result = village.placeOutpost(kind, ground.x, ground.z);

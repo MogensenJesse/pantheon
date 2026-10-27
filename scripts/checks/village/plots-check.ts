@@ -2,7 +2,12 @@
 // Run: node --experimental-strip-types --no-warnings scripts/checks/village/plots-check.ts
 import assert from 'node:assert/strict';
 import { VILLAGE } from '../../../src/config/village.ts';
-import { PLOT_TYPES } from '../../../src/world/village/model/buildings.ts';
+import { type Modifiers, neutralModifiers } from '../../../src/skills/modifiers.ts';
+import {
+  PLOT_TYPES,
+  PLOT_UNLOCKS,
+  plotTypeOpen,
+} from '../../../src/world/village/model/buildings.ts';
 import type { VillageEvent } from '../../../src/world/village/model/types.ts';
 import { woodCostOf } from '../../../src/world/village/sim/economy.ts';
 import { siteCost } from '../../../src/world/village/sim/faith.ts';
@@ -10,10 +15,11 @@ import type { VillageSim } from '../../../src/world/village/sim/villageSim.ts';
 import type { PlotResult } from '../../../src/world/village/sim/villageSimTypes.ts';
 import { check, finish } from '../lib/check.ts';
 import {
-  convertVillage,
   DAY_S,
+  grownVillage,
   loadMap,
   makeSim,
+  richVillage,
   savedHash,
   stepSim,
 } from '../lib/villageHeadless.ts';
@@ -22,17 +28,15 @@ const map = loadMap('island-mountain');
 const { seed } = map;
 
 /** A grown, converted village, made once and restored from for each check. */
-const grown = (() => {
-  const sim = convertVillage(makeSim(map, { mode: 'hamlet' }));
-  stepSim(sim, { seconds: 2 * DAY_S, fed: true });
-  return sim.serialize();
-})();
-const rich = (): VillageSim => {
-  const sim = makeSim(map, { mode: 'hamlet', restore: structuredClone(grown) });
-  sim.faith.faith = 500;
-  sim.economy.addWood(500);
+const grown = grownVillage(map);
+/** The skill tree has opened every plot type. */
+const everything = { ...neutralModifiers(), plotFarmstead: 1, plotShrine: 1 };
+const rich = (modifiers: Modifiers = everything): VillageSim => {
+  const sim = richVillage(grown, { modifiers });
   // The planner keeps its sites open; finish them so the cap is free for the player's plots.
-  for (const b of sim.buildings.filter((x) => x.stage < 2 || x.upgrade > 0)) sim.kindle(b.id, []);
+  for (const b of sim.buildings.filter((x) => x.stage < 2 || x.upgrade > 0)) {
+    sim.haul(b.id, 1000, []);
+  }
   return sim;
 };
 
@@ -158,6 +162,52 @@ await check(
     assert.ok(capped || spots.length <= room, 'the cap held');
   },
 );
+
+await check('the skill tree opens farmsteads and shrines; the older types are open to all', () => {
+  const closed = neutralModifiers();
+  const types = Object.keys(PLOT_UNLOCKS);
+  assert.deepEqual(types.sort(), ['farmstead', 'shrine']);
+  for (const type of PLOT_TYPES) {
+    assert.equal(plotTypeOpen(type, closed), !types.includes(type), `${type} on a plain tree`);
+    assert.equal(plotTypeOpen(type, everything), true, `${type} once opened`);
+  }
+  assert.equal(plotTypeOpen('farmstead', { ...closed, plotShrine: 1 }), false, 'each has its own');
+  const sim = rich(closed);
+  const [spot] = freeSpots(sim, 1);
+  for (const type of ['farmstead', 'shrine'] as const) {
+    assert.equal(sim.plotCheck(type, spot!.x, spot!.z, spot!.rot), 'locked', type);
+  }
+  const wood = sim.economy.stock.wood;
+  assert.equal(sim.placePlot('shrine', spot!.x, spot!.z, spot!.rot, []), 'locked');
+  assert.equal(sim.economy.stock.wood, wood, 'a locked plot costs nothing');
+  assert.equal(sim.plotCheck('house_b', spot!.x, spot!.z, spot!.rot), 'ok', 'houses are open');
+  assert.equal(
+    makeSim(map, { mode: 'hamlet' }).plotCheck('farmstead', spot!.x, spot!.z, spot!.rot),
+    'not-converted',
+    'a hamlet that has not converted says so first',
+  );
+  const farm = rich({ ...closed, plotFarmstead: 1 });
+  assert.equal(farm.plotCheck('farmstead', spot!.x, spot!.z, spot!.rot), 'ok');
+  assert.equal(farm.plotCheck('shrine', spot!.x, spot!.z, spot!.rot), 'locked');
+});
+
+for (const type of ['farmstead', 'shrine'] as const) {
+  await check(
+    `a ${type} is a plot like the others: it costs wood and the builders finish it`,
+    () => {
+      const sim = rich();
+      const [spot] = freeSpots(sim, 1);
+      const wood = sim.economy.stock.wood;
+      assert.equal(sim.placePlot(type, spot!.x, spot!.z, spot!.rot, []), 'ok');
+      assert.equal(sim.economy.stock.wood, wood - woodCostOf(type));
+      assert.ok(woodCostOf(type) > 0, 'it has a price');
+      const placed = sim.buildings.find((b) => b.type === type)!;
+      sim.haul(placed.id, 1000, []);
+      assert.equal(placed.stage, 2);
+      assert.equal(placed.level, 1);
+    },
+  );
+}
 
 await check('builders raise the plot into a finished building', () => {
   const sim = rich();

@@ -3,6 +3,9 @@
 // by the mouse ray against its box (a roof is hit before the ground behind it); then a field, by the
 // ground point.
 
+import { insideFootprint } from '../core/math/geom.ts';
+import type { VillageBuildingType } from '../world/village/model/assetKeys.ts';
+import { BUILDING_HEIGHT_M } from '../world/village/model/buildingInfo.ts';
 import type { Selection } from '../world/village/model/selection.ts';
 import type { Building, Field, Villagers } from '../world/village/model/types.ts';
 
@@ -43,17 +46,8 @@ export const VILLAGER_BODY_M = 1;
 const BUILDING_MARGIN_M = 0.5;
 
 /** About how tall a building is (m), by type and how far it is built. */
-export function buildingHeightM(type: string, stage: number): number {
-  const full =
-    type === 'temple'
-      ? 9
-      : type === 'well'
-        ? 2.2
-        : type === 'house_a'
-          ? 4
-          : type === 'house_b'
-            ? 4.5
-            : 5;
+export function buildingHeightM(type: VillageBuildingType, stage: number): number {
+  const full = BUILDING_HEIGHT_M[type];
   if (stage >= 2) return full;
   return stage === 1 ? full * 0.5 : 0.6;
 }
@@ -97,15 +91,6 @@ export function rayBuildingHit(
     if (tMin > tMax) return null;
   }
   return tMin;
-}
-
-/** Whether a ground point is inside a field's plot. */
-export function insideField(f: Field, x: number, z: number): boolean {
-  const cos = Math.cos(f.rotY);
-  const sin = Math.sin(f.rotY);
-  const dx = x - f.x;
-  const dz = z - f.z;
-  return Math.abs(dx * cos - dz * sin) <= f.halfW && Math.abs(dx * sin + dz * cos) <= f.halfD;
 }
 
 export interface PickInput {
@@ -156,7 +141,7 @@ export function pickTarget(input: PickInput): Selection | null {
 
   if (ground) {
     for (const f of world.fields) {
-      if (insideField(f, ground.x, ground.z)) return { kind: 'field', id: f.id };
+      if (insideFootprint(f, ground.x, ground.z)) return { kind: 'field', id: f.id };
     }
   }
   return null;

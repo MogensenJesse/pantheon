@@ -27,7 +27,8 @@ export const village = {
     TEMPLE: 1,
     WELL: 2,
     FENCE: 320,
-    STOCKPILE: 8,
+    /** Build-site piles, and the sheaf the hand carries. */
+    STOCKPILE: 10,
     GRAVE: 128,
     /** Stumps drawn at once (a village that fells more than this shows the first ones). */
     STUMP: 1024,

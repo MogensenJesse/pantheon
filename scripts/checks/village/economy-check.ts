@@ -3,7 +3,9 @@
 // Run: node --experimental-strip-types scripts/checks/village/economy-check.ts
 import assert from 'node:assert/strict';
 import { VILLAGE } from '../../../src/config/village.ts';
-import { Role } from '../../../src/world/village/model/types.ts';
+import { BUILDING_TYPES } from '../../../src/world/village/model/assetKeys.ts';
+import { type Building, Role, type VillageEvent } from '../../../src/world/village/model/types.ts';
+import { remainingWork } from '../../../src/world/village/sim/construction.ts';
 import {
   CHEAPEST_WOOD_COST,
   capsOf,
@@ -148,6 +150,17 @@ await check(
     assert.equal(housing.planned, 0);
   },
 );
+
+/** The least wood a building may cost: the biggest tree gives 9, so no building is ever one tree. */
+const PACING_FLOOR_WOOD = 10;
+
+await check('no building is cheaper than the pacing floor, and every one has a price', () => {
+  assert.ok(CHEAPEST_WOOD_COST >= PACING_FLOOR_WOOD, `cheapest is ${CHEAPEST_WOOD_COST}`);
+  for (const type of BUILDING_TYPES) {
+    if (type === 'temple' || type === 'well') continue; // not built through sites
+    assert.ok(woodCostOf(type) >= PACING_FLOOR_WOOD, `${type} has a price at the floor or above`);
+  }
+});
 
 await check('shortages: less than a day of food, less wood than the cheapest building', () => {
   assert.deepEqual(shortages({ wood: 50, food: 11 }, 12), { food: true, wood: false });
@@ -326,6 +339,113 @@ await check(
       started += events.filter((e) => e.kind === 'siteStarted').length;
     });
     assert.ok(started > 0, 'addWood restarted growth');
+  },
+);
+
+await check(
+  'haul: wood given to an open site is builder work and nothing else; a finished building takes none',
+  () => {
+    const sim = convertedHamlet();
+    const open: Building[] = [];
+    hoursSim(sim, 1, () => {
+      const site = sim.buildings.find((b) => b.stage < 2);
+      if (site) open.push(site);
+      return open.length === 0;
+    });
+    const site = open[0];
+    assert.ok(site, 'a site opened');
+    const events: VillageEvent[] = [];
+    const wood = sim.economy.stock.wood;
+    const stage = site.stage;
+    const progress = site.progress;
+
+    const seconds = sim.haul(site.id, 1, events);
+    assert.equal(seconds, VILLAGE.HAND.WORK_PER_WOOD_S, 'a log is a fixed amount of work');
+    assert.ok(Math.abs(site.progress - progress - seconds) < 1e-9, 'it went into the stage');
+    assert.equal(site.stage, stage);
+    assert.equal(events.length, 0);
+    assert.equal(sim.economy.stock.wood, wood, 'the hand pays from its hold, never from the store');
+
+    for (const bad of [0, -3, Number.NaN]) {
+      assert.equal(sim.haul(site.id, bad, events), 0, `${bad} wood is no work`);
+    }
+    assert.equal(sim.haul(-1, 5, events), 0, 'no such building');
+    const temple = sim.buildings.find((b) => b.type === 'temple')!;
+    const templeProgress = temple.progress;
+    assert.equal(sim.haul(temple.id, 5, events), 0, 'a finished building has nothing to build');
+    assert.equal(temple.progress, templeProgress);
+    assert.equal(events.length, 0);
+
+    const left = remainingWork(site) / VILLAGE.HAND.WORK_PER_WOOD_S;
+    sim.haul(site.id, left + 0.01, events);
+    assert.equal(site.stage, stage + 1, 'enough wood finishes the stage');
+    assert.deepEqual(
+      events.map((e) => e.kind),
+      ['stageCompleted'],
+    );
+  },
+);
+
+await check(
+  'takeHarvest: a ripe field gives its yield once and starts again; a green one gives nothing',
+  () => {
+    const sim = makeSim(map, { mode: 'hamlet' });
+    const field = sim.fields[0];
+    assert.ok(field, 'the hamlet has a field');
+    const ripe = VILLAGE.HAND.WHEAT.MIN_RIPE;
+    field.growth = ripe - 0.01;
+    assert.equal(sim.takeHarvest(field.id), 0, 'too green');
+    assert.equal(field.growth, ripe - 0.01, 'and left standing');
+
+    field.growth = 1;
+    assert.equal(sim.takeHarvest(field.id), E.FIELD_YIELD, 'a ripe field gives the full yield');
+    assert.equal(field.growth, 0, 'and is sown again');
+    assert.equal(sim.takeHarvest(field.id), 0, 'a second take gives nothing');
+
+    field.growth = ripe + 0.05;
+    assert.ok(Math.abs(sim.takeHarvest(field.id) - E.FIELD_YIELD * (ripe + 0.05)) < 1e-9);
+    assert.equal(sim.takeHarvest(-99), 0, 'no such field');
+
+    sim.economy.addFood(Number.POSITIVE_INFINITY);
+    const full = sim.economy.stock.food;
+    field.growth = 1;
+    const food = sim.takeHarvest(field.id);
+    assert.ok(food > 0 && sim.economy.addFood(food) === 0, 'a full larder still cleared the field');
+    assert.equal(sim.economy.stock.food, full, 'and the stock stays at its cap');
+    assert.equal(villageStateProblem(sim.serialize(), sim.seed), null);
+  },
+);
+
+await check(
+  'uprootTree: the sim gives a tree’s wood once and a woodcutter who was at it is let go',
+  () => {
+    const sim = makeSim(map, { mode: 'hamlet' });
+    const events: VillageEvent[] = [];
+    const wood = sim.economy.stock.wood;
+    let id = -1;
+    hoursSim(sim, 0.5, () => {
+      const v = sim.villagers;
+      for (let i = 0; i < v.count; i++) {
+        if (v.role[i] !== Role.Woodcutter || v.slot[i]! < 0) continue;
+        const spot = sim.workSpots.trees.find((s) => -s.id === v.target[i]!);
+        if (spot?.tree !== undefined) id = spot.tree;
+      }
+      return id < 0;
+    });
+    assert.ok(id >= 0, 'a woodcutter reached a tree');
+    assert.ok(sim.forest.isStanding(id));
+    assert.equal(sim.uprootTree(id, events), yieldOf(sim.forest.info(id)));
+    assert.equal(sim.forest.isStanding(id), false);
+    assert.deepEqual(events, [{ kind: 'treeUprooted', tree: id }]);
+    assert.equal(sim.uprootTree(id, events), 0, 'a stump gives nothing');
+    assert.equal(
+      sim.economy.stock.wood,
+      wood,
+      'the hand pays the stock; the sim only hands over wood',
+    );
+    hoursSim(sim, 0.2);
+    assert.equal(sim.forest.isStanding(id), false, 'the woodcutter does not chop a stump');
+    assert.equal(villageStateProblem(sim.serialize(), sim.seed), null);
   },
 );
 

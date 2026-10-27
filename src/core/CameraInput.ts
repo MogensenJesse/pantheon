@@ -19,7 +19,7 @@ export interface CameraInputContext {
   getYaw: () => number;
   getPitch: () => number;
   isLocked: () => boolean;
-  /** While blocked the mouse does not turn the camera (the radial menu uses it to choose). */
+  /** While blocked the mouse does not turn the camera (the village overview and the finale's cutscene use it). */
   setLookBlocked: (blocked: boolean) => void;
   /** While off a press on the canvas does not take the pointer (the village overview uses the cursor). */
   setCaptureEnabled: (enabled: boolean) => void;

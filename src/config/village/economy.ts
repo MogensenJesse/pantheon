@@ -46,9 +46,15 @@ export const ECONOMY_PARTS = {
     /** What a village starts with. */
     START: { wood: 30, food: 24 },
     /** Wood a building costs to start (the temple and the well are not built through sites). */
-    WOOD_COST: { house_a: 10, house_b: 14, house_c: 18, workshop: 20, granary: 20 } as Readonly<
-      Record<string, number>
-    >,
+    WOOD_COST: {
+      house_a: 10,
+      house_b: 14,
+      house_c: 18,
+      workshop: 20,
+      granary: 20,
+      farmstead: 12,
+      shrine: 14,
+    } as Readonly<Record<string, number>>,
     /**
      * A site starts only while the free beds (counting beds in sites under construction) are below
      * this share of all beds, and the number of sites that may be open at once rises to

@@ -12,7 +12,30 @@ export const PLOT_TYPES: readonly VillageBuildingType[] = [
   'house_c',
   'workshop',
   'granary',
+  'farmstead',
+  'shrine',
 ];
+
+/** The switch modifiers (`skills/modifiers.ts`) that open a plot type: above 0 once the skill tree grants it. */
+type PlotSwitch = 'plotFarmstead' | 'plotShrine';
+
+/**
+ * The building types the skill tree opens for plots, and the switch modifier that opens each. A type not named
+ * here is open to everyone.
+ */
+export const PLOT_UNLOCKS: Readonly<Partial<Record<VillageBuildingType, PlotSwitch>>> = {
+  farmstead: 'plotFarmstead',
+  shrine: 'plotShrine',
+};
+
+/** Whether the player may mark a plot of this type yet (`mods` is the skill tree's modifiers). */
+export const plotTypeOpen = (
+  type: VillageBuildingType,
+  mods: Readonly<Record<PlotSwitch, number>>,
+): boolean => {
+  const key = PLOT_UNLOCKS[type];
+  return key === undefined || mods[key] > 0;
+};
 
 /** The village's temple, or undefined before one exists. */
 export const templeOf = (buildings: readonly Building[]): Building | undefined =>
@@ -21,7 +44,7 @@ export const templeOf = (buildings: readonly Building[]): Building | undefined =
 /** Houses of any size (`house_*`). */
 export const isHouse = (b: Pick<Building, 'type'>): boolean => b.type.startsWith('house_');
 
-/** Built (stage 2); the opposite of `isOpenSite` in sim/construction. */
+/** Built (stage 2). A finished building can still be an open site while an upgrade is under way (`isOpenSite` in sim/construction). */
 export const isFinished = (b: Building): boolean => b.stage >= 2;
 
 /** Beds a house gains from its upgrade level (0 for any other building). */

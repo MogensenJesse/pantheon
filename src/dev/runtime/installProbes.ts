@@ -3,6 +3,8 @@
 // Loaded with a dynamic import under `import.meta.env.DEV`, so none of it ships. Returns one teardown.
 
 import type { DirectionalLight, Vector3 } from 'three';
+import { setEnergy } from '../../core/energy';
+import { state } from '../../core/state/gameState';
 import type { OrbSystemContext } from '../../entities/energyOrb/orbSystem';
 import type { Gameplay } from '../../gameplay/initGameplay';
 import type { Saving } from '../../gameplay/setupSaving';
@@ -16,6 +18,7 @@ import type { VillageSystemContext } from '../../world/village/VillageSystem';
 import { forceRain } from '../../world/village/villageDevState';
 import type { Weather } from '../../world/weather/weather';
 import { installDevHook } from './devHook';
+import { initHandProbe } from './handProbe';
 import { initLandmarkProbe } from './landmarkProbe';
 import { initLifeProbe } from './lifeProbe';
 import { initOrbProbe } from './orbProbe';
@@ -53,12 +56,13 @@ export interface ProbeSources {
 
 export function installProbes(src: ProbeSources): () => void {
   const { gameplay, village } = src;
+  const teleport = (x: number, z: number) => {
+    src.playerPosition.x = x;
+    src.playerPosition.z = z;
+  };
   const disposers: (() => void)[] = [
     // Console teleport for checking distant spots (`__pantheonTeleport(x, z)`).
-    installDevHook('__pantheonTeleport', (x: number, z: number) => {
-      src.playerPosition.x = x;
-      src.playerPosition.z = z;
-    }),
+    installDevHook('__pantheonTeleport', teleport),
     // The village overview: `__pantheonOverview.debug()`, `.setActive(true, true)` (true skips the temple rule).
     installDevHook('__pantheonOverview', {
       debug: () => src.overview.debug(),
@@ -98,20 +102,14 @@ export function installProbes(src: ProbeSources): () => void {
       landmarks: gameplay.landmarks,
       restoration: gameplay.restoration,
       finishRestoration: village ? (kind) => village.dev.completeRestoration(kind) : null,
-      teleport: (x, z) => {
-        src.playerPosition.x = x;
-        src.playerPosition.z = z;
-      },
+      teleport,
     }),
     initLifeProbe({
       ambient: gameplay.ambientLife,
       animals: src.animals,
       playerPosition: () => src.playerPosition,
     }),
-    initSkillsProbe(src.skills, {
-      getYaw: src.getYaw,
-      radialOpen: gameplay.abilityUi.isOpen,
-    }),
+    initSkillsProbe(src.skills, { getYaw: src.getYaw }),
   ];
   disposers.push(
     initWeatherProbe({
@@ -123,17 +121,27 @@ export function installProbes(src: ProbeSources): () => void {
   );
   if (village) {
     disposers.push(initVillageProbe(village));
-    if (gameplay.powers) {
+    if (gameplay.handRuntime && gameplay.handUi) {
       disposers.push(
-        initPowersProbe({
-          powers: gameplay.powers,
+        initHandProbe({
+          runtime: gameplay.handRuntime,
+          ui: gameplay.handUi,
           sim: village.sim,
+          sheep: src.animals.hand,
+          teleport,
           orbPlace: gameplay.orbPlace,
-          builderList: gameplay.builderList,
-          castBuilder: gameplay.castBuilder,
+          energy: () => state.energy,
+          setEnergy,
         }),
       );
     }
+    disposers.push(
+      initPowersProbe({
+        sim: village.sim,
+        builderList: gameplay.builderList,
+        castBuilder: gameplay.castBuilder,
+      }),
+    );
     if (gameplay.quest) {
       disposers.push(
         initQuestProbe({

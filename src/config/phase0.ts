@@ -79,7 +79,7 @@ export const PHASE0 = {
     ELDER_MEET_HOLD_S: 10,
     /** Villagers who must believe for the "help the village believe" step. */
     CONVERTS_GOAL: 5,
-    /** A Sign counts as lighting the temple fire within this distance (m) of the temple... */
+    /** A tree put down within this distance (m) of the temple counts as lighting the temple fire... */
     FIRE_TEMPLE_M: 15,
     /** ...at dusk: this much of the day before sunset, until this much after it. */
     DUSK_BEFORE_SUNSET: 0.13,
@@ -145,37 +145,10 @@ export const PHASE0 = {
       },
     },
   },
-  /** The conversion powers. */
-  POWERS: {
+  /** What belief looks like in the world. */
+  PIPS: {
     /** Belief pips show above villagers within this distance (m) of the orb. */
     PIP_RANGE_M: 15,
-    MURMUR: {
-      /** The orb must stay within this distance (m) of the villager. */
-      RANGE_M: 6,
-      /** Seconds of murmuring that take a villager from 0 to full belief; also the longest channel. */
-      SECONDS: 20,
-      DRAIN_PER_SEC: 1,
-      /** The villager stays where they are, looking at the orb, a moment after each step of the channel. */
-      HOLD_S: 0.6,
-    },
-    DREAM: {
-      COST: 8,
-      /** The house must stand within this distance (m) of the orb. */
-      RANGE_M: 14,
-      /** Belief each sleeper in the house gains. */
-      BELIEF: 0.35,
-    },
-    SIGN: {
-      COST: 12,
-      COOLDOWN_SEC: 30,
-      /** Villagers outdoors within this distance (m) see it. */
-      RANGE_M: 25,
-      BELIEF: 0.3,
-      /** Those who see it stop and look at the orb for this long (s). */
-      NOTICE_S: 4,
-      /** The sparkles burst this high (m) above the orb's position. */
-      SPARKLE_HEIGHT_M: 1.2,
-    },
   },
   /** The day cycle's phases (0..1) where the sun goes down and comes up again. */
   DAY: {

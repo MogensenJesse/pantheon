@@ -16,10 +16,12 @@ import {
 import type { VillageSim } from '../../../src/world/village/sim/villageSim.ts';
 import { check, finish } from '../lib/check.ts';
 import {
-  convertVillage,
+  buildingOf,
   DAY_S,
+  grownVillage,
   loadMap,
   makeSim,
+  richVillage,
   savedHash,
   stepSim,
 } from '../lib/villageHeadless.ts';
@@ -31,47 +33,59 @@ const tiers = (houseTier: number, storeTier = 1) => ({
   houseTier,
   storeTier,
 });
-const building = (type: string, over: Partial<Building> = {}): Building =>
-  ({ id: 1, type, stage: 2, progress: 0, level: 1, upgrade: 0, ...over }) as Building;
 
 await check('which buildings can be upgraded, how high the tree lets them, and why not', () => {
-  assert.equal(upgradeGroup(building('house_a')), 'house');
-  assert.equal(upgradeGroup(building('granary')), 'store');
-  assert.equal(upgradeGroup(building('workshop')), 'store');
-  assert.equal(upgradeGroup(building('temple')), null);
-  assert.equal(tierCeiling(building('house_b'), tiers(2)), 2);
-  assert.equal(tierCeiling(building('house_b'), tiers(9)), U.MAX_LEVEL, 'never above the top');
-  assert.equal(tierCeiling(building('granary'), tiers(3, 1)), 1);
+  assert.equal(upgradeGroup(buildingOf('house_a')), 'house');
+  assert.equal(upgradeGroup(buildingOf('granary')), 'store');
+  assert.equal(upgradeGroup(buildingOf('workshop')), 'store');
+  assert.equal(upgradeGroup(buildingOf('farmstead')), 'works');
+  assert.equal(upgradeGroup(buildingOf('shrine')), 'works');
+  assert.equal(upgradeGroup(buildingOf('temple')), null);
+  assert.equal(tierCeiling(buildingOf('house_b'), tiers(2)), 2);
+  assert.equal(tierCeiling(buildingOf('house_b'), tiers(9)), U.MAX_LEVEL, 'never above the top');
+  assert.equal(tierCeiling(buildingOf('granary'), tiers(3, 1)), 1);
   const t2 = tiers(2, 2);
-  assert.deepEqual(checkUpgrade(building('house_a'), t2), { ok: true });
+  assert.deepEqual(checkUpgrade(buildingOf('house_a'), t2), { ok: true });
   const refused = (b: Building, want: string, t = t2) =>
     assert.deepEqual(checkUpgrade(b, t), { ok: false, reason: want });
-  refused(building('temple'), 'unsupported');
-  refused(building('house_a', { stage: 1 }), 'unfinished');
-  refused(building('house_a', { upgrade: 50 }), 'busy');
-  refused(building('house_a', { level: 2 }), 'tier');
-  refused(building('house_a', { level: U.MAX_LEVEL }), 'maxed');
-  refused(building('house_a'), 'tier', tiers(1));
+  refused(buildingOf('temple'), 'unsupported');
+  refused(buildingOf('house_a', { stage: 1 }), 'unfinished');
+  refused(buildingOf('house_a', { upgrade: 50 }), 'busy');
+  refused(buildingOf('house_a', { level: 2 }), 'tier');
+  refused(buildingOf('house_a', { level: U.MAX_LEVEL }), 'maxed');
+  refused(buildingOf('house_a'), 'tier', tiers(1));
+  // The works tier is its own ceiling: houses and stores do not open it.
+  const works = (workTier: number) => ({ ...tiers(3, 3), workTier });
+  refused(buildingOf('farmstead'), 'tier', works(1));
+  refused(buildingOf('shrine'), 'tier', works(1));
+  assert.deepEqual(checkUpgrade(buildingOf('shrine'), works(2)), { ok: true });
+  assert.deepEqual(checkUpgrade(buildingOf('farmstead'), works(2)), { ok: true });
+  assert.equal(tierCeiling(buildingOf('farmstead'), works(9)), U.MAX_LEVEL);
+  assert.equal(
+    tierCeiling(buildingOf('farmstead'), tiers(3, 3)),
+    1,
+    'house and store tiers do not reach it',
+  );
 });
 
 await check('each step costs more, and the level gives beds to houses and room to stores', () => {
-  const a = upgradeCost(building('house_b'));
-  const b = upgradeCost(building('house_b', { level: 2 }));
+  const a = upgradeCost(buildingOf('house_b'));
+  const b = upgradeCost(buildingOf('house_b', { level: 2 }));
   assert.ok(b.wood > a.wood && b.faith > a.faith && b.workS > a.workS);
-  const house = building('house_a');
-  const raised = building('house_a', { level: 3 });
+  const house = buildingOf('house_a');
+  const raised = buildingOf('house_a', { level: 3 });
   assert.equal(
     bedsOf(raised) - bedsOf(house),
     2 * U.BEDS_PER_LEVEL,
     'two levels, two steps of beds',
   );
   assert.equal(
-    bedsOf(building('house_a', { stage: 1, level: 3 })),
+    bedsOf(buildingOf('house_a', { stage: 1, level: 3 })),
     0,
     'an unfinished house has none',
   );
   const stores = (level: number) =>
-    capsOf([building('granary', { level }), building('workshop', { level })]);
+    capsOf([buildingOf('granary', { level }), buildingOf('workshop', { level })]);
   assert.ok(stores(2).food > stores(1).food && stores(2).wood > stores(1).wood);
   assert.equal(
     stores(2).food - stores(1).food,
@@ -80,17 +94,8 @@ await check('each step costs more, and the level gives beds to houses and room t
 });
 
 /** A grown, converted village with room in its pockets, made once and restored from for each check. */
-const grown = (() => {
-  const sim = convertVillage(makeSim(map, { mode: 'hamlet' }));
-  stepSim(sim, { seconds: 2 * DAY_S, fed: true });
-  return sim.serialize();
-})();
-const rich = (modifiers = tiers(1)): VillageSim => {
-  const sim = makeSim(map, { mode: 'hamlet', restore: structuredClone(grown), modifiers });
-  sim.faith.faith = 500;
-  sim.economy.addWood(500);
-  return sim;
-};
+const grown = grownVillage(map);
+const rich = (modifiers = tiers(1)): VillageSim => richVillage(grown, { modifiers });
 const finishedHouse = (sim: VillageSim): Building =>
   sim.buildings.find((b) => isHouse(b) && b.stage === 2)!;
 
@@ -163,15 +168,15 @@ await check(
   },
 );
 
-await check('Kindle finishes an upgrade at once', () => {
+await check('wood hauled to an upgrade finishes it, and a finished building takes none', () => {
   const sim = rich(tiers(2));
   const house = finishedHouse(sim);
   sim.upgrade(house.id, []);
   const events: VillageEvent[] = [];
-  assert.equal(sim.kindle(house.id, events), true);
+  assert.ok(sim.haul(house.id, 1000, events) > 0);
   assert.equal(house.level, 2);
   assert.ok(events.some((e) => e.kind === 'upgradeCompleted'));
-  assert.equal(sim.kindle(house.id, []), false, 'nothing left to finish');
+  assert.equal(sim.haul(house.id, 1000, []), 0, 'nothing left to finish');
 });
 
 await check(

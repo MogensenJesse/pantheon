@@ -1,0 +1,78 @@
+/*
+ * src/ui/overview/powerBar.css — the powers bar in the village overview (the orb's hand and the weather
+ * powers), bottom middle. Quiet and mythic, all tokens; hidden while the player has no power.
+ */
+
+.ov-powers {
+  position: fixed;
+  left: 50%;
+  bottom: 1.5rem;
+  transform: translateX(-50%);
+  display: flex;
+  gap: var(--ui-space-3);
+  pointer-events: none;
+}
+
+/* One slot: a ring that empties as the cooldown runs, the name and cost, and a word when not ready. */
+.ov-power {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas: "icon name" "icon cost" "note note";
+  column-gap: var(--ui-space-2);
+  align-items: center;
+  min-width: 8rem;
+  padding: var(--ui-space-2) var(--ui-space-3);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  background: rgba(var(--ui-surface-rgb), 0.7);
+  color: var(--ui-hud-text);
+  font: inherit;
+  font-size: var(--ui-text-sm);
+  text-align: left;
+  text-shadow: var(--ui-text-shadow);
+  pointer-events: auto;
+  cursor: pointer;
+}
+.ov-power[data-ready="true"] {
+  border-color: rgba(var(--ui-energy-rgb), 0.6);
+  color: rgb(var(--ui-energy-bright-rgb));
+}
+.ov-power[data-ready="false"] {
+  opacity: 0.7;
+}
+.ov-power[data-armed="true"] {
+  border-color: rgb(var(--ui-energy-bright-rgb));
+  box-shadow: 0 0 0.8rem rgba(var(--ui-energy-glow-rgb), 0.45);
+}
+.ov-power__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--ui-radius-md);
+  /* Dark sweep over the slot: the covered fraction is the cooldown left. */
+  background: conic-gradient(
+    var(--ui-backdrop) calc(var(--ov-cooldown, 0) * 360deg),
+    transparent 0
+  );
+  pointer-events: none;
+}
+.ov-power__icon {
+  grid-area: icon;
+  display: grid;
+  place-items: center;
+}
+.ov-power__name {
+  grid-area: name;
+}
+.ov-power__cost {
+  grid-area: cost;
+  font-size: var(--ui-text-xs);
+  color: var(--ui-hint-text);
+}
+.ov-power__note {
+  grid-area: note;
+  min-height: 1em;
+  font-size: var(--ui-text-xs);
+  font-style: italic;
+  color: var(--ui-warning-text);
+}

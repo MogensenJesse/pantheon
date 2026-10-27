@@ -55,6 +55,8 @@ const MODIFIER_LABEL: Record<ModifierKey, string> = {
   orbFaithTrail: 'Faith per memory gathered',
   shrineAttuned: 'Energy returns inside a shrine',
   flatRegenPerSec: 'Energy regained anywhere',
+  handReachMul: 'How far the hand reaches',
+  handCostMul: 'Energy a lift costs',
   bedsPerHouseAdd: 'Beds in every house',
   woodPerTreeAdd: 'Wood from a felled tree',
   fieldYieldAdd: 'Food from a harvest',
@@ -72,12 +74,22 @@ const MODIFIER_LABEL: Record<ModifierKey, string> = {
   stormStrengthMul: 'How strong storms are',
   houseTier: 'Highest house level',
   storeTier: 'Highest store level',
+  workTier: 'Highest farmstead and shrine level',
+  plotFarmstead: 'Builders can raise farmsteads',
+  plotShrine: 'Builders can raise shrines',
+  faithMul: 'Faith gathered',
   energyPerBeliever: 'Energy per believer',
   templeRegen: 'The temple restores energy around it',
 };
 
 /** Modifiers that are a switch, not a number: the label says it all when they go on. */
-const SWITCHES: readonly ModifierKey[] = ['shrineAttuned', 'evergreen', 'templeRegen'];
+const SWITCHES: readonly ModifierKey[] = [
+  'shrineAttuned',
+  'evergreen',
+  'templeRegen',
+  'plotFarmstead',
+  'plotShrine',
+];
 
 /** Unit written after a number. */
 const UNIT: Partial<Record<ModifierKey, string>> = {
@@ -121,7 +133,7 @@ export function nodeTooltip(
     .map((x) => tree.find((n) => n.id === x)?.name ?? x);
   const lines = [
     ...node.effects.map(describeEffect),
-    node.ability ? 'A power: cast it from the radial menu (hold Q)' : '',
+    node.ability ? 'A power you can cast' : '',
     needs.length > 0 ? `Needs ${needs.join(' and ')}` : '',
     gate ? `Needs the milestone: ${gate}` : '',
     excludedBy.length > 0 ? `Closed: you took ${excludedBy.join(' and ')}` : '',

@@ -8,7 +8,7 @@ import type { VillageSim } from '../../../src/world/village/sim/villageSim.ts';
 import { check, finish } from '../lib/check.ts';
 import {
   buildingsOverlap,
-  DAY_S,
+  dayPhaseAt,
   type LoadedMap,
   loadMap,
   makeSim,
@@ -49,7 +49,7 @@ function run(map: LoadedMap, hours: number, vigil: boolean) {
   const lastZ = new Float32Array(VILLAGE.VILLAGERS.MAX);
   simulate(sim, {
     hours,
-    phase: vigil ? () => 0.02 : (t) => (0.3 + t / DAY_S) % 1,
+    phase: vigil ? () => 0.02 : dayPhaseAt,
     vigil,
     presence: false,
     // The smoke is about layout and paths: the village is fed so it grows to full size on any terrain.

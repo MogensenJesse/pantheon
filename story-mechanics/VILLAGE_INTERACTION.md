@@ -4,7 +4,7 @@ Status: built. Milestones ([arch-ii](../docs/village/arch-ii.md)), upgrades ([up
 
 ## The idea
 
-The village runs itself. The player chooses **where** (plots, outposts), **whom** (hearten) and **what to answer** (prayers); the village does the labour. Few verbs, no menus, no building queue. Inspired by Travian's upgrade and expansion loop and Black & White's relationship with its villagers, but neither is copied: nothing is picked up or thrown, and there is no good/evil score.
+The village runs itself. The player chooses **where** (plots, outposts), **whom** (hearten) and **what to answer** (prayers); the village does the labour. Few verbs, no menus, no building queue. Inspired by Travian's upgrade and expansion loop and Black & White's relationship with its villagers, but neither is copied: villagers are never picked up or thrown (the orb's hand carries trees, wheat and sheep, never people: `HAND.md`), and there is no good/evil score.
 
 ## Decisions
 
@@ -12,7 +12,7 @@ The village runs itself. The player chooses **where** (plots, outposts), **whom*
 - **Upgrades** are in. The skill tree decides which upgrade tiers exist; the village upgrades buildings in the world with wood and faith. A building under upgrade stays finished and usable.
 - **Player plots.** In overview the player marks a spot for a building; builders start on it. The planner keeps working on its own.
 - **Prayers.** Villagers voice a need (rain, food, shelter, healing). Answering pays faith and counts toward a milestone. An unanswered prayer costs that villager their belief, so they stop being a believer and earn no faith until restored.
-- **Hearten** is the hand: a touch on one villager that lifts them for a while (work rate, belief restored, a visible glow). It is a button in the info panel, not a power-bar slot.
+- **Hearten** is the touch (the orb's carrying hand is in `HAND.md`): a touch on one villager that lifts them for a while (work rate, belief restored, a visible glow). It is a button in the info panel, not a power-bar slot.
 - **Outposts** are passive. A spot beyond the village grid is marked, a crew builds it (the remote-site framework), then it delivers wood or food at a capped rate.
 - **One verb for places.** "Mark a place" is a building plot inside the grid and an outpost beyond it.
 - **Gating by milestones**, not scores. No renown, no temperament.

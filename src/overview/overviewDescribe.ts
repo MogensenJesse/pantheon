@@ -2,9 +2,12 @@
 // no DOM, no three, node-runnable). Plain data in, plain data out; the panel only draws it.
 
 import { VILLAGE } from '../config/village.ts';
+import { distXZ } from '../core/math/geom.ts';
 import { modifiers } from '../skills/modifiers.ts';
 import { SPEAKER_NAMES } from '../story/story.ts';
 import { hungerTitle } from '../ui/village/villageText.ts';
+import type { VillageBuildingType } from '../world/village/model/assetKeys.ts';
+import { BUILDING_LABELS } from '../world/village/model/buildingInfo.ts';
 import { bedsOf, isHouse } from '../world/village/model/buildings.ts';
 import {
   Activity,
@@ -14,6 +17,12 @@ import {
   Role,
   type Villagers,
 } from '../world/village/model/types.ts';
+import {
+  farmsteadGrowth,
+  farmsteadYield,
+  shrineShare,
+  workshopShare,
+} from '../world/village/sim/buildingEffects.ts';
 import { foodPerDay } from '../world/village/sim/economy.ts';
 import { stageOf } from '../world/village/sim/hunger.ts';
 import { type Prayer, prayerLeftS } from '../world/village/sim/prayers.ts';
@@ -118,16 +127,6 @@ export function describeWorldOf(
   };
 }
 
-const BUILDING_NAMES: Readonly<Record<string, string>> = {
-  temple: 'Temple',
-  house_a: 'Small house',
-  house_b: 'House',
-  house_c: 'Large house',
-  workshop: 'Workshop',
-  granary: 'Granary',
-  well: 'Well',
-};
-
 const ROLE_NAMES: Readonly<Record<number, string>> = {
   [Role.Builder]: 'Builder',
   [Role.Priest]: 'Priest',
@@ -139,7 +138,7 @@ const ROLE_NAMES: Readonly<Record<number, string>> = {
 
 const STAGE_NAMES = ['Foundation', 'Frame', 'Finished'] as const;
 
-const buildingName = (type: string): string => BUILDING_NAMES[type] ?? type;
+const buildingName = (type: VillageBuildingType): string => BUILDING_LABELS[type];
 
 /** What the tooltip over a thing says. */
 export function nameOf(sel: Selection, world: DescribeWorld): string | null {
@@ -287,7 +286,11 @@ function upgradeParts(
   world: DescribeWorld,
 ): Pick<Description, 'bar' | 'upgrade'> & { rows: InfoRow[]; subtitle?: string } {
   const none = { rows: [] as InfoRow[] };
-  const tiers = { houseTier: modifiers.houseTier, storeTier: modifiers.storeTier };
+  const tiers = {
+    houseTier: modifiers.houseTier,
+    storeTier: modifiers.storeTier,
+    workTier: modifiers.workTier,
+  };
   const check = checkUpgrade(b, tiers);
   if (!check.ok && check.reason === 'unsupported') return none;
   const level: InfoRow = { label: 'Level', value: `${b.level} of ${VILLAGE.UPGRADES.MAX_LEVEL}` };
@@ -390,11 +393,47 @@ function describeBuilding(id: number, world: DescribeWorld): Description | null 
     };
   }
   if (b.type === 'workshop') {
+    const chop = Math.round(workshopShare(b.level) * 100);
     return {
       title: name,
       subtitle: up.subtitle ?? 'Holds wood for building',
-      rows: [...up.rows, { label: 'Wood', value: `${Math.floor(stock.wood)} of ${stock.woodCap}` }],
+      rows: [
+        ...up.rows,
+        { label: 'Wood', value: `${Math.floor(stock.wood)} of ${stock.woodCap}` },
+        ...(chop > 0 ? [{ label: 'Woodcutters', value: `${chop}% faster` }] : []),
+      ],
       bar: up.bar ?? { label: 'Wood', value: stock.woodCap > 0 ? stock.wood / stock.woodCap : 0 },
+      upgrade: up.upgrade,
+      goTo: { x: b.x, z: b.z },
+    };
+  }
+  if (b.type === 'farmstead') {
+    const reach = VILLAGE.EFFECTS.FARMSTEAD;
+    const fields = world.fields.filter((f) => distXZ(b.x, b.z, f.x, f.z) <= reach.RADIUS_M).length;
+    return {
+      title: name,
+      subtitle: up.subtitle ?? 'Helps the fields around it',
+      rows: [
+        ...up.rows,
+        { label: 'Fields in reach', value: String(fields) },
+        {
+          label: 'Growth, each field',
+          value: `${Math.round(farmsteadGrowth(b.level) * 100)}% faster`,
+        },
+        { label: 'Harvest, each field', value: `${farmsteadYield(b.level)} more food` },
+      ],
+      bar: up.bar,
+      upgrade: up.upgrade,
+      goTo: { x: b.x, z: b.z },
+    };
+  }
+  if (b.type === 'shrine') {
+    const perMinute = shrineShare(b.level) * modifiers.faithMul * 60;
+    return {
+      title: name,
+      subtitle: up.subtitle ?? 'Gathers faith by itself',
+      rows: [...up.rows, { label: 'Faith from this', value: `${perMinute.toFixed(1)} a minute` }],
+      bar: up.bar,
       upgrade: up.upgrade,
       goTo: { x: b.x, z: b.z },
     };

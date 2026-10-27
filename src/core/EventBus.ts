@@ -1,5 +1,6 @@
 // src/core/EventBus.ts
 
+import type { Delivery } from '../hand/handPorts';
 import type { VillageBuildingType } from '../world/village/model/assetKeys';
 
 export interface GameEvents {
@@ -54,6 +55,8 @@ export interface GameEvents {
   'village:plotPlaced': Readonly<{ type: VillageBuildingType }>;
   /** The player touched a villager (Hearten). */
   'village:heartened': Readonly<{ villager: number; mended: boolean; aera: boolean }>;
+  /** The hand put something down in the village: wood or food joined a store, or wood became work on a site. */
+  'hand:delivered': Readonly<Delivery>;
   /** A prayer opened, was answered (faith paid) or lapsed (the villager lost their belief). */
   'village:prayer': Readonly<{
     villager: number;

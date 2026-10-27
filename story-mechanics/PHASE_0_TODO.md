@@ -105,6 +105,35 @@ Built and working with placeholder props (design: `VILLAGE_INTERACTION.md`; docs
 - [ ] Words: the toast and hint texts are placeholders (`ui/village/villageAlerts.ts`, `ui/overview/overviewPlots.ts`, `overview/overviewDescribe.ts`); the milestone labels in `src/skills/milestones.ts`.
 - [ ] Not built, decide if wanted: a "healing" prayer (needs a sickness mechanic), raids, trade, a creature companion (`BACKLOG.md`).
 
+## The hand (uproot, lift, drop) and the new buildings
+Built and working with stand-ins (design: `HAND.md`; code notes: `docs/village/hand.md`). Nothing here was ever drawn on a real GPU: headless checks cover the rules, not the look. What is left is yours.
+
+To look at on a real GPU (convert a village, or `__pantheonVillage.convertNow()`, then `__pantheonHand`):
+- [ ] The carried tree: its size next to the orb (about a third of the tree next to the 0.24 m orb), the tilt and the trailing, clipping through the ground or the orb, its level of detail at distance, and the shadow of a moving carried tree (it may stay at the rest pose).
+- [ ] The stump that stays where a lifted tree stood, and that **cancelling** (Esc, a cutscene, a save) puts back exactly one tree, not two or none.
+- [ ] Wheat: the field after a harvest by the hand (the grass data map repaints when growth falls), and the sheaf stand-in that hangs from the orb.
+- [ ] A held sheep: the pose, whether the legs read as lifted, the missing blob shadow, and the spot left in the flock; a new sheep walking into view after it respawns.
+- [ ] The ring and the hint on what would be lifted and on where it would be put down: legible by day, at dusk and in the overview (both the field rings and the building rings).
+- [ ] The sparkles of a drop, also at the overview cursor; the overview cursor while it carries something.
+- [ ] Hauling to a remote camp: drop a tree at a restoration or an outpost camp. Is the ring at the camp (a fixed size) legible and centred, does the crew's work visibly jump, and does the place complete cleanly when the hauled wood fills the last stage?
+- [ ] The carried tree may swing or snap when the overview closes while it holds something (the heading follows the orb again): see how it looks, and whether it clips the new camera.
+- [ ] The ring sizes moved: roam and overview now share one set (`ui/hand/handRings.ts`) and the building rings were widened to the real drop zone (the margin counts on every side). Check they still look right on a house, a granary, a field and a sheep.
+- [ ] A hitch the first time a tree is lifted (the batches and the materials are made before the warm-up; if it hitches, say which).
+- [ ] Farmstead and Shrine stand-ins (the house kit: a low open barn, a small stone hall): their footprints against the lanes and the fields, the planks while they are built or raised, levels 2 and 3 (no visible change yet), and that a farmstead does not look like a house from the overview.
+- [ ] That the faith effect reads: a shrine at level 3 and Fervour make the faith number move visibly faster.
+
+Models, optional until you want them (stand-ins hold the places):
+- [ ] **Farmstead**, levels 1 to 3 (footprint about 7 x 4.5 m; it helps the fields around it, so a barn with a few tools and a cart is enough).
+- [ ] **Shrine**, levels 1 to 3 (footprint about 3.6 x 3.6 m; a place for offerings; not the same as the map's energy shrines).
+- [ ] **Market** and **Beacon**, all levels. Not built (named ideas: surplus into faith, a wider orb presence); the model comes first if you want them.
+- [ ] Carry props for the hand: a log bundle (a tree cut small, today the tree itself is drawn small), a sheaf of wheat (a pile stands in), a sack. Hens are not liftable yet.
+
+Decide and tune:
+- [ ] Playtest the numbers in `src/config/village/hand.ts` (reach, energy cost per kind, belief per deed, witness radius, cooldowns, wood to work, food per sheaf and per sheep) and `src/config/village/effects.ts` (the farmstead's reach and bonus, the workshop's axes, the shrine's faith). The conversion took about 13 minutes of deeds when measured once at the placeholder numbers (`hand-quest-check` prints its own count).
+- [ ] Whether carrying should slow the orb or drain energy (today energy is only charged at the lift).
+- [ ] The name **Shrine** for the building (it overlaps with the energy shrines of the map); which building types come next.
+- [ ] Words: the hand's lines (`src/hand/handText.ts`), the node texts for Farmsteads, Shrines, Fine works and Fervour (`src/skills/skillTree.ts`).
+
 ## Quests
 Design: `QUESTS.md` (decided: no phase-0 quest line, several quests at once, rewarded teaching quests, Caros's five favours, a memory-book journal, Aera, the final act "The Name Returns"). Placeholders ship; yours:
 - [ ] Words: Caros's lines for the eight teaching quests and five favours, Aera's lines (her only one now is the monolith favour's closing line, placeholder text), the final fragment and Caros's closing line (a trader seen on the road).

@@ -89,6 +89,65 @@ await check('the life of a stump: fall, stump, a wait, a sapling that grows, a t
 });
 
 await check(
+  'uproot: a standing tree goes straight to a stump with its whole yield, once; it grows back like a felled one',
+  () => {
+    const forest = createForest(trees, { woodAdd: () => 2 });
+    const events: VillageEvent[] = [];
+    assert.equal(forest.uproot(0, events), yieldOf(trees[0]!) + 2, 'the yield and Sharp axes');
+    assert.equal(forest.state(0), TreeState.Stump, 'no fall: a stump at once');
+    assert.equal(forest.isStanding(0), false);
+    assert.deepEqual(events, [{ kind: 'treeUprooted', tree: 0 }]);
+    assert.equal(forest.uproot(0, events), 0, 'a stump gives nothing');
+    assert.equal(forest.fell(0, 1, 0, events), 0, 'and cannot be felled');
+    assert.equal(forest.chop(0, 1000, 1, 0, events), 0, 'or chopped');
+    assert.equal(events.length, 1, 'only the first uproot made an event');
+    assert.equal(forest.counts().standing, trees.length - 1);
+    assert.equal(forest.counts().stumps, 1);
+
+    forest.update(F.REGROW_DAYS * DAY_S - 5, free, events);
+    assert.equal(forest.state(0), TreeState.Stump, 'still waiting');
+    forest.update(10, free, events);
+    assert.equal(forest.state(0), TreeState.Sapling);
+    forest.update(F.GROW_DAYS * DAY_S + 1, free, events);
+    assert.equal(forest.state(0), TreeState.Standing);
+    assert.deepEqual(
+      events.map((e) => e.kind),
+      ['treeUprooted', 'treeSapling', 'treeGrown'],
+      'a stump that was uprooted is not announced as a fall that ended',
+    );
+
+    const falling = createForest(trees);
+    falling.fell(1, 0, 1, []);
+    assert.equal(falling.uproot(1, []), 0, 'a falling tree cannot be uprooted');
+    assert.equal(falling.state(1), TreeState.Falling);
+  },
+);
+
+await check(
+  'uproot: chopping already done on the tree is dropped, and the tree is saved as a stump',
+  () => {
+    const forest = createForest(trees);
+    const events: VillageEvent[] = [];
+    forest.chop(3, 7, 1, 0, events);
+    assert.ok(
+      forest.serialize().chopSeconds.some((s) => s > 0),
+      'chopping is saved',
+    );
+    assert.ok(forest.uproot(3, events) > 0);
+    const saved = structuredClone(forest.serialize());
+    assert.equal(forestProblem(saved, trees.length), null);
+    assert.deepEqual(saved.ids, [3]);
+    assert.deepEqual(saved.states, [TreeState.Stump]);
+    assert.deepEqual(saved.chopIds, [], 'no half-chopped tree is left behind');
+    assert.deepEqual(saved.chopSeconds, []);
+    const copy = createForest(trees);
+    copy.restore(saved);
+    assert.equal(copy.state(3), TreeState.Stump);
+    assert.deepEqual(copy.serialize(), saved);
+  },
+);
+
+await check(
   'rain speeds a sapling up; an occupied spot keeps its stump; the sapling cap holds',
   () => {
     const dry = createForest(trees);
@@ -166,6 +225,17 @@ await check('nearest: the standing trees closest to a point, in order', () => {
   assert.deepEqual(forest.nearest(11, 0, 2), [1, 2]);
   forest.fell(1, 1, 0, []);
   assert.deepEqual(forest.nearest(11, 0, 2), [2, 0]);
+});
+
+await check('within: the standing trees inside a radius, in id order, reusing the list', () => {
+  const forest = createForest(trees);
+  const out: number[] = [99];
+  assert.deepEqual(forest.within(11, 0, 11, out), [0, 1, 2], 'cleared, then filled');
+  assert.equal(forest.within(11, 0, 11, out), out, 'the same list comes back');
+  assert.deepEqual(forest.within(11, 0, 0.5, out), []);
+  forest.uproot(1, []);
+  assert.deepEqual(forest.within(11, 0, 11, out), [0, 2], 'a stump is not a tree');
+  assert.deepEqual(forest.within(0, 0, 10, out), [0], 'the edge counts');
 });
 
 // --- in a real village ---

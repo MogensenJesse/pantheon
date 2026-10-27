@@ -20,12 +20,18 @@ import {
   type Animal,
   type AnimalEnv,
   type AnimalKind,
+  type AnimalSpot,
   addAnimal,
+  animalsWithin,
   createFlock,
   type Flock,
+  headcount,
+  liftAnimal,
   PARAMS,
   poseOf,
+  releaseAnimal,
   stepFlock,
+  stepOwed,
 } from './animalSim';
 import { createWalkable } from './animalWalkable';
 import {
@@ -63,6 +69,22 @@ export interface AnimalsOptions {
   seed: number;
 }
 
+/**
+ * What the orb's hand does with a sheep (story-mechanics/HAND.md): lift it out of the flock, hang it from the orb,
+ * and either put it back or have it consumed (the village is paid in food and the flock gets a new sheep later).
+ */
+export interface AnimalHand {
+  /** The sheep free to lift within `radiusM` of (x, z), written to `out`. */
+  sheepWithin: (x: number, z: number, radiusM: number, out: AnimalSpot[]) => AnimalSpot[];
+  /** False when the hand already holds one or the sheep is not there. */
+  lift: (id: number) => boolean;
+  /** Where the carried sheep hangs this frame (feet at y), facing `yaw`. */
+  hold: (pose: { x: number; y: number; z: number; yaw: number; scale: number }) => void;
+  /** `'back'` returns it to the flock where it was lifted; `'consumed'` is a delivery. False when nothing was held. */
+  release: (how: 'back' | 'consumed') => boolean;
+  holding: () => boolean;
+}
+
 export interface Animals {
   /** Fixed step. */
   update: (dt: number) => void;
@@ -72,6 +94,8 @@ export interface Animals {
   endWarmup: () => void;
   /** A flock that belongs to a place (life/places/placeLife.ts): it circles there whatever the hour, and `level` says how many of its birds are out. */
   addBirdFlock: (spec: FlockSpec) => BirdFlock;
+  /** The orb's hand and the sheep. */
+  hand: AnimalHand;
   /** DEV: have the farm animals now, whatever the village's state (a village of eight people that is converted). */
   setAlways: (on: boolean) => void;
   /** How many of each kind live in the village now, and how many bird flocks and birds are out (DEV and checks). */
@@ -88,6 +112,7 @@ interface Part {
 }
 
 interface Farm extends Part {
+  hand: AnimalHand;
   setAlways: (on: boolean) => void;
   counts: () => Record<AnimalKind, number>;
   dispose: () => void;
@@ -137,6 +162,7 @@ export function createAnimals(options: AnimalsOptions): Animals {
       renderer.end();
     },
     addBirdFlock: sky.addFlock,
+    hand: farm.hand,
     setAlways: farm.setAlways,
     beginWarmup: () => renderer.beginWarmup(),
     endWarmup: () => renderer.endWarmup(),
@@ -210,23 +236,79 @@ function createFarm(options: AnimalsOptions): Farm {
         );
         flocks.set(kind, flock);
       }
-      // animals never leave: the flock only grows with the village
-      while (flock.animals.length < want) addAnimal(flock, env);
+      // animals never leave: the flock only grows with the village (one the hand carried off still counts, until it is replaced)
+      while (headcount(flock) < want) addAnimal(flock, env);
     }
   };
 
-  /** The animal between two fixed steps: smaller while it grows into view, a little different each. */
-  const pose = (animal: Animal, x: number, z: number, alpha: number, blob: number) => {
+  /** Where the hand hangs the sheep it carries (set each frame it is held). */
+  const heldAt = { x: 0, y: 0, z: 0, yaw: 0, scale: 1 };
+  const sheepFlock = () => flocks.get('sheep');
+  const hand: AnimalHand = {
+    sheepWithin: (x, z, radiusM, out) => {
+      const flock = sheepFlock();
+      if (!flock) {
+        out.length = 0;
+        return out;
+      }
+      return animalsWithin(flock, x, z, radiusM, out);
+    },
+    lift: (id) => {
+      const flock = sheepFlock();
+      return !!flock && liftAnimal(flock, id);
+    },
+    hold: (pose) => {
+      heldAt.x = pose.x;
+      heldAt.y = pose.y;
+      heldAt.z = pose.z;
+      heldAt.yaw = pose.yaw;
+      heldAt.scale = pose.scale;
+    },
+    release: (how) => {
+      const flock = sheepFlock();
+      return !!flock && releaseAnimal(flock, how);
+    },
+    holding: () => !!sheepFlock()?.held,
+  };
+
+  /** Sets the shared puppet to `animal` at (x, y, z); each animal is a little different in size. */
+  const place = (
+    animal: Animal,
+    x: number,
+    y: number,
+    z: number,
+    yaw: number,
+    scale: number,
+    blob: number,
+    groundNx: number,
+    groundNz: number,
+  ) => {
     puppet.model = animal.kind;
     puppet.x = x;
-    puppet.y = options.getY(x, z);
+    puppet.y = y;
     puppet.z = z;
-    puppet.yaw = animal.prevYaw + wrapAngle(animal.yaw - animal.prevYaw) * alpha;
-    puppet.scale = Math.max(0.02, fadeHermite(animal.arrive)) * (0.92 + animal.seed * 0.16);
+    puppet.yaw = yaw;
+    puppet.scale = scale * (0.92 + animal.seed * 0.16);
     poseOf(animal, puppet.pose);
     puppet.blob = blob;
-    puppet.groundNx = ground.x;
-    puppet.groundNz = ground.z;
+    puppet.groundNx = groundNx;
+    puppet.groundNz = groundNz;
+  };
+
+  /** The animal between two fixed steps: smaller while it grows into view. */
+  const pose = (animal: Animal, x: number, z: number, alpha: number, blob: number) => {
+    const yaw = animal.prevYaw + wrapAngle(animal.yaw - animal.prevYaw) * alpha;
+    const scale = Math.max(0.02, fadeHermite(animal.arrive));
+    place(animal, x, options.getY(x, z), z, yaw, scale, blob, ground.x, ground.z);
+  };
+
+  /** The animal the hand carries, hanging in the air with its legs still. */
+  const drawHeld = (renderer: AnimalRenderer, animal: Animal) => {
+    place(animal, heldAt.x, heldAt.y, heldAt.z, heldAt.yaw, heldAt.scale, 0, 0, 0);
+    puppet.pose.walk = 0;
+    puppet.pose.headDown = 0;
+    puppet.pose.peck = 0;
+    renderer.add(puppet);
   };
 
   return {
@@ -240,7 +322,10 @@ function createFarm(options: AnimalsOptions): Farm {
       orbAt.x = orb.x;
       orbAt.z = orb.z;
       env.scare = notices ? orbAt : null;
-      for (const flock of flocks.values()) stepFlock(flock, dt, env);
+      for (const flock of flocks.values()) {
+        stepFlock(flock, dt, env);
+        stepOwed(flock, dt, env);
+      }
     },
     draw: (renderer, alpha, viewX, viewZ) => {
       const range2 = A.DRAW_DISTANCE_M ** 2;
@@ -256,8 +341,10 @@ function createFarm(options: AnimalsOptions): Farm {
           pose(animal, x, z, alpha, blob);
           renderer.add(puppet);
         }
+        if (flock.held) drawHeld(renderer, flock.held);
       }
     },
+    hand,
     setAlways: (on: boolean) => {
       always = on;
       review = A.REVIEW_S;

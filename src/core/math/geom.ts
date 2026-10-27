@@ -23,3 +23,24 @@ export function headingToXZ(deg: number, out: XZ = { x: 0, z: 0 }): XZ {
   out.z = Math.cos(rad);
   return out;
 }
+
+/** A yawed rectangle on the ground (a building, a field): `halfW` and `halfD` are half its sizes in its own x and z. */
+export interface Footprint {
+  x: number;
+  z: number;
+  rotY: number;
+  halfW: number;
+  halfD: number;
+}
+
+/** Whether (x, z) lies inside the footprint, which counts as `marginM` bigger on every side. */
+export function insideFootprint(f: Footprint, x: number, z: number, marginM = 0): boolean {
+  const dx = x - f.x;
+  const dz = z - f.z;
+  const cos = Math.cos(f.rotY);
+  const sin = Math.sin(f.rotY);
+  return (
+    Math.abs(dx * cos - dz * sin) <= f.halfW + marginM &&
+    Math.abs(dx * sin + dz * cos) <= f.halfD + marginM
+  );
+}

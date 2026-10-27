@@ -190,6 +190,30 @@ await check('parseSkills accepts a good slice and refuses damaged ones', () => {
   expectRefuses(parseSkills, bad);
 });
 
+await check(
+  'the hand nodes change the reach and the cost, and the old Dream and Sign are gone',
+  () => {
+    // The numbers are the tree's own: this check is about what taking a node does, not what it is worth.
+    const effectOf = (id: string, key: 'handReachMul' | 'handCostMul'): number => {
+      const effect = SKILL_NODES.find((n) => n.id === id)?.effects.find((e) => e.key === key);
+      assert.ok(effect && 'mul' in effect, `${id} multiplies ${key}`);
+      return effect.mul;
+    };
+    const s = take(opened(2), 'long_reach', 'deep_grip');
+    const m = modifiersOf(s);
+    assert.equal(m.handReachMul, effectOf('long_reach', 'handReachMul'));
+    assert.equal(m.handCostMul, effectOf('deep_grip', 'handCostMul'));
+    assert.ok(m.handReachMul > 1 && m.handCostMul < 1, 'further and cheaper');
+    assert.deepEqual(modifiersOf(opened(2)).handReachMul, 1, 'neutral until taken');
+    assert.deepEqual(grantedAbilities(s), [], 'they are a change to the hand, not a power');
+    for (const id of ['dream', 'sign']) {
+      assert.equal(unlock(opened(2), id).ok, false, `${id} is no longer in the tree`);
+      const old = { ...base, opened: true, sparks: 0, ranks: { [id]: 1 } };
+      assert.equal(parseSkills(old).ok, false, `a save with ${id} taken is refused`);
+    }
+  },
+);
+
 // --- arch II, The Village ---
 
 const A2 = VILLAGE.ARCH_II;
@@ -317,6 +341,47 @@ await check('parseSkills holds arch II to its rules', () => {
     ['a milestone twice', { ...good, milestones: ['first_place', 'first_place'] }],
   ];
   for (const [what, value] of bad) assert.equal(parseSkills(value).ok, false, what);
+});
+
+await check(
+  'Fine works opens the farmstead levels, rank by rank, once a building has been raised',
+  () => {
+    const ready = takeAll(villageOpen(20), ['wider_beds', 'good_soil', 'farmsteads']);
+    assert.deepEqual(canUnlock(villageOpen(20), 'fine_works'), { ok: false, reason: 'locked' });
+    assert.deepEqual(canUnlock(ready, 'fine_works'), { ok: false, reason: 'gated' });
+    const raised: SkillsState = { ...ready, milestones: ['level_2'] };
+    assert.deepEqual(canUnlock(raised, 'fine_works'), { ok: true });
+    assert.equal(modifiersOf(raised).workTier, 1, 'neutral until taken');
+    const one = takeAll(raised, ['fine_works']);
+    assert.equal(modifiersOf(one).workTier, 2);
+    const two = takeAll(one, ['fine_works']);
+    assert.equal(modifiersOf(two).workTier, 3);
+    assert.deepEqual(canUnlock(two, 'fine_works'), { ok: false, reason: 'maxed' });
+  },
+);
+
+await check(
+  'Farmsteads and Shrines open their plots, and Shrines wait for five answered prayers',
+  () => {
+    const soil = takeAll(villageOpen(20), ['wider_beds', 'good_soil']);
+    assert.equal(modifiersOf(soil).plotFarmstead, 0, 'closed until taken');
+    assert.equal(modifiersOf(takeAll(soil, ['farmsteads'])).plotFarmstead, 1);
+    assert.equal(modifiersOf(takeAll(soil, ['farmsteads'])).plotShrine, 0, 'each its own');
+    const seed = takeAll(villageOpen(20), ['wider_beds', 'seedkeeper']);
+    assert.deepEqual(canUnlock(seed, 'shrines'), { ok: false, reason: 'gated' });
+    const answered: SkillsState = { ...seed, milestones: ['prayers_5'] };
+    assert.deepEqual(canUnlock(answered, 'shrines'), { ok: true });
+    assert.equal(modifiersOf(takeAll(answered, ['shrines'])).plotShrine, 1);
+    assert.deepEqual(canUnlock(villageOpen(20), 'shrines'), { ok: false, reason: 'locked' });
+  },
+);
+
+await check('Fervour needs Devotion and makes all faith come a quarter faster', () => {
+  const ready = takeAll(villageOpen(20), ['wider_beds', 'seedkeeper', 'devotion']);
+  assert.deepEqual(canUnlock(villageOpen(20), 'fervour'), { ok: false, reason: 'locked' });
+  assert.deepEqual(canUnlock(ready, 'fervour'), { ok: true });
+  assert.equal(modifiersOf(ready).faithMul, 1, 'neutral until taken');
+  assert.equal(modifiersOf(takeAll(ready, ['fervour'])).faithMul, 1.25);
 });
 
 // --- milestones and gates ---

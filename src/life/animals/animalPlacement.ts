@@ -4,9 +4,9 @@
 // at the edge of the village on the side with the most room, near the fields if there are any.
 
 import { life } from '../../config/visual/life.ts';
+import { type Footprint, insideFootprint } from '../../core/math/geom.ts';
 import { TAU } from '../../core/math/scalar.ts';
 import type { AnimalKind } from './animalSim.ts';
-import { type Footprint, insideFootprint } from './animalWalkable.ts';
 
 const A = life.ANIMALS;
 

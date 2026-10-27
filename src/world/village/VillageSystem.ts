@@ -17,11 +17,11 @@ import { createVillageAssets } from './assets/villageAssets';
 import { loadVillageKit } from './assets/villageKit';
 import type { VillageBuildingType } from './model/assetKeys';
 import { templeOf } from './model/buildings';
+import type { CarriedKind, CarriedPose } from './model/carried';
 import { makeVillageSeed, type VillageSeed } from './model/seed';
 import type { VillageEvent } from './model/types';
 import { createVillageView } from './render/VillageView';
 import type { LineupFigure } from './render/villagerRenderer';
-import type { BlessKind } from './sim/blessings';
 import type { TreeInfo } from './sim/forest';
 import type { HeartenResult } from './sim/hearten';
 import { type OutpostRefusal, outpostOf } from './sim/outposts';
@@ -67,7 +67,7 @@ export interface VillageSystemOptions {
 
 /** DEV cheats that go through the system so the renderer follows. */
 export interface VillageDevApi {
-  /** Add faith; Echo and the powers' costs use the same call. */
+  /** Add faith; Echo, the powers' costs and prayers answered use the same call. */
   addFaith: (amount: number) => void;
   /** Add wood or food to the stores (kept up to what they hold); returns what was kept. */
   addWood: (amount: number) => number;
@@ -95,15 +95,34 @@ export interface VillageSystemContext {
   playerDistance: () => number;
   /** Day-cycle phase 0..1 the village is running on (0.25 sunrise, 0.75 sunset). */
   dayPhase: () => number;
-  /** Raise one villager's belief (the powers do this); true when it just reached 1. */
+  /** Raise one villager's belief (the hand's deeds do this); true when it just reached 1. */
   addBelief: (villager: number, amount: number) => boolean;
   /** Add faith (Echo leaves some behind with each orb picked up). */
   addFaith: (amount: number) => void;
   /** Convert the hamlet (the conversion quest's last step): growth opens, `village:converted` is sent. */
   convert: () => boolean;
-  /** The builder powers: each says whether it took effect. Kindle reports its stage like any other. */
-  bless: (kind: BlessKind, id: number, seconds: number) => boolean;
-  kindle: (siteId: number) => boolean;
+  /**
+   * The orb's hand (story-mechanics/HAND.md): each is one call between steps. `uprootTree` pulls a standing tree
+   * out of the ground (the view shows a stump) and returns its wood; `takeHarvest` reaps a ripe field and returns
+   * the food; `haul` counts wood brought to an open site as work and returns the seconds given, and `haulRemote`
+   * does the same for an unfinished remote site (a restoration or an outpost). The caller puts wood and food in
+   * the stores (`sim.economy.addWood/addFood`).
+   */
+  uprootTree: (id: number) => number;
+  takeHarvest: (fieldId: number) => number;
+  haul: (siteId: number, wood: number) => number;
+  haulRemote: (siteId: number, wood: number) => number;
+  /**
+   * What the hand shows while it holds a tree or a sheaf of wheat: view only, the sim keeps the tree standing
+   * (and the wheat on its field) until `uprootTree` or `takeHarvest`. For a tree `lift` hides it and shows a
+   * stump (false when it cannot be lifted), `pose` hangs the small copy from the orb and `release` ends it,
+   * putting the tree back when asked; a sheaf is a pile drawn at the orb.
+   */
+  carry: {
+    lift: (what: CarriedKind, id: number) => boolean;
+    pose: (what: CarriedKind, id: number, pose: CarriedPose) => void;
+    release: (what: CarriedKind, id: number, putBack: boolean) => void;
+  };
   /** Begins the next upgrade of a finished building (the overview panel's button); says why not when it cannot. */
   upgrade: (id: number) => UpgradeStart;
   /** Why the player's plot of this type cannot be marked at (x, z) facing `rotY`, or 'ok' (nothing is spent). */
@@ -114,7 +133,6 @@ export interface VillageSystemContext {
   plotFacing: (x: number, z: number) => number;
   /** Hearten: touch a villager (the info panel's button); says why not when it cannot. */
   hearten: (villager: number) => HeartenResult;
-  provide: (food: number) => boolean;
   /** The outpost tool's checks: cheap (where it may stand), and the real thing (a crew sets out; says why not). */
   outpostCheck: (kind: string, x: number, z: number) => OutpostRefusal | null;
   placeOutpost: (kind: string, x: number, z: number) => OutpostResult;
@@ -122,7 +140,7 @@ export interface VillageSystemContext {
   startRestoration: (kind: string, x: number, z: number) => 'ok' | 'busy' | 'no-route' | 'no-crew';
   /** The whole village prays together at dusk while this is on (the story's last night). */
   setGathering: (on: boolean) => void;
-  /** Hold a villager still, facing (x, z), for a few seconds (the powers do this). */
+  /** Hold a villager still, facing (x, z), for a few seconds (the hand's deeds do this). */
   notice: (villager: number, x: number, z: number, seconds: number) => boolean;
   /** Fixed-step simulation; `clockS` is the game clock the weather runs on. */
   update: (dt: number, playerPosition: Vector3, clockS: number) => void;
@@ -285,6 +303,9 @@ export async function initVillageSystem(
         case 'treeFelled':
           view.treeFelled(event.tree, event.dirX, event.dirZ);
           break;
+        case 'treeUprooted':
+          view.treeUprooted(event.tree);
+          break;
         case 'treeStump':
           view.treeStump(event.tree);
           break;
@@ -332,11 +353,26 @@ export async function initVillageSystem(
     },
     notice: sim.notice,
     addFaith: sim.addFaith,
-    bless: sim.bless,
-    kindle: (siteId) => {
-      const done = sim.kindle(siteId, events);
+    uprootTree: (id) => {
+      const wood = sim.uprootTree(id, events);
       applyEvents();
-      return done;
+      return wood;
+    },
+    takeHarvest: sim.takeHarvest,
+    carry: {
+      lift: (what, id) => view.liftCarried(what, id),
+      pose: (what, id, pose) => view.poseCarried(what, id, pose),
+      release: (what, id, putBack) => view.releaseCarried(what, id, putBack),
+    },
+    haul: (siteId, wood) => {
+      const seconds = sim.haul(siteId, wood, events);
+      applyEvents();
+      return seconds;
+    },
+    haulRemote: (siteId, wood) => {
+      const seconds = sim.haulRemote(siteId, wood, events);
+      applyEvents();
+      return seconds;
     },
     upgrade: (id) => {
       const result = sim.upgrade(id, events);
@@ -356,7 +392,6 @@ export async function initVillageSystem(
       applyEvents();
       return result;
     },
-    provide: sim.provide,
     outpostCheck: sim.outpostCheck,
     placeOutpost: (kind, x, z) => {
       const result = sim.startOutpost(kind, x, z, events);

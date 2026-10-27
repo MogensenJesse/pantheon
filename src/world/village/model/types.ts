@@ -120,7 +120,7 @@ export interface Villagers {
   offset: Float32Array;
   /** 0..1, fixed: low values join optional prayers. */
   piety: Float32Array;
-  /** 0..1, rises through the orb's powers; at 1 the villager believes (a convert). */
+  /** 0..1, rises through the hand's deeds and a prayer answered; at 1 the villager believes (a convert). */
   belief: Float32Array;
   /** Seconds since this villager began to die (0 while alive); they are removed once the collapse and the fade are over. */
   dying: Float32Array;
@@ -263,6 +263,8 @@ export type VillageEvent =
   | { kind: 'graveAdded'; grave: Grave }
   /** A woodcutter's last hit landed: the tree falls toward (dirX, dirZ). */
   | { kind: 'treeFelled'; tree: number; dirX: number; dirZ: number }
+  /** The orb's hand pulled the tree out of the ground: a stump at once, with no fall. */
+  | { kind: 'treeUprooted'; tree: number }
   /** The fall is over: a stump. */
   | { kind: 'treeStump'; tree: number }
   /** A sapling begins to grow at the stump. */

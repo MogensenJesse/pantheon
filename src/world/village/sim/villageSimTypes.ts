@@ -13,7 +13,6 @@ import type {
   Villagers,
 } from '../model/types.ts';
 import type { AgentStats, AgentsState } from './agents.ts';
-import type { Blessing, BlessKind } from './blessings.ts';
 import type { Economy, EconomyState } from './economy.ts';
 import type { FaithInputs, FaithState } from './faith.ts';
 import type { Forest, ForestCounts, ForestState, TreeInfo } from './forest.ts';
@@ -63,8 +62,6 @@ export type VillageSimState = {
   graveyard: GraveyardState;
   /** Trees that fell or are growing back, and the chopping done on the others. */
   forest: ForestState;
-  /** What the Blessing power is speeding up, and for how long. */
-  blessings: Blessing[];
   /** Open prayers, the lapsed and the count of answered ones. */
   prayers: PrayersState;
   /** Villagers lifted by a Hearten, and their cooldowns. */
@@ -226,7 +223,7 @@ export interface VillageSim {
   gatheredShare: (radiusM: number) => number;
   beliefShare: () => number;
   /**
-   * Raises a villager's belief (the orb's powers do this). True when it just reached 1; the events carry
+   * Raises a villager's belief (the hand's deeds do this). True when it just reached 1; the events carry
    * the convert. What converts the village is `convertVillage`.
    */
   addBelief: (villager: number, amount: number, events: VillageEvent[]) => boolean;
@@ -235,16 +232,25 @@ export interface VillageSim {
    * False when it already is converted, and in a sandbox village.
    */
   convertVillage: (events: VillageEvent[]) => boolean;
-  /** Holds a villager still, facing (x, z), for a few seconds (the powers do this); false for someone indoors. */
+  /** Holds a villager still, facing (x, z), for a few seconds (the hand's deeds do this); false for someone indoors. */
   notice: (villager: number, x: number, z: number, seconds: number) => boolean;
   /**
-   * The builder powers. Blessing: a field, a finished house or a standing tree or sapling works or grows
-   * faster for `seconds`; false when there is no such thing. Kindle: finishes the current stage of an open
-   * site. Provide: puts food in the larder, false when it is full.
+   * The orb's hand (story-mechanics/HAND.md). The village changes only when an item is delivered, so each of
+   * these is one call between steps and draws no random number. `uprootTree` pulls a standing tree out of the
+   * ground and returns the wood it gave (0 when it was not standing); the caller puts it in the stores.
+   * `takeHarvest` reaps a ripe field (growth at least `HAND.WHEAT.MIN_RIPE`) and returns the food (0 when not
+   * ripe). `haul` counts wood brought to an open site (or an upgrade under way) as builder work and returns the
+   * seconds of work given (0 when there is no such site).
    */
-  bless: (kind: BlessKind, id: number, seconds: number) => boolean;
-  isBlessed: (kind: BlessKind, id: number) => boolean;
-  kindle: (siteId: number, events: VillageEvent[]) => boolean;
+  uprootTree: (id: number, events: VillageEvent[]) => number;
+  takeHarvest: (fieldId: number) => number;
+  haul: (siteId: number, wood: number, events: VillageEvent[]) => number;
+  /**
+   * Counts wood brought to an unfinished remote site (`RemoteSite.id`: a place being restored, an outpost) as the
+   * crew's work, exactly like the crew's own: a finished stage is reported, and the last one ends the site and
+   * calls the crew home. Returns the seconds of work given (0 when there is no such site or it is finished).
+   */
+  haulRemote: (siteId: number, wood: number, events: VillageEvent[]) => number;
   /** What a plot of `type` at (x, z) facing `rotY` would come to (no effect): `'ok'` or the reason it cannot. */
   plotCheck: (type: VillageBuildingType, x: number, z: number, rotY: number) => PlotResult;
   /** The player marks a plot: a site starts there, paid like any site. */
@@ -261,9 +267,6 @@ export interface VillageSim {
   upgrade: (id: number, events: VillageEvent[]) => UpgradeStart;
   /** The highest level the skill tree allows this building now (1 when none). */
   upgradeCeiling: (id: number) => number;
-  provide: (food: number) => boolean;
-  /** What the Blessing power is speeding up now. */
-  readonly blessings: readonly Blessing[];
   /** Who is praying for what, who lost their belief, and how many prayers were answered. */
   readonly prayers: Readonly<PrayersState>;
   /** Villagers lifted by a Hearten now, with the seconds of lift and of cooldown they have left. */
@@ -297,6 +300,7 @@ export type PlotResult =
   | PlotRefusal
   | 'type'
   | 'not-converted'
+  | 'locked'
   | 'full'
   | 'cap'
   | 'wood'

@@ -4,7 +4,7 @@
 // a tree), so `updatePropLod` and `resnapMapProps` need no changes and a resnap keeps a felled tree hidden.
 
 import type { DirectionalLight } from 'three';
-import { Matrix4, Quaternion, Vector3 } from 'three';
+import { Euler, Matrix4, Quaternion, Vector3 } from 'three';
 import type { PropLodAsset } from '../../../assets/assetManifest';
 import { enableWaterReflectionLayer } from '../../../rendering/layers/waterReflectionLayers';
 import type { MapTerrainContext } from '../../MapTerrainBuilder';
@@ -13,6 +13,7 @@ import { propCastsShadow } from '../../mapProps/config/propShadowKeys';
 import type { PropLodGroup } from '../../mapProps/mapPropLod';
 import { resolvePropInstanceMatrix } from '../../mapProps/resolvePropInstanceMatrix';
 import { createPropTerrainSurface } from '../../terrain/cpu/terrainSurfaceCpu';
+import type { CarriedPose } from '../model/carried';
 import type { Forest, TreeInfo } from '../sim/forest';
 import { TreeState } from '../sim/forest';
 import type { DressingRenderer } from './dressingRenderer';
@@ -23,6 +24,8 @@ import { fallAngle } from './treeFall';
 const BATCH_CAPACITY = 64;
 /** Seconds between growth updates of the saplings. */
 const GROW_STEP_S = 0.25;
+/** Seconds between shadow updates while the hand carries a tree (the shadow is baked, not drawn live). */
+const CARRY_SHADOW_S = 0.25;
 
 export interface ForestViewOptions {
   sun: DirectionalLight;
@@ -45,6 +48,16 @@ export interface ForestView {
   /** Show the forest as the sim has it (a new game, or a restored one) before the first frame. */
   showFounded: () => void;
   felled: (tree: number, dirX: number, dirZ: number) => void;
+  /** The orb's hand pulled the tree out: it leaves its group and a stump stays, with no fall. */
+  uprooted: (tree: number) => void;
+  /**
+   * The hand lifts a tree (view only: the sim still has it standing): it leaves its group, a stump shows and a
+   * small copy follows `pose`. False when it cannot be lifted (not standing, or already lifted).
+   */
+  lift: (tree: number) => boolean;
+  pose: (tree: number, pose: CarriedPose) => void;
+  /** The hold ends. `putBack` restores the tree and drops the stump; otherwise the sim's events carry on from here. */
+  release: (tree: number, putBack: boolean) => void;
   stump: (tree: number) => void;
   sapling: (tree: number) => void;
   grown: (tree: number) => void;
@@ -66,6 +79,9 @@ const _m = new Matrix4();
 const _q = new Quaternion();
 const _t1 = new Matrix4();
 const _t2 = new Matrix4();
+const _euler = new Euler();
+const _pos = new Vector3();
+const _scale = new Vector3();
 
 export function createForestView(options: ForestViewOptions): ForestView {
   const { sun, terrain, forest, trees, propGroups, propAssets, dressing } = options;
@@ -112,7 +128,12 @@ export function createForestView(options: ForestViewOptions): ForestView {
 
   const falling = new Map<number, Falling>();
   const growing = new Map<number, { handle: number; batch: DynamicPropBatch }>();
+  /** The small copies of trees the hand carries. */
+  const carried = new Map<number, { handle: number; batch: DynamicPropBatch }>();
+  /** Trees the hand hid and put a stump under; the sim has them standing until the delivery uproots them. */
+  const lifted = new Set<number>();
   let sinceGrow = 0;
+  let sinceCarryShadow = 0;
   let changed = false;
 
   /** The static group holding tree `id` and its slot in it, or null when it has none. */
@@ -213,6 +234,14 @@ export function createForestView(options: ForestViewOptions): ForestView {
     growing.delete(id);
   };
 
+  const endCarry = (id: number) => {
+    const c = carried.get(id);
+    if (!c) return;
+    c.batch.remove(c.handle);
+    carried.delete(id);
+    changed = true;
+  };
+
   const addStump = (id: number) => {
     const tree = trees[id]!;
     dressing.addStump(id, tree.x, tree.z, yawOf(id), tree.scale);
@@ -234,6 +263,51 @@ export function createForestView(options: ForestViewOptions): ForestView {
       // The tree falls from where it stood: take its matrix, then hide it in the group.
       startFall(id, dirX, dirZ);
       setStatic(id, false);
+      // A woodcutter got to a tree the hand was holding: the hold is over, the sim's events take it from here.
+      lifted.delete(id);
+      endCarry(id);
+    },
+    uprooted: (id) => {
+      setStatic(id, false);
+      addStump(id);
+      lifted.delete(id);
+      endCarry(id);
+    },
+    lift: (id) => {
+      if (lifted.has(id) || !forest.isStanding(id)) return false;
+      const tree = trees[id]!;
+      const batch = batchOf(tree.key);
+      // The tree as it stood, until the first pose puts the small copy on the hand.
+      const shown = batch && placedMatrix(id, 1, _m);
+      setStatic(id, false);
+      addStump(id);
+      lifted.add(id);
+      if (batch && shown) {
+        const handle = batch.add(tree.x, tree.z, _m);
+        if (handle) carried.set(id, { handle, batch });
+        else if (import.meta.env.DEV) console.warn(`[forest] no room to show ${tree.key} carried`);
+      }
+      return true;
+    },
+    pose: (id, p) => {
+      const c = carried.get(id);
+      if (!c) return;
+      _euler.set(-p.tilt, p.yaw, 0, 'YXZ');
+      _q.setFromEuler(_euler);
+      const scale = trees[id]!.scale * p.scale;
+      // The model's root is not its origin: hang the root, not the origin, from the hand.
+      _pos.set(0, c.batch.footY * scale, 0).applyQuaternion(_q);
+      _pos.set(p.x - _pos.x, p.y - _pos.y, p.z - _pos.z);
+      _scale.setScalar(scale);
+      _m.compose(_pos, _q, _scale);
+      c.batch.set(c.handle, p.x, p.z, _m);
+    },
+    release: (id, putBack) => {
+      endCarry(id);
+      if (putBack && lifted.delete(id)) {
+        dressing.removeStump(id);
+        setStatic(id, true);
+      }
     },
     stump: (id) => {
       endFall(id);
@@ -261,6 +335,13 @@ export function createForestView(options: ForestViewOptions): ForestView {
           g.batch.set(g.handle, trees[id]!.x, trees[id]!.z, _m);
         }
       }
+      if (carried.size > 0) {
+        sinceCarryShadow += dt;
+        if (sinceCarryShadow >= CARRY_SHADOW_S) {
+          sinceCarryShadow = 0;
+          changed = true;
+        }
+      }
       if (changed) {
         changed = false;
         options.onChanged();
@@ -270,6 +351,8 @@ export function createForestView(options: ForestViewOptions): ForestView {
       for (const batch of batches.values()) batch.dispose();
       falling.clear();
       growing.clear();
+      carried.clear();
+      lifted.clear();
     },
   };
 }

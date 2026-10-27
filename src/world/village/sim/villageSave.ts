@@ -3,7 +3,6 @@
 import { VILLAGE } from '../../../config/village.ts';
 import { isInt, isNum, isRecord } from '../../../core/guards.ts';
 import type { VillageSeed } from '../model/seed.ts';
-import { blessingsProblem } from './blessings.ts';
 import { stockProblem } from './economy.ts';
 import { faithProblem } from './faith.ts';
 import { forestProblem } from './forest.ts';
@@ -46,8 +45,6 @@ export function villageStateProblem(state: VillageSimState, seed: VillageSeed): 
   // The shape only; the ids are checked against the map's trees when the sim restores (`restoreState`).
   const trees = forestProblem(state.forest, Number.POSITIVE_INFINITY);
   if (trees) return trees;
-  const blessed = blessingsProblem(state.blessings);
-  if (blessed) return blessed;
   const prayed = prayersProblem(state.prayers, state.villagers.count);
   if (prayed) return prayed;
   const heartened = heartenProblem(state.hearten, state.villagers.count);
