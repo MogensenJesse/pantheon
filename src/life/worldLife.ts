@@ -13,6 +13,7 @@ import type { AnimalModel } from './animals/animalModels';
 import { type Animals, createAnimals } from './animals/animals';
 import { createTreeGrid, woodCentres } from './habitat';
 import { createDriftFields } from './particles/driftFields';
+import { createGroundNode } from './particles/groundNode';
 import { createPlaceLife, type PlaceLife } from './places/placeLife';
 
 type Orb = { x: number; y: number; z: number };
@@ -21,7 +22,10 @@ export interface WorldLifeOptions {
   scene: Scene;
   camera: PerspectiveCamera;
   sun: DirectionalLight;
-  terrain: Pick<MapTerrainContext, 'getWorldY' | 'waterLevelM' | 'grids'>;
+  terrain: Pick<
+    MapTerrainContext,
+    'getWorldY' | 'waterLevelM' | 'grids' | 'splatMaterial' | 'fine'
+  >;
   /** The village the sheep and hens belong to and whose pipelines are warmed up with ours; null on a map without one. */
   village: Pick<VillageSystemContext, 'sim' | 'beginWarmup' | 'endWarmup'> | null;
   /** The map's trees: where leaves blow from, what animals walk round and where the woods (the birds' places) are. */
@@ -57,6 +61,8 @@ const groundNormal = new Vector3();
 export async function createWorldLife(options: WorldLifeOptions): Promise<WorldLife> {
   const { scene, camera, sun, terrain, village, trees, orb, creaturesNotice, seed } = options;
   const { getWorldY: groundY, waterLevelM } = terrain;
+  // the specks ride the ground under themselves, on the GPU (the CPU `groundY` is for the animals and the habitat)
+  const groundNode = createGroundNode(terrain, waterLevelM);
 
   const driftFields = createDriftFields({
     scene,
@@ -64,6 +70,7 @@ export async function createWorldLife(options: WorldLifeOptions): Promise<WorldL
     trees: createTreeGrid(trees),
     groundY,
     waterLevelM,
+    groundNode,
     creaturesNotice,
   });
   const animals = createAnimals({
@@ -85,7 +92,7 @@ export async function createWorldLife(options: WorldLifeOptions): Promise<WorldL
     seed,
   });
   // Made now, so it is compiled with the rest; it shows once a place has woken.
-  const placeLife = createPlaceLife({ scene, groundY, waterLevelM, animals });
+  const placeLife = createPlaceLife({ scene, groundY, groundNode, animals });
 
   return {
     animals,

@@ -152,21 +152,13 @@ export const life = {
     /** Seconds the pull takes to build once creatures notice the orb, so none snaps toward it. */
     PULL_SMOOTH_S: 1.5,
   },
-  /** Places of power keep their own small clouds of life (life/places/placeLife.ts places them): a look per kind of cloud. */
+  /**
+   * Places of power keep a small cloud of life, drawn with the look of the field it comes from (fireflies, pollen,
+   * leaves: `life/places/lifeRules.ts` reads the look through the parent, so a change to the field shows at the place).
+   * Here is only the motion of the cloud.
+   */
   CLOUDS: {
     FIREFLY_SWIRL: {
-      count: 36,
-      shape: 'dot',
-      additive: true,
-      sizeM: [0.05, 0.09],
-      colorA: '#d8ff7a',
-      colorB: '#ffe58a',
-      hdr: 0.4,
-      alpha: 1,
-      spin: 0,
-      blinkHz: 0.32,
-      nightMul: 1,
-      orbPullM: 12,
       style: 'swirl',
       spreadM: 6,
       heightM: 2.6,
@@ -177,18 +169,6 @@ export const life = {
       wobbleHz: 0.2,
     },
     DUST_RISE: {
-      count: 60,
-      shape: 'dot',
-      additive: true,
-      sizeM: [0.025, 0.05],
-      colorA: '#d9cfae',
-      colorB: '#ffffff',
-      hdr: 0.06,
-      alpha: 0.6,
-      spin: 0,
-      blinkHz: 0,
-      nightMul: 1,
-      orbPullM: 0,
       style: 'rise',
       spreadM: 3.5,
       heightM: 7,
@@ -199,18 +179,6 @@ export const life = {
       wobbleHz: 0.15,
     },
     LEAF_SHED: {
-      count: 40,
-      shape: 'leaf',
-      additive: false,
-      sizeM: [0.1, 0.2],
-      colorA: '#5d7f34',
-      colorB: '#8aa64a',
-      hdr: 1,
-      alpha: 0.95,
-      spin: 4,
-      blinkHz: 0,
-      nightMul: 0.12,
-      orbPullM: 0,
       style: 'shed',
       spreadM: 3,
       heightM: 9,
@@ -327,6 +295,11 @@ export const life = {
    * its full set. It is cosmetic and never saved: the level is worked out from the landmark state and the quests.
    */
   PLACES: {
+    /**
+     * The share of its field's specks a place shows at the top story level (restored). The other levels are fractions
+     * of it, so this one number sets how much life every place has.
+     */
+    AMOUNT: 0.25,
     LEVELS: {
       /** A place that has woken: faint and rare. */
       AWAKE: 0.25,

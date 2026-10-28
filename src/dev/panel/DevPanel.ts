@@ -5,17 +5,19 @@ import type { PostFXContext } from '../../rendering/PostFX';
 import type { SkySystemContext } from '../../rendering/sky/SkySystem';
 import type { GrassSystem } from '../../world/grass/core/GrassSystem';
 import { bindChromeToggles, mountDevPanelShell } from './DevPanelLayout';
+import { initDevPanelAnimals } from './devPanelAnimals';
 import { initDevPanelBloom } from './devPanelBloom';
 import { initDevPanelDof } from './devPanelDof';
 import { initDevPanelGameplay } from './devPanelGameplay';
 import { initDevPanelGodrays } from './devPanelGodrays';
 import { initDevPanelGrass } from './devPanelGrass';
 import { initDevPanelGuideLine } from './devPanelGuideLine';
+import { initDevPanelHand } from './devPanelHand';
 import { initDevPanelHaze } from './devPanelHaze';
+import { initDevPanelLife } from './devPanelLife';
 import { initDevPanelMapEditor } from './devPanelMapEditor';
 import { initDevPanelOrganicOrb } from './devPanelOrganicOrb';
 import { initPerformancePanel } from './devPanelPerformance';
-import { initDevPanelPostFx } from './devPanelPostFx';
 import { type DevPanelPropLodContext, initDevPanelPropLod } from './devPanelPropLod';
 import { type DevPanelShadowContext, initDevPanelShadows } from './devPanelShadows';
 import { initDevPanelSky } from './devPanelSky';
@@ -92,6 +94,9 @@ export function initDevPanel(
     disposers.push(initDevPanelPropLod(panel, propLodCtx));
   }
   disposers.push(initDevPanelTreeSway(panel));
+  disposers.push(initDevPanelLife(panel));
+  disposers.push(initDevPanelAnimals(panel));
+  disposers.push(initDevPanelHand(panel));
 
   if (villageCtx) {
     disposers.push(initDevPanelVillage(panel, villageCtx));
@@ -100,8 +105,6 @@ export function initDevPanel(
   if (shadowCtx) {
     disposers.push(initDevPanelShadows(panel, shadowCtx));
   }
-
-  disposers.push(initDevPanelPostFx(panel, postFX));
 
   if (skyCtx) {
     disposers.push(initDevPanelSky(panel, skyCtx.sky, postFX, skyCtx.sun, skyCtx.ambientLight));

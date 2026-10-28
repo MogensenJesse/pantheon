@@ -2,7 +2,7 @@
 import type { DirectionalLight } from 'three';
 import { GODRAYS_MAX_SAMPLES } from '../../config/visual/godrays';
 import type { GodraysParams, PostFXContext } from '../../rendering/PostFX';
-import { bindRange, injectRangeRows, mountSection, syncSpecs } from '../bindRange';
+import { bindSpecs, injectRangeRows, mountSection, subsectionHtml, syncSpecs } from '../bindRange';
 import {
   ALL_SPECS,
   DENSITY_SPECS,
@@ -10,22 +10,6 @@ import {
   MASK_SPECS,
   STRENGTH_SPECS,
 } from './devPanelGodraysSpecs';
-
-function bindGodraysSpecs(
-  panel: HTMLDivElement,
-  postFX: PostFXContext,
-  specs: GodraysSpec[],
-): Array<() => void> {
-  const disposers: Array<() => void> = [];
-  for (const s of specs) {
-    disposers.push(
-      bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => {
-        postFX.setGodraysParams({ [s.key]: v } as Partial<GodraysParams>);
-      }),
-    );
-  }
-  return disposers;
-}
 
 export function initDevPanelGodrays(
   panel: HTMLDivElement,
@@ -40,10 +24,7 @@ export function initDevPanelGodrays(
       <p class="dev-hint">Occlusion shafts from a sun disc. Sky is cleared far-plane view distance only — distant trees occlude too. Additive. Samples cap at ${GODRAYS_MAX_SAMPLES}. Shaft <strong>tint + weight</strong> are per Time of day stop. Perf → Disable god rays vs Disable valley fog / Disable distance haze.</p>
       <div id="dev-godrays-strength-rows"></div>
       <div id="dev-godrays-density-rows"></div>
-      <details class="dev-subsection">
-        <summary>Occlusion / screen fade</summary>
-        <div class="dev-section-body" id="dev-godrays-mask-rows"></div>
-      </details>
+      ${subsectionHtml('Occlusion / screen fade', '<div id="dev-godrays-mask-rows"></div>')}
       <div class="dev-actions">
         <button type="button" id="dev-godrays-diagnose">Log god rays diagnose</button>
         <button type="button" id="dev-godrays-reset">Reset god rays</button>
@@ -70,7 +51,9 @@ export function initDevPanelGodrays(
     });
   };
 
-  const disposers = bindGodraysSpecs(panel, postFX, ALL_SPECS);
+  const disposers = bindSpecs(panel, ALL_SPECS, (s, v) => {
+    postFX.setGodraysParams({ [(s as GodraysSpec).key]: v } as Partial<GodraysParams>);
+  });
 
   const resetBtn = panel.querySelector('#dev-godrays-reset') as HTMLButtonElement | null;
   const onReset = () => {

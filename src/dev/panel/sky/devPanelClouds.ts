@@ -19,6 +19,7 @@ import {
   bindRangeOnChange,
   injectRangeRows,
   mountSection,
+  subsectionHtml,
   syncSpecs,
 } from '../../bindRange';
 import {
@@ -69,38 +70,29 @@ export function initDevPanelClouds(
         <input type="checkbox" id="dev-cloud-enabled" ${shipped.enabled ? 'checked' : ''} />
       </label>
       <p class="dev-hint" id="dev-cloud-effective">${formatEffectiveSummary(cloudSystem)}</p>
-      <details class="dev-subsection">
-        <summary>Cloud shape (rebuild)</summary>
-        <div class="dev-section-body" id="dev-cloud-shape-rows"></div>
-      </details>
-      <details class="dev-subsection">
-        <summary>Runtime</summary>
-        <div class="dev-section-body" id="dev-cloud-runtime-rows"></div>
-      </details>
-      <details class="dev-subsection">
-        <summary>Edge</summary>
-        <div class="dev-section-body" id="dev-cloud-edge-rows"></div>
-      </details>
-      <details class="dev-subsection">
-        <summary>Life</summary>
-        <p class="dev-hint">Lobes shear and towers rise. Small clouds fade together; large masses stay solid. Fade field keeps every cloud drawn: white is present, red would be invisible. Live, not saved on the map.</p>
+      ${subsectionHtml('Cloud shape (rebuild)', '<div id="dev-cloud-shape-rows"></div>')}
+      ${subsectionHtml('Runtime', '<div id="dev-cloud-runtime-rows"></div>')}
+      ${subsectionHtml('Edge', '<div id="dev-cloud-edge-rows"></div>')}
+      ${subsectionHtml(
+        'Life',
+        `<p class="dev-hint">Lobes shear and towers rise. Small clouds fade together; large masses stay solid. Fade field keeps every cloud drawn: white is present, red would be invisible. Live, not saved on the map.</p>
         <label class="dev-row">
           <span>Fade field</span>
           <input type="checkbox" id="dev-cloud-life-debug" />
         </label>
-        <div class="dev-section-body" id="dev-cloud-life-rows"></div>
-      </details>
-      <details class="dev-subsection">
-        <summary>Terrain hug</summary>
-        <label class="dev-row">
+        <div id="dev-cloud-life-rows"></div>`,
+      )}
+      ${subsectionHtml(
+        'Terrain hug',
+        `<label class="dev-row">
           <span>Terrain interaction</span>
           <input type="checkbox" id="dev-cloud-terrain-enabled" ${shipped.terrainInteractionEnabled ? 'checked' : ''} />
         </label>
-        <div class="dev-section-body" id="dev-cloud-terrain-rows"></div>
-      </details>
-      <details class="dev-subsection">
-        <summary>Lighting / haze</summary>
-        <label class="dev-row">
+        <div id="dev-cloud-terrain-rows"></div>`,
+      )}
+      ${subsectionHtml(
+        'Lighting / haze',
+        `<label class="dev-row">
           <span>Cast shadows</span>
           <input type="checkbox" id="dev-cloud-cast-shadows" ${shipped.castShadows ? 'checked' : ''} />
         </label>
@@ -109,13 +101,13 @@ export function initDevPanelClouds(
           <input type="checkbox" id="dev-cloud-receive-shadows" ${shipped.receiveShadows ? 'checked' : ''} />
         </label>
         <p class="dev-hint">Cast bakes each cloud's live silhouette (boil, flat base, faded clouds drop out) into a <strong>dedicated soft map</strong> (not the PCSS sun map) every frame: <code>VISUAL.clouds.castShadowHalfM</code> window, <code>castShadowSoftnessM</code> penumbra. Receive uses the main sun map for terrain/prop umbras, faded out at its ±200 m edge. Instances sort back-to-front for cleaner soft overlaps. Particle count / sphere segments need field rebuild or full reload.</p>
-        <div class="dev-section-body" id="dev-cloud-lighting-rows"></div>
-      </details>
-      <details class="dev-subsection">
-        <summary>Reveal ramp</summary>
-        <p class="dev-hint">Opacity only (energy/atmosphere). Night clouds stay visible.</p>
-        <div class="dev-section-body" id="dev-cloud-reveal-rows"></div>
-      </details>
+        <div id="dev-cloud-lighting-rows"></div>`,
+      )}
+      ${subsectionHtml(
+        'Reveal ramp',
+        `<p class="dev-hint">Opacity only (energy/atmosphere). Night clouds stay visible.</p>
+        <div id="dev-cloud-reveal-rows"></div>`,
+      )}
       <div class="dev-actions">
         <button type="button" id="dev-cloud-reset">Reset clouds</button>
       </div>

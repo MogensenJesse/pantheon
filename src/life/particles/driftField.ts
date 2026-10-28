@@ -20,6 +20,8 @@ import {
 } from 'three/tsl';
 import { windUniforms } from '../../rendering/ambience/windUniforms';
 import { advanceDrift, EDGE_FADE_FROM } from './driftMath';
+import type { GroundNode } from './groundNode';
+import { createLiveLook } from './liveLook';
 import { orbPullNode } from './orbNotice';
 import { createSpeckMaterial, createSpeckMesh, type SpeckLook } from './speckMaterial';
 
@@ -35,7 +37,7 @@ export interface DriftLook extends SpeckLook {
 }
 
 export interface DriftFieldState {
-  /** The centre of the box (ground height under the camera) and the share of the specks shown, 0..1. */
+  /** The centre of the box in x and z (the camera; its y is not read) and the share of the specks shown, 0..1. */
   centre: Vector3;
   density: number;
   /** The share of the specks drawn in the alternate colour (birch leaves), 0..1. */
@@ -59,32 +61,44 @@ const GROUND_FADE = 0.05;
 /** The most the clock may advance in one frame when carrying the specks (a hitch must not throw them across). */
 const MAX_CLOCK_STEP_S = 0.25;
 
-export function createDriftField(name: string, look: DriftLook): DriftField {
+export function createDriftField(
+  name: string,
+  look: DriftLook,
+  groundNode: GroundNode,
+): DriftField {
   const uCentre = uniform(new Vector3());
   const uDrift = uniform(new Vector2());
   const uDensity = uniform(0);
   const uAlt = uniform(0);
   const iSeed = attribute('iSeed', 'vec4');
   const clock = windUniforms.uWindClock;
+  // the look's numbers as uniforms, so the DEV panel's edits of the config reach the shader
+  const live = createLiveLook();
 
-  const box = float(look.boxM);
-  const height = float(look.heightM);
+  const box = live.num(() => look.boxM);
+  const height = live.num(() => look.heightM);
+  const wobbleM = live.num(() => look.wobbleM);
   // a lattice fixed in the world: the box follows the camera, the specks do not
   const u = fract(iSeed.x.add(uDrift.x.sub(uCentre.x).div(box)));
   const lz = fract(iSeed.z.add(uDrift.y.sub(uCentre.z).div(box)));
-  const v = fract(iSeed.y.sub(clock.mul(look.fallMps / look.heightM)));
-  const sway = clock.mul(PI2.mul(look.wobbleHz));
-  const x = uCentre.x
-    .add(u.sub(0.5).mul(box))
-    .add(sin(sway.add(iSeed.z.mul(PI2))).mul(look.wobbleM));
-  const y = uCentre.y
-    .add(v.mul(height))
-    .add(sin(sway.mul(1.3).add(iSeed.w.mul(PI2))).mul(look.wobbleM * 0.25));
+  const v = fract(iSeed.y.sub(clock.mul(live.num(() => look.fallMps).div(height))));
+  const sway = clock.mul(PI2.mul(live.num(() => look.wobbleHz)));
+  const x = uCentre.x.add(u.sub(0.5).mul(box)).add(sin(sway.add(iSeed.z.mul(PI2))).mul(wobbleM));
   const z = uCentre.z
     .add(lz.sub(0.5).mul(box))
-    .add(sin(sway.mul(0.77).add(iSeed.x.mul(PI2))).mul(look.wobbleM));
+    .add(sin(sway.mul(0.77).add(iSeed.x.mul(PI2))).mul(wobbleM));
+  // each speck rides the ground under itself, not the ground under the camera
+  const y = groundNode(x, z)
+    .add(v.mul(height))
+    .add(sin(sway.mul(1.3).add(iSeed.w.mul(PI2))).mul(wobbleM.mul(0.25)));
   const placed = vec3(x, y, z);
-  const position = look.orbPullM > 0 ? orbPullNode(placed, look.orbPullM) : placed;
+  const position =
+    look.orbPullM > 0
+      ? orbPullNode(
+          placed,
+          live.num(() => look.orbPullM),
+        )
+      : placed;
 
   const fromCentre = length(vec2(u.sub(0.5), lz.sub(0.5)).mul(2));
   const edge = float(1).sub(smoothstep(float(EDGE_FADE_FROM), float(1), fromCentre));
@@ -99,6 +113,7 @@ export function createDriftField(name: string, look: DriftLook): DriftField {
     fade: edge.mul(fall),
     density: uDensity,
     alt: uAlt,
+    live,
   });
   const mesh = createSpeckMesh(name, look, material);
 
@@ -108,6 +123,7 @@ export function createDriftField(name: string, look: DriftLook): DriftField {
   return {
     mesh,
     update: (state) => {
+      live.sync();
       const dt =
         lastClock === null
           ? 0

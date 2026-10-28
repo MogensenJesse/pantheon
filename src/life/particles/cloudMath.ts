@@ -29,7 +29,10 @@ export function ageAt(seed: DriftSeed, clockS: number, lifeS: number): number {
   return fract(seed.y + clockS / lifeS);
 }
 
-/** Where a speck is. `ring` puts the specks on a ring at the spread radius instead of over the disc. */
+/**
+ * Where a speck is. `ring` puts the specks on a ring at the spread radius instead of over the disc. `centre.y` is the
+ * ground; the shader adds the ground under each speck's own x and z (`groundNode.ts`).
+ */
 export function cloudPosition(
   seed: DriftSeed,
   centre: Vec3Like,

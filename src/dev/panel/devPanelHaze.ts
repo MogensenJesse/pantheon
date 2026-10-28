@@ -89,7 +89,7 @@ export function initDevPanelHaze(panel: HTMLDivElement): () => void {
   injectRangeRows(body.querySelector('#dev-haze-distance-rows')!, VALLEY_VOLUME_SPECS);
   syncUi(panel);
 
-  const unregisterLateTick = registerDevPanelLateTick(() => syncClock(panel));
+  const unregisterLateTick = registerDevPanelLateTick(() => syncClock(panel), body);
   const disposers: Array<() => void> = [];
 
   for (const s of ALL_HAZE_SPECS) {

@@ -1,4 +1,5 @@
 // src/dev/panel/devPanelVillage.ts — village growth readouts and cheats (DEV)
+import { VILLAGE } from '../../config/village';
 import {
   type CrownTuning,
   crownTuning,
@@ -6,6 +7,7 @@ import {
 } from '../../world/village/render/crownTuning';
 import type { VillageSystemContext } from '../../world/village/VillageSystem';
 import { forceRain, villageDevState } from '../../world/village/villageDevState';
+import { buildConfigGroups } from '../bindConfig';
 import {
   bindCheckbox,
   bindRange,
@@ -63,6 +65,23 @@ export function initDevPanelVillage(
   ctx: DevPanelVillageContext,
 ): () => void {
   const { village } = ctx;
+  const effects = buildConfigGroups('dev-effects', VILLAGE.EFFECTS, [
+    {
+      title: 'Building effects',
+      hint: 'What finished buildings give per level (placeholders until a playtest). Derived each step, so a change is live.',
+      rows: [
+        ['FARMSTEAD.RADIUS_M', 'Farmstead reach (m)', 10, 200, 5, 0],
+        ['FARMSTEAD.GROWTH_PER_LEVEL', 'Growth per level', 0, 1, 0.01],
+        ['FARMSTEAD.YIELD_PER_LEVEL', 'Yield per level', 0, 5, 0.1, 1],
+        ['FARMSTEAD.MAX_GROWTH_ADD', 'Growth cap', 0, 3, 0.05],
+        ['FARMSTEAD.MAX_YIELD_ADD', 'Yield cap', 0, 10, 0.5, 1],
+        ['SHRINE.FAITH_PER_LEVEL', 'Faith/s per level', 0, 0.2, 0.005, 3],
+        ['SHRINE.MAX_FAITH_ADD', 'Faith/s cap', 0, 2, 0.01],
+        ['WORKSHOP.CHOP_PER_LEVEL', 'Chop speed per level', 0, 1, 0.01],
+        ['WORKSHOP.MAX_CHOP_ADD', 'Chop speed cap', 0, 3, 0.05],
+      ],
+    },
+  ]);
   const scaleButtons = TIME_SCALES.map(
     (s) => `<button type="button" class="dev-btn" data-village-scale="${s}">x${s}</button>`,
   ).join(' ');
@@ -92,6 +111,8 @@ export function initDevPanelVillage(
       <p class="dev-hint"><strong>Temple beacon</strong>: the orb, beam and light column over the temple appear once your energy reaches 100%, then grow with the faith gathered after that (beam and column grow to their full size at the faith set in <code>VISUAL.village.CROWN_*.MAX_FAITH</code>). Values are the strongest the effect gets.</p>
       ${BEACON_SPECS.map(rangeRowHtml).join('')}
       <button type="button" class="dev-btn" id="dev-beacon-reset">Reset beacon</button>
+      ${effects.html}
+      <button type="button" class="dev-btn" id="dev-effects-reset">Reset effects</button>
     `,
   });
   if (!body) return () => {};
@@ -130,6 +151,8 @@ export function initDevPanelVillage(
     resetCrownTuning();
     syncSpecs(panel, BEACON_SPECS, (spec) => crownTuning[spec.key]);
   });
+  disposers.push(effects.bind(panel));
+  listen(body.querySelector('#dev-effects-reset'), () => effects.reset(panel));
   listen(body.querySelector('#dev-village-wood'), () => village.dev.addWood(20));
   listen(body.querySelector('#dev-village-food'), () => village.dev.addFood(20));
   listen(body.querySelector('#dev-village-rain'), () => {
@@ -145,13 +168,12 @@ export function initDevPanelVillage(
   listen(body.querySelector('#dev-village-complete'), () => village.dev.completeSites());
 
   const readout = body.querySelector('#dev-village-readout');
-  const details = body.closest('details');
   let last = 0;
   disposers.push(
+    // The stats walk every building and villager: the hook skips them while the section is collapsed.
     registerDevPanelLateTick(() => {
       const now = performance.now();
-      // The stats walk every building and villager: do not collect them for a collapsed section.
-      if (!readout || (details && !details.open) || now - last < READOUT_INTERVAL_MS) return;
+      if (!readout || now - last < READOUT_INTERVAL_MS) return;
       last = now;
       const s = village.sim.stats();
       readout.textContent = formatVillageReadout(s, {
@@ -159,7 +181,7 @@ export function initDevPanelVillage(
         rain: village.rain(),
         rainForced: villageDevState.rain01 !== null,
       });
-    }),
+    }, body),
   );
 
   return () => {

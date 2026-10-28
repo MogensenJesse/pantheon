@@ -17,6 +17,7 @@ const DEV_SHELL_HTML = `
   <details class="dev-section dev-group" id="dev-group-look" open>
     <summary>Look</summary>
     <div class="dev-section-body">
+      <p class="dev-hint"><strong>Color pipeline:</strong> exposure / grade / LUT stop look → <strong>Time of day</strong> (includes master Grade enabled). Glow → Bloom panel. Toggle effects via the Perf panel.</p>
       <div id="dev-section-tod"></div>
       <div id="dev-section-glow-bloom"></div>
       <div id="dev-section-guide-line"></div>
@@ -24,7 +25,6 @@ const DEV_SHELL_HTML = `
       <div id="dev-section-godrays"></div>
       <div id="dev-section-haze"></div>
       <div id="dev-section-dof"></div>
-      <div id="dev-section-postfx"></div>
       <div id="dev-section-sky"></div>
       <div id="dev-section-clouds"></div>
     </div>
@@ -37,6 +37,9 @@ const DEV_SHELL_HTML = `
       <div id="dev-section-grass"></div>
       <div id="dev-section-prop-lod"></div>
       <div id="dev-section-tree-sway"></div>
+      <div id="dev-section-life"></div>
+      <div id="dev-section-animals"></div>
+      <div id="dev-section-hand"></div>
       <div id="dev-section-village"></div>
       <div id="dev-section-shadows"></div>
       <div id="dev-section-water"></div>

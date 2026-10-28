@@ -37,15 +37,30 @@ export interface AnimalParams {
   homeRadiusM: number;
 }
 
+// getters, so the DEV panel's edits of the config reach the steps
 const paramsOf = (c: typeof A.SHEEP | typeof A.CHICKEN): AnimalParams => ({
-  walkMps: c.WALK_MPS,
-  runMps: c.RUN_MPS,
+  get walkMps() {
+    return c.WALK_MPS;
+  },
+  get runMps() {
+    return c.RUN_MPS;
+  },
   restS: c.REST_S,
-  turnRadS: c.TURN_RAD_S,
-  strideM: c.STRIDE_M,
-  gapM: c.GAP_M,
-  blob: c.BLOB,
-  scareRadiusM: c.SCARE_RADIUS_M,
+  get turnRadS() {
+    return c.TURN_RAD_S;
+  },
+  get strideM() {
+    return c.STRIDE_M;
+  },
+  get gapM() {
+    return c.GAP_M;
+  },
+  get blob() {
+    return c.BLOB;
+  },
+  get scareRadiusM() {
+    return c.SCARE_RADIUS_M;
+  },
   homeRadiusM: c.HOME_RADIUS_M,
 });
 

@@ -11,6 +11,7 @@ import { weatherLook } from '../../rendering/weather/weatherLook';
 import { type DriftWorld, fireflyShare, leafShare, pollenShare, shoreness } from '../driftRules';
 import type { TreeGrid } from '../habitat';
 import { createDriftField, type DriftField, type DriftFieldState } from './driftField';
+import type { GroundNode } from './groundNode';
 import { orbNoticeUniforms } from './orbNotice';
 
 export interface DriftFieldsOptions {
@@ -21,6 +22,8 @@ export interface DriftFieldsOptions {
   /** The height of the ground at a place, and of the water (shores are where the two are close). */
   groundY: (x: number, z: number) => number;
   waterLevelM: number;
+  /** The ground under a point as a shader node: every speck rides the ground under itself. */
+  groundNode: GroundNode;
   /** True from Phase 1: living things (fireflies) notice the orb. */
   creaturesNotice: () => boolean;
 }
@@ -32,10 +35,10 @@ export interface DriftFields {
 }
 
 export function createDriftFields(options: DriftFieldsOptions): DriftFields {
-  const { scene, camera, trees, groundY, waterLevelM, creaturesNotice } = options;
-  const leaves = createDriftField('driftLeaves', life.LEAVES);
-  const pollen = createDriftField('driftPollen', life.POLLEN);
-  const fireflies = createDriftField('driftFireflies', life.FIREFLIES);
+  const { scene, camera, trees, groundY, waterLevelM, groundNode, creaturesNotice } = options;
+  const leaves = createDriftField('driftLeaves', life.LEAVES, groundNode);
+  const pollen = createDriftField('driftPollen', life.POLLEN, groundNode);
+  const fireflies = createDriftField('driftFireflies', life.FIREFLIES, groundNode);
   const fields: DriftField[] = [leaves, pollen, fireflies];
   for (const field of fields) scene.add(field.mesh);
 
@@ -83,6 +86,10 @@ export function createDriftFields(options: DriftFieldsOptions): DriftFields {
       );
       orbNoticeUniforms.uOrb.value.set(orb.x, orb.y, orb.z);
       orbNoticeUniforms.uOrbPull.value = pull;
+      if (import.meta.env.DEV) {
+        orbNoticeUniforms.uInner.value = life.ORB_NOTICE.INNER_SHARE;
+        orbNoticeUniforms.uKeep.value = life.ORB_NOTICE.KEEP;
+      }
 
       world.shore01 = shore;
       world.woods01 = woods;

@@ -1,22 +1,10 @@
 // src/dev/panel/devPanelDof.ts — DEV depth of field (PostFX)
 import { VISUAL } from '../../config/visualTuning';
 import type { DofParams, PostFXContext } from '../../rendering/PostFX';
-import { bindRange, injectRangeRows, mountSection, syncSpecs } from '../bindRange';
+import { bindSpecs, injectRangeRows, mountSection, syncSpecs } from '../bindRange';
 import { DOF_SPECS, type DofSpec } from './devPanelDofSpecs';
 
 const D = VISUAL.dof;
-
-function bindDofSpecs(panel: HTMLDivElement, postFX: PostFXContext): Array<() => void> {
-  const disposers: Array<() => void> = [];
-  for (const s of DOF_SPECS) {
-    disposers.push(
-      bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => {
-        postFX.setDofParams({ [s.key]: v } as Partial<DofParams>);
-      }),
-    );
-  }
-  return disposers;
-}
 
 function readDofParam(postFX: PostFXContext, s: DofSpec): number {
   return postFX.getDofParams()[s.key] as number;
@@ -42,7 +30,9 @@ export function initDevPanelDof(panel: HTMLDivElement, postFX: PostFXContext): (
 
   syncSpecs(panel, DOF_SPECS, (s) => readDofParam(postFX, s));
 
-  const disposers = bindDofSpecs(panel, postFX);
+  const disposers = bindSpecs(panel, DOF_SPECS, (s, v) => {
+    postFX.setDofParams({ [s.key]: v } as Partial<DofParams>);
+  });
 
   const resetBtn = panel.querySelector('#dev-dof-reset') as HTMLButtonElement | null;
   const onReset = () => {

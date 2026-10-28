@@ -56,7 +56,10 @@ export function boxCoords(
   };
 }
 
-/** The world position of a speck: its place in the box plus the sway of its fall. */
+/**
+ * The world position of a speck: its place in the box plus the sway of its fall. `centre.y` is the ground; the shader
+ * has no single ground, it adds the ground under each speck's own x and z (`groundNode.ts`).
+ */
 export function driftPosition(
   seed: DriftSeed,
   centre: Vec3Like,

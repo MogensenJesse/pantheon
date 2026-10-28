@@ -4,13 +4,7 @@
 // A speck is a camera-facing sprite: a tumbling leaf or a soft dot, in a colour mixed from the look's two colours
 // (and an alternate for a share of them), lit by the time of day and optionally blinking. Additive specks (pollen,
 // fireflies, dust) glow with the bloom scale; the others blend normally.
-import {
-  AdditiveBlending,
-  Color,
-  InstancedBufferAttribute,
-  InstancedMesh,
-  PlaneGeometry,
-} from 'three';
+import { AdditiveBlending, InstancedBufferAttribute, InstancedMesh, PlaneGeometry } from 'three';
 import {
   abs,
   cameraPosition,
@@ -27,6 +21,7 @@ import {
   smoothstep,
   step,
   uv,
+  varying,
   vec2,
   vec3,
 } from 'three/tsl';
@@ -35,6 +30,7 @@ import { windUniforms } from '../../rendering/ambience/windUniforms';
 import { GLOW_MESH_RENDER_ORDER, uHdrBloomScale } from '../../rendering/glowMaterial';
 import { propShadowUniforms } from '../../world/mapProps/config/mapPropShadowUniforms';
 import { seedAt } from './driftMath';
+import type { LiveLook } from './liveLook';
 
 /** The part of a field's look that decides how one speck is drawn. */
 export interface SpeckLook {
@@ -75,26 +71,40 @@ export function createSpeckMaterial(options: {
   density;
   /** The share of the specks drawn in the look's alternate colour, 0..1 (ignored for a look with none). */
   alt?;
+  /** The field's live look: the numbers and colours of `look` the shader reads as uniforms (DEV edits them). */
+  live: LiveLook;
 }): SpriteNodeMaterial {
-  const { name, look, iSeed, position, fade, density, alt } = options;
+  const { name, look, iSeed, position, fade, density, alt, live } = options;
   const clock = windUniforms.uWindClock;
 
   const variation = fract(iSeed.z.mul(11.3));
   const size = mix(
-    float(look.sizeM[0]),
-    float(look.sizeM[1]),
+    live.num(() => look.sizeM[0]),
+    live.num(() => look.sizeM[1]),
     fract(iSeed.y.mul(13.7).add(iSeed.z.mul(5.1))),
   );
-  const base = mix(vec3(new Color(look.colorA)), vec3(new Color(look.colorB)), variation);
+  const base = mix(
+    live.color(() => look.colorA),
+    live.color(() => look.colorB),
+    variation,
+  );
   // which specks take the alternate colour: a hash of the index, not a seed channel (x, y and z set where a speck
   // sits in its tile, so a channel would put the alternates in one band of every tile)
   const tint =
     look.altColor && alt
-      ? mix(base, vec3(new Color(look.altColor)), step(hash(instanceIndex.add(7919)), alt))
+      ? mix(
+          base,
+          live.color(() => look.altColor),
+          step(hash(instanceIndex.add(7919)), alt),
+        )
       : base;
   const { uDaylight, uNightSkyDaylight } = propShadowUniforms;
   const day = smoothstep(uNightSkyDaylight, float(1), uDaylight);
-  const lit = mix(float(look.nightMul), float(1), day);
+  const lit = mix(
+    live.num(() => look.nightMul),
+    float(1),
+    day,
+  );
 
   const r = length(uv().sub(0.5)).mul(2);
   const mask =
@@ -106,19 +116,23 @@ export function createSpeckMaterial(options: {
   let blink = float(1);
   if (look.blinkHz > 0) {
     // the twin of `blinkAt` in driftMath.ts
-    const phase = fract(clock.mul(look.blinkHz).add(fract(iSeed.w.mul(37.31))));
+    const phase = fract(clock.mul(live.num(() => look.blinkHz)).add(fract(iSeed.w.mul(37.31))));
     const s = sin(phase.mul(PI2)).mul(0.5).add(0.5);
     blink = mix(float(0.1), float(1), smoothstep(float(0.45), float(0.95), s));
   }
   // the first share of the specks, each fading in a little after the last so a change of density is gradual
   const shown = smoothstep(iSeed.w, iSeed.w.add(0.08), density.mul(1.08));
   // no speck fills the screen: it fades in with its distance from the camera
-  const near = smoothstep(
-    float(NEAR_FADE_M[0]),
-    float(NEAR_FADE_M[1]),
-    distance(position, cameraPosition),
+  // per vertex: `position` samples the terrain, which must not run for every fragment of the quad
+  const near = varying(
+    smoothstep(float(NEAR_FADE_M[0]), float(NEAR_FADE_M[1]), distance(position, cameraPosition)),
   );
-  const visible = shown.mul(near).mul(fade).mul(mask).mul(blink).mul(look.alpha);
+  const visible = shown
+    .mul(near)
+    .mul(fade)
+    .mul(mask)
+    .mul(blink)
+    .mul(live.num(() => look.alpha));
 
   const material = new SpriteNodeMaterial();
   material.name = name;
@@ -128,18 +142,23 @@ export function createSpeckMaterial(options: {
   material.positionNode = position;
   if (look.shape === 'leaf') {
     // a tumbling leaf turns edge-on now and then
-    const flip = abs(cos(clock.mul(look.spin * 0.6).add(iSeed.x.mul(PI2))))
+    const spin = live.num(() => look.spin);
+    const flip = abs(cos(clock.mul(spin.mul(0.6)).add(iSeed.x.mul(PI2))))
       .mul(0.7)
       .add(0.3);
     material.scaleNode = vec3(size.mul(flip), size, 1);
-    material.rotationNode = clock.mul(look.spin).add(iSeed.y.mul(PI2));
+    material.rotationNode = clock.mul(spin).add(iSeed.y.mul(PI2));
   } else {
     material.scaleNode = vec3(size, size, 1);
   }
   if (look.additive) {
     material.blending = AdditiveBlending;
     material.forceSinglePass = true;
-    material.colorNode = tint.mul(lit).mul(look.hdr).mul(uHdrBloomScale).mul(visible);
+    material.colorNode = tint
+      .mul(lit)
+      .mul(live.num(() => look.hdr))
+      .mul(uHdrBloomScale)
+      .mul(visible);
   } else {
     material.colorNode = tint.mul(lit);
     material.opacityNode = visible;

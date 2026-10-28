@@ -11,7 +11,13 @@ import { ambience } from '../../rendering/ambience/ambienceState';
 import type { Animals } from '../animals/animals';
 import { type BirdFlock, recentreBirdFlock } from '../animals/birdSim';
 import { fireflyGate } from '../driftRules';
-import { type CloudField, type CloudFieldState, createCloudField } from '../particles/cloudField';
+import {
+  type CloudField,
+  type CloudFieldState,
+  type CloudLook,
+  createCloudField,
+} from '../particles/cloudField';
+import type { GroundNode } from '../particles/groundNode';
 import {
   cloudRadiusM,
   easeLevel,
@@ -19,9 +25,9 @@ import {
   LIFE_KINDS,
   lifeOf,
   type PlaceLifeSpec,
+  placeCloudLooks,
 } from './lifeRules';
 
-const C = life.CLOUDS;
 const PL = life.PLACES;
 
 type CloudKind = NonNullable<PlaceLifeSpec['cloud']>;
@@ -32,14 +38,11 @@ const FLOCKS: Partial<
 > = { tree: PL.TREE, temple_ruin: PL.TEMPLE };
 
 /** The look of each cloud and whether its specks sit on a ring (the radius is per place: `cloudRadiusM`). */
-const CLOUDS: Record<
-  CloudKind,
-  { look: typeof C.FIREFLY_SWIRL | typeof C.DUST_RISE | typeof C.LEAF_SHED; ring: boolean }
-> = {
-  leaves: { look: C.LEAF_SHED, ring: false },
-  fireflies: { look: C.FIREFLY_SWIRL, ring: false },
-  'ring-fireflies': { look: C.FIREFLY_SWIRL, ring: true },
-  motes: { look: C.DUST_RISE, ring: false },
+const CLOUDS: Record<CloudKind, { look: CloudLook; ring: boolean }> = {
+  leaves: { look: placeCloudLooks.LEAF_SHED, ring: false },
+  fireflies: { look: placeCloudLooks.FIREFLY_SWIRL, ring: false },
+  'ring-fireflies': { look: placeCloudLooks.FIREFLY_SWIRL, ring: true },
+  motes: { look: placeCloudLooks.DUST_RISE, ring: false },
 };
 
 interface Site {
@@ -79,12 +82,13 @@ export interface PlaceLife {
 export interface PlaceLifeOptions {
   scene: Scene;
   groundY: (x: number, z: number) => number;
-  waterLevelM: number;
+  /** The ground under a point as a shader node (`particles/groundNode.ts`): the specks of a cloud ride it. */
+  groundNode: GroundNode;
   animals: Pick<Animals, 'addBirdFlock'>;
 }
 
 export function createPlaceLife(options: PlaceLifeOptions): PlaceLife {
-  const { scene, groundY, waterLevelM, animals } = options;
+  const { scene, groundY, groundNode, animals } = options;
   const sites = new Map<LandmarkKind, Site>();
   const clouds = new Map<LandmarkKind, CloudField>();
   const flocks = new Map<LandmarkKind, BirdFlock>();
@@ -93,7 +97,9 @@ export function createPlaceLife(options: PlaceLifeOptions): PlaceLife {
     const spec = lifeOf(kind);
     if (spec.cloud) {
       const def = CLOUDS[spec.cloud];
-      const field = createCloudField(`placeCloud_${kind}`, def.look, { ring: def.ring });
+      const field = createCloudField(`placeCloud_${kind}`, def.look, groundNode, {
+        ring: def.ring,
+      });
       scene.add(field.mesh);
       clouds.set(kind, field);
     }
@@ -158,9 +164,9 @@ export function createPlaceLife(options: PlaceLifeOptions): PlaceLife {
         const gate = isFireflyCloud(spec.cloud)
           ? fireflyGate(ambience.night01, ambience.golden01)
           : 1;
-        // fireflies at the sunken ruin hover over the water, not under it
-        cloudState.centre.set(site.x, Math.max(groundY(site.x, site.z), waterLevelM), site.z);
-        cloudState.level = site.level * gate;
+        // the specks ride the ground (or the water, at the sunken ruin) under themselves
+        cloudState.centre.set(site.x, 0, site.z);
+        cloudState.level = site.level * gate * PL.AMOUNT;
         cloudState.spreadM = cloudRadiusM(kind);
         cloud.update(cloudState);
       }

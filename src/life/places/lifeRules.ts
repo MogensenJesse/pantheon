@@ -8,8 +8,21 @@
 import { life } from '../../config/visual/life.ts';
 import { clamp01 } from '../../core/math/scalar.ts';
 import type { LandmarkKind } from '../../map/MapTypes.ts';
+import type { CloudLook } from '../particles/cloudField.ts';
+import type { SpeckLook } from '../particles/speckMaterial.ts';
 
 const P = life.PLACES;
+
+/** A cloud's look: the field it comes from, read live through the prototype, with the motion of its own on top. */
+const cloudLook = (parent: SpeckLook, own: object): CloudLook =>
+  Object.assign(Object.create(parent), own);
+
+/** The look of each cloud a place keeps. A change to a field (`FIREFLIES` ...) shows in its place cloud at once. */
+export const placeCloudLooks = {
+  FIREFLY_SWIRL: cloudLook(life.FIREFLIES, life.CLOUDS.FIREFLY_SWIRL),
+  DUST_RISE: cloudLook(life.POLLEN, life.CLOUDS.DUST_RISE),
+  LEAF_SHED: cloudLook(life.LEAVES, life.CLOUDS.LEAF_SHED),
+} as const;
 
 /** What the story says about one place. */
 export interface PlaceFacts {

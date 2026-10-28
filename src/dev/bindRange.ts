@@ -89,6 +89,24 @@ export function bindRange(
   return () => slider.removeEventListener('input', sync);
 }
 
+/** Bind the slider of every spec: `apply(spec, value)` runs on each input. Returns the disposers. */
+export function bindSpecs<T extends RangeSpec>(
+  panel: HTMLDivElement,
+  specs: readonly T[],
+  apply: (spec: T, value: number) => void,
+): Array<() => void> {
+  return specs.map((s) => bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => apply(s, v)));
+}
+
+/** A nested `<details class="dev-subsection">` block around `bodyHtml`. */
+export function subsectionHtml(title: string, bodyHtml: string, open = false): string {
+  return `
+      <details class="dev-subsection"${open ? ' open' : ''}>
+        <summary>${title}</summary>
+        <div class="dev-section-body">${bodyHtml}</div>
+      </details>`;
+}
+
 export function bindRangeOnChange(
   panel: HTMLDivElement,
   id: string,

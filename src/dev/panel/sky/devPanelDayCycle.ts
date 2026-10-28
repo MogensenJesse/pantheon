@@ -133,10 +133,15 @@ export function bindDayCyclePanel(
   ambientLight: AmbientLight,
   onElevationScrub?: (elevationDeg: number) => void,
 ): () => void {
-  const unregisterLateTick = registerDevPanelLateTick(() => {
-    if (isDayCycleTimeFrozen()) return;
-    syncDayCyclePanel(panel);
-  });
+  // the phase slider lives in Gameplay, the elevation slider in Sky: sync while either is on screen
+  const unregisterLateTick = registerDevPanelLateTick(
+    () => {
+      if (isDayCycleTimeFrozen()) return;
+      syncDayCyclePanel(panel);
+    },
+    panel.querySelector(`#${DAY_CYCLE_SPECS.elevation.id}`),
+    panel.querySelector(`#${DAY_CYCLE_PHASE_SPEC.id}`),
+  );
 
   const disposers: Array<() => void> = [];
 

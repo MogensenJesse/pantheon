@@ -101,6 +101,8 @@ let rendererRef: WebGPURenderer | null = null;
 let grassRef: GrassSystem | undefined;
 let propLodGroupsRef: PropLodGroup[] | undefined;
 let lastHud: PerfHudModel = EMPTY_HUD;
+/** Set by `getPerfHud`: the HUD walks the grass and prop LOD groups, so it is only built for a panel that reads it. */
+let hudWanted = true;
 
 function installConsoleHook(): void {
   if (!import.meta.env.DEV || typeof window === 'undefined') return;
@@ -172,39 +174,42 @@ export function endPerformanceFrame(renderer: WebGPURenderer): void {
     void drainGpuTimestamps(renderer);
   }
   const counters = sampleRendererCounters(renderer);
-  const gpu = readGpuTimestamps(renderer);
-  const frame = getFrameStats();
-  const adapter = sampleGpuAdapter(renderer);
-  const grassStats = grassRef?.getBladeStats();
-  const propStats = propLodGroupsRef ? countPropLodDrawStats(propLodGroupsRef) : null;
-  lastHud = {
-    fps: frame.fps,
-    fpsAvg: frame.fpsAvg,
-    fpsP95: frame.fpsP95,
-    frameMs: frame.frameMs,
-    hitchCount: frame.hitchCount,
-    cpuMs: getCpuFrameTotalMs(),
-    gpuRenderMs: gpu.renderMs,
-    gpuComputeMs: gpu.computeMs,
-    drawCalls: counters.drawCalls,
-    triangles: counters.triangles,
-    geometries: counters.geometries,
-    textures: counters.textures,
-    gpuMemoryMb: bytesToMb(counters.gpuMemoryBytes),
-    jsHeapMb: bytesToMb(counters.jsHeapBytes),
-    adapter: formatAdapterLabel(adapter),
-    backend: adapter.backend,
-    timestampQuery: adapter.timestampQuery,
-    sections: getLastCpuSections().map((s) => ({ name: s.name, ms: s.ms })),
-    grassAllocated: grassStats?.allocatedTotal ?? 0,
-    grassEstimatedVisible: grassStats?.estimatedVisibleTotal ?? 0,
-    grassAllocatedPerRing: grassStats?.rings.map((r) => r.instanceCount) ?? [],
-    propTrianglesPerLod: propStats?.trianglesPerLod ?? [0, 0, 0],
-    propTrianglesTotal: propStats?.trianglesTotal ?? 0,
-    propInstancesPerLod: propStats?.instancesPerLod ?? [0, 0, 0],
-    propInstancesTotal: propStats?.instancesTotal ?? 0,
-    propLodBound: propLodGroupsRef != null,
-  };
+  if (hudWanted) {
+    hudWanted = false;
+    const gpu = readGpuTimestamps(renderer);
+    const frame = getFrameStats();
+    const adapter = sampleGpuAdapter(renderer);
+    const grassStats = grassRef?.getBladeStats();
+    const propStats = propLodGroupsRef ? countPropLodDrawStats(propLodGroupsRef) : null;
+    lastHud = {
+      fps: frame.fps,
+      fpsAvg: frame.fpsAvg,
+      fpsP95: frame.fpsP95,
+      frameMs: frame.frameMs,
+      hitchCount: frame.hitchCount,
+      cpuMs: getCpuFrameTotalMs(),
+      gpuRenderMs: gpu.renderMs,
+      gpuComputeMs: gpu.computeMs,
+      drawCalls: counters.drawCalls,
+      triangles: counters.triangles,
+      geometries: counters.geometries,
+      textures: counters.textures,
+      gpuMemoryMb: bytesToMb(counters.gpuMemoryBytes),
+      jsHeapMb: bytesToMb(counters.jsHeapBytes),
+      adapter: formatAdapterLabel(adapter),
+      backend: adapter.backend,
+      timestampQuery: adapter.timestampQuery,
+      sections: getLastCpuSections().map((s) => ({ name: s.name, ms: s.ms })),
+      grassAllocated: grassStats?.allocatedTotal ?? 0,
+      grassEstimatedVisible: grassStats?.estimatedVisibleTotal ?? 0,
+      grassAllocatedPerRing: grassStats?.rings.map((r) => r.instanceCount) ?? [],
+      propTrianglesPerLod: propStats?.trianglesPerLod ?? [0, 0, 0],
+      propTrianglesTotal: propStats?.trianglesTotal ?? 0,
+      propInstancesPerLod: propStats?.instancesPerLod ?? [0, 0, 0],
+      propInstancesTotal: propStats?.instancesTotal ?? 0,
+      propLodBound: propLodGroupsRef != null,
+    };
+  }
   if (isOverlayMounted() || devDebugSettings.showFpsCounter) {
     overlayEndFrame();
     updateOverlay(counters);
@@ -212,6 +217,7 @@ export function endPerformanceFrame(renderer: WebGPURenderer): void {
 }
 
 export function getPerfHud(): PerfHudModel {
+  hudWanted = true;
   return lastHud;
 }
 

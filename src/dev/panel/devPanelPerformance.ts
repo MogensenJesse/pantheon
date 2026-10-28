@@ -216,7 +216,7 @@ export function initPerformancePanel(
           .join(' · ');
         sectionsEl.textContent = top ? `CPU ${top}` : '';
       }
-    }),
+    }, panel),
   );
 
   const gpuBtn = panel.querySelector('#dev-gpu-info') as HTMLButtonElement | null;

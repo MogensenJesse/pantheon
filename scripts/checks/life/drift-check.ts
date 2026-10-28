@@ -10,12 +10,7 @@ import {
   shoreness,
 } from '../../../src/life/driftRules.ts';
 import { createTreeGrid, isBirchKey, type PlacedTree } from '../../../src/life/habitat.ts';
-import {
-  ageAt,
-  type CloudShape,
-  cloudFade,
-  cloudPosition,
-} from '../../../src/life/particles/cloudMath.ts';
+import { ageAt, cloudFade, cloudPosition } from '../../../src/life/particles/cloudMath.ts';
 import {
   advanceDrift,
   blinkAt,
@@ -26,6 +21,7 @@ import {
   orbPulled,
   seedAt,
 } from '../../../src/life/particles/driftMath.ts';
+import { placeCloudLooks } from '../../../src/life/places/lifeRules.ts';
 import { check, finish } from '../lib/check.ts';
 
 const H = life.HABITAT;
@@ -313,14 +309,13 @@ await check(
   },
 );
 
-const clouds = life.CLOUDS;
+const clouds = placeCloudLooks;
 const place = { x: 100, y: 5, z: -40 };
-const asShape = (c: (typeof clouds)[keyof typeof clouds]): CloudShape => c as CloudShape;
 
 await check(
   'a cloud of fireflies stays within its spread, around the place, and a ring stays on its ring',
   () => {
-    const shape = asShape(clouds.FIREFLY_SWIRL);
+    const shape = clouds.FIREFLY_SWIRL;
     for (let i = 0; i < clouds.FIREFLY_SWIRL.count; i++) {
       const s = seedAt(i, clouds.FIREFLY_SWIRL.count);
       for (const t of [0, 12.5, 400, 9000]) {
@@ -344,8 +339,8 @@ await check(
 await check(
   'dust motes rise through the cloud and fade in and out; leaves fall from it downwind',
   () => {
-    const rise = asShape(clouds.DUST_RISE);
-    const shed = asShape(clouds.LEAF_SHED);
+    const rise = clouds.DUST_RISE;
+    const shed = clouds.LEAF_SHED;
     for (let i = 0; i < clouds.DUST_RISE.count; i++) {
       const s = seedAt(i, clouds.DUST_RISE.count);
       for (const t of [0, 1.5, 33, 777]) {

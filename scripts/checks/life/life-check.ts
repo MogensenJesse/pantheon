@@ -285,8 +285,11 @@ function leafNames(block: object, out = new Map<string, number>()): Map<string, 
 
 await check('no number in the animal, bird or place config goes unread', () => {
   // by name: a name two blocks share is skipped, since a read of one would hide the other being dead
+  // (the DEV panel names every number it edits, which is not a read)
   const text = sourcesUnder('src')
-    .filter((f) => !f.endsWith(join('config', 'visual', 'life.ts')))
+    .filter(
+      (f) => !f.endsWith(join('config', 'visual', 'life.ts')) && !f.startsWith(join('src', 'dev')),
+    )
     .map((f) => readFileSync(f, 'utf8'))
     .join('\n');
   const names = new Map<string, number>();

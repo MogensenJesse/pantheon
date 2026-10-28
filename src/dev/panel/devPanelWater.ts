@@ -10,6 +10,8 @@ import {
   bindRange,
   injectRangeRows,
   mountSection,
+  rangeRowHtml,
+  subsectionHtml,
   syncSlider,
   syncSpecs,
 } from '../bindRange';
@@ -44,40 +46,29 @@ export function initDevPanelWater(panel: HTMLDivElement): () => void {
     open: false,
     body: `
       <p class="dev-hint">Reflective ocean — reflection scale lowers RT resolution inland / when looking down; mix stays full. Perf panel → Hide water drops the reflector pass. Per-stop look (color / distortion / shallow) lives under <strong>Time of day</strong>.</p>
-      ${WATER_SPECS.map(
-        (s) => `
+      ${WATER_SPECS.map(rangeRowHtml).join('')}
+      ${subsectionHtml(
+        'Shore depth',
+        `<p class="dev-hint">Absorption = opacity/murk (deep water + refract darkening). Refraction depth = where screen refraction runs. Shore fog bypass keeps shallow water visible through night haze.</p>
+        <label class="dev-row dev-row-check">
+          <span>Shore depth enabled</span>
+          <input type="checkbox" id="dev-shore-enabled" />
+        </label>
+        <div id="dev-shore-sliders"></div>`,
+      )}
+      ${subsectionHtml(
+        'Tide / shore foam',
+        `<p class="dev-hint">Gentle tidal bob + a seaward lace ribbon on the water surface along the waterline. Landward wet-sand darkening lags behind the tide (max width while receding). Foam fades/tints with night valley fog (linked to Shore fog bypass).</p>
+        <label class="dev-row dev-row-check">
+          <span>Tide enabled</span>
+          <input type="checkbox" id="dev-tide-enabled" />
+        </label>
+        <div id="dev-tide-sliders"></div>
         <label class="dev-row">
-          <span>${s.label}</span>
-          <input type="range" id="${s.id}" min="${s.min}" max="${s.max}" step="${s.step}" value="${s.defaultValue}" />
-          <output id="${s.id}-out">${s.format(s.defaultValue)}</output>
+          <span>Foam color</span>
+          <input type="color" id="dev-tide-foam-color" value="${TD.foamColor}" />
         </label>`,
-      ).join('')}
-      <details class="dev-subsection">
-        <summary>Shore depth</summary>
-        <div class="dev-subsection-body">
-          <p class="dev-hint">Absorption = opacity/murk (deep water + refract darkening). Refraction depth = where screen refraction runs. Shore fog bypass keeps shallow water visible through night haze.</p>
-          <label class="dev-row dev-row-check">
-            <span>Shore depth enabled</span>
-            <input type="checkbox" id="dev-shore-enabled" />
-          </label>
-          <div id="dev-shore-sliders"></div>
-        </div>
-      </details>
-      <details class="dev-subsection">
-        <summary>Tide / shore foam</summary>
-        <div class="dev-subsection-body">
-          <p class="dev-hint">Gentle tidal bob + a seaward lace ribbon on the water surface along the waterline. Landward wet-sand darkening lags behind the tide (max width while receding). Foam fades/tints with night valley fog (linked to Shore fog bypass).</p>
-          <label class="dev-row dev-row-check">
-            <span>Tide enabled</span>
-            <input type="checkbox" id="dev-tide-enabled" />
-          </label>
-          <div id="dev-tide-sliders"></div>
-          <label class="dev-row">
-            <span>Foam color</span>
-            <input type="color" id="dev-tide-foam-color" value="${TD.foamColor}" />
-          </label>
-        </div>
-      </details>
+      )}
       <div class="dev-actions">
         <button type="button" id="dev-water-reset">Reset water</button>
       </div>

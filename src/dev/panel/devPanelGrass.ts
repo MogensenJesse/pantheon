@@ -15,6 +15,7 @@ import {
   bindRangeOnChange,
   injectRangeRows,
   mountSection,
+  subsectionHtml,
   syncSlider,
 } from '../bindRange';
 import {
@@ -284,13 +285,8 @@ function syncUi(panel: HTMLDivElement): void {
 }
 
 export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): () => void {
-  const ringSubsections = RING_LABELS.map(
-    (label, i) => `
-      <details class="dev-subsection">
-        <summary>${label}</summary>
-        <div class="dev-section-body" id="dev-grass-ring${i}-rows"></div>
-      </details>
-    `,
+  const ringSubsections = RING_LABELS.map((label, i) =>
+    subsectionHtml(label, `<div id="dev-grass-ring${i}-rows"></div>`),
   ).join('');
 
   const body = mountSection(panel, {
@@ -299,10 +295,9 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
     open: false,
     body: `
       <p class="dev-hint">Three LOD rings — each <em>ring radius</em> is full-density band width (m). Per-ring <em>fade-out</em> extends past it (density and blade length shrink to 0) while the next LOD is already full, so the overlap equals the fade-out. Fade length curve shapes the blade length part.</p>
-      <details class="dev-subsection">
-        <summary>General</summary>
-        <div class="dev-section-body">
-          <label class="dev-row dev-row-check">
+      ${subsectionHtml(
+        'General',
+        `<label class="dev-row dev-row-check">
             <span>Enabled</span>
             <input type="checkbox" id="dev-grass-enabled" checked />
           </label>
@@ -330,48 +325,38 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
           <p class="dev-hint">LOD colors: green=LOD0, blue=LOD1, magenta=LOD2. Overlap bands show both rings (inner fading on top of outer full). Cull debug overrides LOD colors when both are on. Tile cull skips off-screen grid tiles before terrain sample (looking-down savings).</p>
           <p class="dev-hint">Cull overlay tints frustum-visible blades (does not draw the whole wrap tile). Green=frustum ok, cyan=near bypass, blue=pitch bypass, yellow=keep fail, pink=prop exclusion. Hidden biome/frustum fails stay undrawn on purpose. Empty patches with terrain on = depth burial (grass Y vs terrain detail displacement), not compute cull.</p>
           <div id="dev-grass-ring-fade-rows"></div>
-          <p class="dev-hint" id="dev-grass-derived-summary"></p>
-        </div>
-      </details>
+          <p class="dev-hint" id="dev-grass-derived-summary"></p>`,
+      )}
       ${ringSubsections}
-      <details class="dev-subsection">
-        <summary>Blade &amp; wind</summary>
-        <div class="dev-section-body">
-          <div id="dev-grass-blade-rows"></div>
-          <div id="dev-grass-tuning-rows"></div>
-        </div>
-      </details>
-      <details class="dev-subsection">
-        <summary>Appearance</summary>
-        <div class="dev-section-body">
-          <p class="dev-hint">Blade albedo (dark / base / tip / rust / warm) lives under <strong>Time of day → Grass colors</strong>.</p>
-          <div id="dev-grass-look-rows"></div>
-        </div>
-      </details>
-      <details class="dev-subsection">
-        <summary>Sun lighting</summary>
-        <div class="dev-section-body">
-          <p class="dev-hint">Wrap + hemisphere + fake SSS back-light on grass and flowers (shared foliage TSL). Hemisphere sky/ground tints are per stop under <strong>Time of day → Light &amp; foliage</strong>.</p>
+      ${subsectionHtml(
+        'Blade &amp; wind',
+        `<div id="dev-grass-blade-rows"></div>
+          <div id="dev-grass-tuning-rows"></div>`,
+      )}
+      ${subsectionHtml(
+        'Appearance',
+        `<p class="dev-hint">Blade albedo (dark / base / tip / rust / warm) lives under <strong>Time of day → Grass colors</strong>.</p>
+          <div id="dev-grass-look-rows"></div>`,
+      )}
+      ${subsectionHtml(
+        'Sun lighting',
+        `<p class="dev-hint">Wrap + hemisphere + fake SSS back-light on grass and flowers (shared foliage TSL). Hemisphere sky/ground tints are per stop under <strong>Time of day → Light &amp; foliage</strong>.</p>
           <div id="dev-grass-sun-rows"></div>
           <label class="dev-row">
             <span>Back-light tint</span>
             <input type="color" id="dev-grass-backlight-tint" value="${GRASS_FL.backlightTint}" />
-          </label>
-        </div>
-      </details>
-      <details class="dev-subsection">
-        <summary>Biome &amp; trail</summary>
-        <div class="dev-section-body">
-          <div id="dev-grass-biome-rows"></div>
+          </label>`,
+      )}
+      ${subsectionHtml(
+        'Biome &amp; trail',
+        `<div id="dev-grass-biome-rows"></div>
           <p class="dev-hint">3D grass follows baked biome density (meadow / forest / hills), not the whole island. Threshold is a floor; keep then uses the baked weight so forest 0.5 is half as dense as meadow. Clump strength 0 is a uniform carpet. Edge scale shortens blades at patch fringes; edge density packs more of those short blades.</p>
           <div id="dev-grass-thin-rows"></div>
-          <div id="dev-grass-trail-rows"></div>
-        </div>
-      </details>
-      <details class="dev-subsection">
-        <summary>Flowers</summary>
-        <div class="dev-section-body">
-          <label class="dev-row dev-row-check">
+          <div id="dev-grass-trail-rows"></div>`,
+      )}
+      ${subsectionHtml(
+        'Flowers',
+        `<label class="dev-row dev-row-check">
             <span>Enabled</span>
             <input type="checkbox" id="dev-flower-enabled" ${VISUAL.grass.flowers.enabled ? 'checked' : ''} />
           </label>
@@ -383,9 +368,8 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
           <label class="dev-row">
             <span>Color 2</span>
             <input type="color" id="dev-flower-color2" value="${VISUAL.grass.flowers.color2}" />
-          </label>
-        </div>
-      </details>
+          </label>`,
+      )}
       <div class="dev-actions">
         <button type="button" id="dev-grass-reset">Reset grass</button>
       </div>

@@ -11,13 +11,32 @@ import {
   getLiveMsaaSamples,
   setMsaaSamplesAndReload,
 } from '../../rendering/postfx/msaaDevOverride';
-import { bindCheckbox, bindRange, mountSection } from '../bindRange';
+import { bindCheckbox, bindRange, mountSection, type RangeSpec, rangeRowHtml } from '../bindRange';
 
 const DEFAULTS: UpscalingSettings = { ...VISUAL.render.upscaling };
 const DEFAULT_AA: AaMethod = VISUAL.render.aaMethod;
 
 const formatScale = (v: number) => v.toFixed(2);
 const formatSharpness = (v: number) => v.toFixed(2);
+
+const SCALE_SPEC: RangeSpec = {
+  id: 'dev-upscale-scale',
+  label: 'Resolution scale',
+  min: 0.25,
+  max: 1,
+  step: 0.05,
+  defaultValue: DEFAULTS.resolutionScale,
+  format: formatScale,
+};
+const SHARPNESS_SPEC: RangeSpec = {
+  id: 'dev-upscale-sharpness',
+  label: 'RCAS sharpness (0=sharp)',
+  min: 0,
+  max: 2,
+  step: 0.05,
+  defaultValue: DEFAULTS.sharpness,
+  format: formatSharpness,
+};
 
 function syncUpscalingUi(panel: HTMLDivElement, settings: UpscalingSettings, aa: AaMethod): void {
   const enabled = panel.querySelector('#dev-upscale-enabled') as HTMLInputElement | null;
@@ -84,11 +103,7 @@ export function initDevPanelUpscaling(panel: HTMLDivElement, postFX: PostFXConte
         <span>Enable upscaling</span>
         <input type="checkbox" id="dev-upscale-enabled" />
       </label>
-      <label class="dev-row">
-        <span>Resolution scale</span>
-        <input type="range" id="dev-upscale-scale" min="0.25" max="1" step="0.05" value="${DEFAULTS.resolutionScale}" />
-        <output id="dev-upscale-scale-out">${formatScale(DEFAULTS.resolutionScale)}</output>
-      </label>
+      ${rangeRowHtml(SCALE_SPEC)}
       <label class="dev-row">
         <span>Method</span>
         <select id="dev-upscale-method">
@@ -96,11 +111,7 @@ export function initDevPanelUpscaling(panel: HTMLDivElement, postFX: PostFXConte
           <option value="bilinear">Bilinear</option>
         </select>
       </label>
-      <label class="dev-row">
-        <span>RCAS sharpness (0=sharp)</span>
-        <input type="range" id="dev-upscale-sharpness" min="0" max="2" step="0.05" value="${DEFAULTS.sharpness}" />
-        <output id="dev-upscale-sharpness-out">${formatSharpness(DEFAULTS.sharpness)}</output>
-      </label>
+      ${rangeRowHtml(SHARPNESS_SPEC)}
       <label class="dev-row dev-row-check">
         <span>RCAS denoise (noisy areas)</span>
         <input type="checkbox" id="dev-upscale-denoise" />
