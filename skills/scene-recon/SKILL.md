@@ -19,6 +19,21 @@ implements is `3d-plan.md`; its first run is a vertical slice (two pieces end to
   credential: run the node scripts with `OPENAI_API_KEY=proxy-injected`; the proxy supplies the real one. Never print it.
 - Blender: live Blender MCP if connected, otherwise the `bpy` wheel (headless, see below).
 
+## Quick start in a fresh cloud container
+The `bpy` venv, the plugin install and `node_modules` are container-local; rebuild them (about 5 minutes, mostly the 430 MB `bpy` download):
+```bash
+python3 -m venv /tmp/bpy-venv && /tmp/bpy-venv/bin/pip install bpy           # headless Blender (Cycles CPU)
+git clone --depth 1 https://github.com/EL4CTEO/blender-skills /tmp/blender-skills   # public, MIT, v1.2.0
+P=~/.claude/plugins/cache/blender-agent-skills/blender-agent-skills/1.2.0 && mkdir -p $P && cp -r /tmp/blender-skills/skills $P/
+(cd skills/model-loop/scripts && npm install)                                  # sharp
+export BPY_PY=/tmp/bpy-venv/bin/python
+python3 skills/scene-recon/scripts/camera_fit.py --selftest                    # then, from skills/scene-recon/scripts:
+./run_bpy.sh test_camera_fit_bpy.py && ./run_bpy.sh test_recon_import.py        # all three print OK
+```
+- Writing under `~/.claude` may need the user's approval; read the plugin's three scripts first (`turntable.py`, `render_batch.py`, `qa_check.py`).
+- The OpenAI key is saved as a network secret for `api.openai.com` on the user's "Pantheon" environment: no key to paste; run node scripts with `OPENAI_API_KEY=proxy-injected`.
+- The Figma MCP (Weave tools) can time out after a worker restart; if `mcp__Figma__weave_*` is missing, retry ToolSearch before telling the user.
+
 ## Paths
 - `SKILL_DIR` = this folder; `S` = `SKILL_DIR/scripts`; `M` = `SKILL_DIR/../model-loop/scripts`.
 - Run folder `R` = `<project>/assets-src/model-loop/<asset>_recon/`: `input.png`, `refs/`, `textures/`, `meshes/<id>.glb`,
