@@ -1,0 +1,82 @@
+{
+ "refs/trunk_roots.png": {
+  "image": "input.png",
+  "size": "1024x1024",
+  "prompt": "From this image, show only the tree's braided trunk together with its root skirt, as one single object: the trunk is cut off cleanly just above the point where the main limbs start to spread (no crown, no branches with leaves, no foliage), and all the thick roots flow down and outward to a flat ground line. Remove everything else: no standing stones, no boulders, no rocks, no water, no waterfall, no ivy, no ground tile. Where rocks hid the roots, show the roots continuing down to the ground. Keep the carved band of square knotwork spiralling up the front strand of the trunk. Isolated, centred, the whole object in frame, three-quarter view from slightly above, plain light-grey background, soft even light, no other objects. Keep exactly the same style, colours, proportions and wear as in the image.",
+  "result": {
+   "out": "assets-src/model-loop/great_tree_recon/refs/trunk_roots.png",
+   "width": 1024,
+   "height": 1024,
+   "model": "gpt-image-2",
+   "tile": false,
+   "mean": [
+    188,
+    185,
+    179
+   ],
+   "stdev": [
+    70,
+    71,
+    78
+   ]
+  },
+  "model": "gpt-image-2",
+  "quality": "medium"
+ },
+ "style/rune_mask.png": {
+  "image": "refs/runestone.png",
+  "size": "1024x1536",
+  "prompt": "From this image, draw only the glowing knotwork carving of the stone as a flat mask: pure white lines on a pure black background, seen exactly straight on from the front (orthographic, no perspective, no tilt). Same interlace pattern, same line thickness and same tall proportions, centred, filling the frame height with a small margin. Include the thin pointed border line of the panel around the knotwork. No stone, no texture, no shading, no glow, no grey: only solid white on solid black.",
+  "result": {
+   "out": "assets-src/model-loop/great_tree_recon/style/rune_mask.png",
+   "width": 1024,
+   "height": 1536,
+   "model": "gpt-image-2",
+   "tile": false,
+   "mean": [
+    29,
+    29,
+    29
+   ],
+   "stdev": [
+    79,
+    79,
+    79
+   ]
+  },
+  "model": "gpt-image-2",
+  "quality": "medium"
+ },
+ "style/id_map.png": {
+  "image": "input.png",
+  "size": "1536x1024",
+  "prompt": "Repaint this exact image as a flat-colour object-ID map. Keep the same framing and keep every shape exactly where it is, pixel-aligned with the original. Use only these solid colours: pure red for the three tall standing runestones; orange for the tree trunk, the roots and the bare branches; pure green for the leaf canopy; pure blue for the pool water and the waterfall; mid grey for the boulders and rocks; yellow for the flat ground tile; magenta for ivy and small plants; pure white for the background. Flat colours only: no shading, no outlines, no gradients, no texture, no shadows.",
+  "result": {
+   "out": "assets-src/model-loop/great_tree_recon/style/id_map.png",
+   "width": 1536,
+   "height": 1024,
+   "model": "gpt-image-2",
+   "tile": false,
+   "mean": [
+    227,
+    211,
+    190
+   ],
+   "stdev": [
+    69,
+    70,
+    102
+   ]
+  },
+  "model": "gpt-image-2",
+  "quality": "medium"
+ },
+ "style/style_sheet.png": {
+  "image": "input.png",
+  "size": "1024x1024",
+  "status": "NOT MADE: 3 attempts on 2026-11-13 failed with the cloud proxy's 'upstream request failed' (the other three calls passed). Material colours were measured from input.png through the ID map instead.",
+  "prompt": "From this image, make a material swatch sheet: a grid of six large flat square swatches, three in the top row and three in the bottom row, with thin light-grey gaps between them. Each swatch shows only the flat painted surface of one material from the image, seen straight on, with no lighting, no shadows, no objects and no perspective. Top row, left to right: tree bark, moss, leaf green. Bottom row, left to right: grey stone, pool water, glowing pale-cyan rune light. Keep exactly the colours and the hand-painted brushwork of the image. No text, no labels.",
+  "model": "gpt-image-2",
+  "quality": "medium"
+ }
+}

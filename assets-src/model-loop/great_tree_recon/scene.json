@@ -1,0 +1,332 @@
+{
+ "asset": "great_tree",
+ "route": "scene-recon (3d-plan.md). Vertical slice: runestone and trunk_roots are built; every other piece is listed only.",
+ "units": {
+  "system": "metres",
+  "up": "Z",
+  "front": "-Y",
+  "origin": "centre of the ground tile, z = 0 on the tile's top face"
+ },
+ "scale": {
+  "tile_m": 9.2,
+  "assumption": "tree 10.5 m tall (kept from the old plan)",
+  "check": "with a 9.2 m tile the tree measures 10.54 m and the left runestone about 3.2 m"
+ },
+ "camera": {
+  "image": "input.png",
+  "size_px": [
+   1536,
+   1024
+  ],
+  "tile_yaw_deg": 45,
+  "corners_px": {
+   "front": [
+    763.5,
+    1007.7
+   ],
+   "right": [
+    1225.4,
+    780.6
+   ],
+   "back": [
+    731.2,
+    604.1
+   ],
+   "left": [
+    288.0,
+    771.1
+   ]
+  },
+  "corner_weights": {
+   "front": 1,
+   "right": 1,
+   "back": 0.2,
+   "left": 1
+  },
+  "az": -1.121,
+  "el": 24.905,
+  "lens_mm": 71.456,
+  "dist_m": 42.4661,
+  "err_px": {
+   "front": 0.46,
+   "right": 0.642,
+   "back": 21.546,
+   "left": 0.65
+  },
+  "note": "Corners are intersections of lines fitted to the tile's top-face edges (sub-pixel, rms 0.05-0.6 px). The back corner is hidden behind the tree: it is extrapolated from two 35 px edge stretches, so it has a low weight; the fitted camera puts it 21.5 px from that pick. With equal weights the camera barely moves (az -2.3, el 24.9, lens 75 mm).",
+  "blender": {
+   "location": [
+    -0.7538713649219587,
+    -38.50967774087154,
+    17.883099510128588
+   ],
+   "rotation_euler": [
+    1.2224615667436163,
+    0.018006243755332888,
+    -0.014990617898849493
+   ],
+   "lens_mm": 71.45584752050702,
+   "sensor_width_mm": 36.0,
+   "sensor_fit": "AUTO",
+   "resolution": [
+    1536,
+    1024
+   ]
+  }
+ },
+ "materials": {
+  "stone_cut": {
+   "texture": "textures/stone_cut.png",
+   "tile_m": 1.0,
+   "roughness": 0.88,
+   "from": "temple_ruin"
+  },
+  "moss": {
+   "texture": "textures/moss.png",
+   "tile_m": 0.8,
+   "roughness": 0.9,
+   "from": "temple_ruin",
+   "note": "painted on by great_tree/build/tree_common.paint_moss (noise patches, more on up-facing faces)"
+  },
+  "bark": {
+   "texture": "textures/bark.png",
+   "tile_m": 1.2,
+   "roughness": 0.88
+  },
+  "leaf": {
+   "texture": "textures/leaf.png",
+   "tile_m": 1.0,
+   "roughness": 0.85
+  },
+  "rune_glow": {
+   "texture": null,
+   "mask": "style/rune_mask.png",
+   "emission_rgb": [
+    0.42,
+    0.93,
+    1.0
+   ],
+   "note": "front-projected mask as emission"
+  }
+ },
+ "segmentation": {
+  "id_map": "style/id_map.png",
+  "method": "GPT Image flat-colour object-ID map of input.png (Weave had no SAM model); boxes from strict colour masks",
+  "classes_bbox_px": {
+   "runestone": [
+    430,
+    494,
+    1104,
+    723
+   ],
+   "wood": [
+    367,
+    81,
+    1179,
+    873
+   ],
+   "canopy": [
+    362,
+    20,
+    1130,
+    406
+   ],
+   "water": [
+    629,
+    705,
+    852,
+    875
+   ],
+   "rock": [
+    344,
+    522,
+    1164,
+    972
+   ],
+   "tile": [
+    294,
+    754,
+    1223,
+    1000
+   ],
+   "ivy": [
+    325,
+    232,
+    1186,
+    921
+   ]
+  }
+ },
+ "pieces": [
+  {
+   "id": "runestone",
+   "source": "trellis",
+   "ref": "refs/runestone.png",
+   "ref_view": [
+    25,
+    20,
+    85
+   ],
+   "mesh": "meshes/runestone.glb",
+   "dims_m": [
+    1.1,
+    0.6,
+    3.2
+   ],
+   "fit": "height",
+   "tris": 5000,
+   "materials": [
+    "stone_cut",
+    "moss",
+    "rune_glow"
+   ],
+   "instances": [
+    {
+     "id": "runestone_l",
+     "bbox_px": [
+      431,
+      494,
+      510,
+      705
+     ],
+     "pos_m": [
+      -4.12,
+      1.55,
+      0.35
+     ],
+     "yaw": 0,
+     "pos_method": "base and top rays, stone assumed 3.2 m tall"
+    },
+    {
+     "id": "runestone_c",
+     "bbox_px": [
+      735,
+      519,
+      803,
+      703
+     ],
+     "pos_m": [
+      0.23,
+      null,
+      null
+     ],
+     "yaw": 0,
+     "pos_method": "x only: its base is hidden by roots and the waterfall, and it stands in a niche above the pool"
+    },
+    {
+     "id": "runestone_r",
+     "bbox_px": [
+      1025,
+      539,
+      1103,
+      724
+     ],
+     "pos_m": [
+      4.51,
+      null,
+      null
+     ],
+     "yaw": 0,
+     "pos_method": "x only: its base is hidden by roots and it stands on the rockery (z unknown)"
+    }
+   ],
+   "review_at": 5,
+   "pass_at": 7,
+   "status": "todo",
+   "best": null
+  },
+  {
+   "id": "trunk_roots",
+   "source": "trellis",
+   "ref": "refs/trunk_roots.png",
+   "ref_view": [
+    0,
+    24,
+    85
+   ],
+   "mesh": "meshes/trunk_roots.glb",
+   "bbox_px": [
+    367,
+    330,
+    1179,
+    873
+   ],
+   "pos_m": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0,
+   "dims_m": [
+    10.5,
+    10.5,
+    6.5
+   ],
+   "fit": "fit",
+   "tris": 40000,
+   "materials": [
+    "bark",
+    "moss"
+   ],
+   "note": "trunk and roots as one organic mass (one Trellis run); cut off above the point where the limbs spread",
+   "review_at": 5,
+   "pass_at": 8,
+   "status": "todo",
+   "best": null
+  },
+  {
+   "id": "crown",
+   "source": "trellis",
+   "ref": "refs/crown.png",
+   "bbox_px": [
+    362,
+    20,
+    1130,
+    406
+   ],
+   "status": "later",
+   "note": "limbs; leaf pads as instances of one pad"
+  },
+  {
+   "id": "leaf_pad",
+   "source": "instance",
+   "ref": "refs/leaf_pad.png",
+   "status": "later"
+  },
+  {
+   "id": "rockery",
+   "source": "trellis",
+   "ref": "refs/rockery.png",
+   "bbox_px": [
+    344,
+    522,
+    1164,
+    972
+   ],
+   "status": "later"
+  },
+  {
+   "id": "water",
+   "source": "procedural",
+   "bbox_px": [
+    629,
+    705,
+    852,
+    875
+   ],
+   "status": "later",
+   "note": "pool and thin waterfall"
+  },
+  {
+   "id": "ivy",
+   "source": "procedural",
+   "bbox_px": [
+    325,
+    232,
+    1186,
+    921
+   ],
+   "status": "later"
+  }
+ ]
+}

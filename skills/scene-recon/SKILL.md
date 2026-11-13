@@ -16,7 +16,9 @@ implements is `3d-plan.md`; its first run is a vertical slice (two pieces end to
 - **Weave through the Figma MCP**: authorised, and a Weave plan linked to the Figma account. Tools:
   `weave_find_model`, `weave_upload_asset`, `weave_run_model`, `weave_get_model_run_output`.
 - `OPENAI_API_KEY` for GPT Image (`../model-loop/scripts/openai-image.mjs`). In a cloud session the key is a proxy-injected
-  credential: run the node scripts with `OPENAI_API_KEY=proxy-injected`; the proxy supplies the real one. Never print it.
+  credential: run the node scripts with `OPENAI_API_KEY=proxy-injected NODE_USE_ENV_PROXY=1` (Node's `fetch` ignores `HTTPS_PROXY`
+  without the second one: `getaddrinfo ENOTFOUND`); the proxy supplies the real key. Never print it. A reply of `upstream request failed`
+  is the proxy, not OpenAI: retry once, then move on (do not burn calls).
 - Blender: live Blender MCP if connected, otherwise the `bpy` wheel (headless, see below).
 
 ## Quick start in a fresh cloud container
@@ -81,6 +83,16 @@ cam.ground_xy([(px, py)])                                 # mask-bottom pixel ->
 cam.blender()                                             # location / rotation_euler / lens for the match camera
 ```
 - Corner labels are world labels; the azimuth is relative to which edge you call front. Mirrored corner order raises `ValueError`.
+- **Diamond tile** (a 3/4 game-asset view, the scene facing the camera): `fit([front, right, back, left], size, tile_m, tile_yaw=45)`.
+- **Corners are line intersections, not clicks.** Fit a line to each top-face edge (sub-pixel brightness crossing per column, robust least
+  squares) and intersect them; a chamfered or rounded corner then does not matter. A front edge whose top/side boundary is too faint: fit the
+  side's bottom silhouette and shift it up by the side's thickness measured on the other front edge.
+- **Hidden corner** (usually the back one, behind the model): extrapolate it from the two short visible edge stretches and pass a low weight,
+  `weights=[1, 1, 0.2, 1]`. `cam.err_px` then shows the visible corners within about 1 px and how far the fitted camera puts the hidden one from
+  your pick. Say so in `scene.json`; do not report it as a 4-corner fit within 3 px.
+- **Scale**: fit with `tile_m=1`, cast the ray of the model's top pixel onto the vertical plane through the tile centre, and choose `tile_m`
+  so the height matches the size the user assumed. A piece that does not stand on the tile (a stone on the rockery) cannot be placed by
+  `ground_xy` alone: its base height is unknown; say which positions are estimates.
 - `python scripts/camera_fit.py --selftest` (corners reproject within 3 px, exact when noiseless, ground round trip, mirrored order refused) and
   `run_bpy.sh test_camera_fit_bpy.py` (the Blender camera gives the same pixels as the numpy projection, < 0.05 px).
 - The lens is the least certain output with noisy picks; azimuth and elevation are stable. Pick corners at pixel precision, from the mask.

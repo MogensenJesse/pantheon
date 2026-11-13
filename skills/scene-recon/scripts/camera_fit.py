@@ -13,13 +13,18 @@ degrees above the horizon, so (az, el, lens) matches loop_render's `ref_view`.
 Corner labels are world labels: front-left = (-s, -s), front-right = (+s, -s), back-right = (+s, +s),
 back-left = (-s, +s) with s = tile_m / 2. If the tile is seen turned by an angle, the azimuth you get is
 relative to that labelling (label the edge you call "front" as front-left -> front-right).
+  tile_yaw=45  the tile stands as a diamond in the world (a corner points to the front, as in a 3/4 game-asset
+               view whose scene faces the camera): give the corners as front, right, back, left.
+  weights=[..] one weight per corner (default 1). Give a corner that is hidden and extrapolated from its two
+               edges a low weight (about sigma_visible / sigma_hidden, e.g. 0.2): the fit then follows the
+               corners you can see. `cam.err_px` lists each corner's reprojection error.
 
 The pose comes from the homography of the four corners (closed form, principal point at the image centre,
 square pixels), then a short Levenberg-Marquardt refinement of rotation, translation and focal length on the
 reprojection error. Four points fix the pose exactly; with noisy picks the refinement spreads the error.
 
 Self-check:  python camera_fit.py --selftest      Fit from a JSON file:  python camera_fit.py picks.json
-  picks.json = {"size": [W, H], "tile_m": 1.0, "corners": [[x, y], [x, y], [x, y], [x, y]]}
+  picks.json = {"size": [W, H], "tile_m": 1.0, "corners": [[x, y], [x, y], [x, y], [x, y]], "tile_yaw": 0, "weights": [1, 1, 1, 1]}
 """
 import json
 import math
@@ -118,9 +123,11 @@ class Camera:
                 "dist": round(self.dist, 4), "rms_px": round(self.rms_px, 4)}
 
 
-def _world_corners(tile_m):
+def _world_corners(tile_m, yaw_deg=0.0):
     s = tile_m / 2
-    return np.array([[-s, -s, 0], [s, -s, 0], [s, s, 0], [-s, s, 0]], float)
+    c = np.array([[-s, -s, 0], [s, -s, 0], [s, s, 0], [-s, s, 0]], float)
+    a = math.radians(yaw_deg)
+    return c @ np.array([[math.cos(a), math.sin(a), 0], [-math.sin(a), math.cos(a), 0], [0, 0, 1]])
 
 
 def _homography(xy, uv):
@@ -143,13 +150,14 @@ def _pose(H, f):
     return U @ Vt, t
 
 
-def _refine(R, t, f, world, uv, iters=80):
-    """Levenberg-Marquardt on rotation vector, translation and log focal length."""
+def _refine(R, t, f, world, uv, iters=80, w=None):
+    """Levenberg-Marquardt on rotation vector, translation and log focal length (w: weight per point)."""
+    w = np.ones(len(world)) if w is None else np.asarray(w, float)
 
     def res(p):
         Rm = _rod(p[:3])
         pc = world @ Rm.T + p[3:6]
-        return (math.exp(p[6]) * pc[:, :2] / pc[:, 2:3] - uv).ravel()
+        return ((math.exp(p[6]) * pc[:, :2] / pc[:, 2:3] - uv) * w[:, None]).ravel()
 
     p = np.concatenate([_rotvec(R), t, [math.log(f)]])
     r = res(p)
@@ -180,15 +188,19 @@ def _refine(R, t, f, world, uv, iters=80):
     return _rod(p[:3]), p[3:6], math.exp(p[6])
 
 
-def fit(corners_px, size_px, tile_m=1.0):
-    """Camera from the 4 corner pixels of a square tile (front-left, front-right, back-right, back-left)."""
+def fit(corners_px, size_px, tile_m=1.0, tile_yaw=0.0, weights=None):
+    """Camera from the 4 corner pixels of a square tile (front-left, front-right, back-right, back-left;
+    with tile_yaw=45: front, right, back, left). weights: one per corner, low for an extrapolated corner."""
     W, H = size_px
     px = np.asarray(corners_px, float)
     if px.shape != (4, 2):
         raise ValueError("need exactly 4 corner pixels")
     S = float(max(W, H))
     uv = (px - [W / 2, H / 2]) / S
-    world = _world_corners(tile_m)
+    world = _world_corners(tile_m, tile_yaw)
+    wts = np.ones(4) if weights is None else np.asarray(weights, float)
+    if wts.shape != (4,) or (wts <= 0).any():
+        raise ValueError("weights: 4 positive numbers")
     Hm = _homography(world[:, :2], uv)
     h1, h2 = Hm[:, 0], Hm[:, 1]
     starts = []
@@ -203,18 +215,20 @@ def fit(corners_px, size_px, tile_m=1.0):
         R, t = _pose(Hm, f0)
         if (-R.T @ t)[2] <= 0:
             continue
-        R, t, f = _refine(R, t, f0, world, uv)
+        R, t, f = _refine(R, t, f0, world, uv, w=wts)
         if (-R.T @ t)[2] <= 0 or t[2] <= 0:
             continue
         r = (f * (world @ R.T + t)[:, :2] / (world @ R.T + t)[:, 2:3] - uv) * S
-        rms = float(np.sqrt((r ** 2).mean()))
-        if best is None or rms < best[0] - 1e-9:
-            best = (rms, R, t, f)
+        cost = float(((r * wts[:, None]) ** 2).sum())
+        if best is None or cost < best[0] - 1e-9:
+            best = (cost, R, t, f, r)
     if best is None:
         raise ValueError("no camera above the ground fits these corners: check the corner order "
                          "(front-left, front-right, back-right, back-left) and that they are not collinear")
-    rms, R, t, f = best
-    return Camera(R, t, f * S, (W, H), rms_px=rms)
+    _, R, t, f, r = best
+    cam = Camera(R, t, f * S, (W, H), rms_px=float(np.sqrt((r ** 2).sum(1).mean())))
+    cam.err_px = [round(float(e), 3) for e in np.linalg.norm(r, axis=1)]  # per corner, in the order given
+    return cam
 
 
 # ---------------------------------------------------------------------------------------------- self-check
@@ -263,6 +277,16 @@ def selftest(verbose=True):
             worst["corner_px"] = max(worst["corner_px"], err)
             worst["ang_deg"] = max(worst["ang_deg"], dang) if sigma == 0 else worst["ang_deg"]
             worst["lens_pct"] = max(worst["lens_pct"], dlens) if sigma == 0 else worst["lens_pct"]
+    # diamond tile (tile_yaw=45): same camera, corners given as front, right, back, left
+    truth = _synthetic(-2, 25, 75, 9.0, (0, 0), (1536, 1024))
+    dia = truth.project(_world_corners(2.0, 45))
+    cam = fit(dia, (1536, 1024), 2.0, tile_yaw=45)
+    assert abs(cam.az - truth.az) < 0.01 and abs(cam.el - truth.el) < 0.01 and abs(cam.lens_mm - 75) < 0.05, cam.summary()
+    # a hidden corner picked 12 px off with a low weight: the visible corners still reproject within 1.5 px
+    bad = dia.copy()
+    bad[2] += [9.0, -8.0]
+    cam = fit(bad, (1536, 1024), 2.0, tile_yaw=45, weights=[1, 1, 0.15, 1])
+    assert max(cam.err_px[i] for i in (0, 1, 3)) < 1.5 and cam.err_px[2] > 5, cam.err_px
     # mirrored labelling must be refused, not silently flipped
     truth = _synthetic(30, 30, 50, 6.0, (0, 0), (1024, 1024))
     try:
@@ -284,8 +308,8 @@ def main(argv):
         print(__doc__)
         return 2
     d = json.load(open(argv[1]))
-    cam = fit(d["corners"], tuple(d["size"]), d.get("tile_m", 1.0))
-    print(json.dumps({**cam.summary(), "blender": cam.blender()}, indent=1))
+    cam = fit(d["corners"], tuple(d["size"]), d.get("tile_m", 1.0), d.get("tile_yaw", 0.0), d.get("weights"))
+    print(json.dumps({**cam.summary(), "err_px": cam.err_px, "blender": cam.blender()}, indent=1))
     return 0
 
 
