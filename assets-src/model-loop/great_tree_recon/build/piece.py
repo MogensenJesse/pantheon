@@ -42,18 +42,30 @@ KNOBS = {
     "runestone": dict(
         shade="flat",            # "flat" | "smooth" (smooth = by angle, sharp above 40 deg)
         planar_deg=0.0,          # > 0: merge near-coplanar triangles into facets first (limited dissolve)
+        # pre-judge colour pass (colmeasure, lit tops): reference #949289, render #6c6d6e with the temple's tint (0.99, 0.99, 1.0) gain 0.46
+        # (tuned for EEVEE; Cycles renders it darker) -> warmer and lighter
         stone=dict(tile_m=0.9, mask="curv", ridge=0.12, crease=0.35, ridge_col=(0.86, 0.85, 0.82, 1), top_light=0.35, ao=0.3,
-                   tex_contrast=0.45, tex_sat=0.2, tint=(0.99, 0.99, 1.0), gain=0.46, face_var=0.10),
+                   tex_contrast=0.45, tex_sat=0.2, tint=(1.0, 0.95, 0.83), gain=0.85, face_var=0.10),
         moss=None,               # the reference stone is clean granite: no moss (threshold, lower = more; None = off)
-        # rune panel on the front (-Y) face, metres in object space: width, height, centre x, centre z
-        rune=dict(w=0.55, h=2.25, cx=0.0, cz=1.45, strength=3.0, floor=0.25),
+        # rune glow: the GPT mask front-projected onto the panel that build/orient.py found on the mesh (scene.json panel_box);
+        # grow = the mask's drawing (it includes the panel's border line) relative to the baked cyan area
+        # pre-judge fix: stretching the mask to the panel's width made the knot 1.7x too fat; keep its aspect, fit the height
+        rune=dict(strength=3.0, grow=1.08),
+        loose=dict(),
     ),
     "trunk_roots": dict(
         shade="flat",
         planar_deg=0.0,
-        bark=dict(tile_m=1.1, mask="curv", ridge=0.08, crease=0.35, top_light=0.22, ao=0.3, tex_contrast=0.08, tex_sat=0.75,
-                  tint=(0.97, 0.96, 0.9), gain=1.1, face_var=0.16),
-        moss=0.62,               # olive moss paint on the bark (tree_common.MOSS_BARK)
+        # pre-judge colour pass (colmeasure, bark without moss): tops matched (#7e735b vs #7f725f) but sides #29200d against #303025 and
+        # top/side contrast 3.9 against 2.5 -> less yellow, softer creases and AO
+        bark=dict(tile_m=1.1, mask="curv", ridge=0.08, crease=0.2, top_light=0.22, ao=0.15, tex_contrast=0.08, tex_sat=0.75,
+                  tint=(0.87, 0.95, 1.0), gain=1.14, face_var=0.16),
+        # olive moss paint on the bark (tree_common.MOSS_BARK). pre-judge fix: on a 10 m piece the limb recipe (scale 4,
+        # thresh 0.62) read as camouflage speckle; fewer, larger patches
+        moss=dict(thresh=0.70, scale=1.3, stretch=(1.0, 1.0, 1.0)),
+        # Trellis broke some thin roots off: detached islands float (qa_check errors). Drop islands under 3 % of the triangles
+        # unless they span a quarter of the piece
+        loose=dict(min_face_frac=0.03, min_diag_frac=0.25),
     ),
 }
 
@@ -87,8 +99,8 @@ def facets(ob, shade, planar_deg, seed=1):
     return len(me.polygons)
 
 
-def rune_glow(mat, ob, w, h, cx, cz, strength, floor, mask_png):
-    """Front-project the white-on-black rune mask onto the -Y side as emission (and a dark panel floor behind it)."""
+def rune_glow(mat, ob, w, h, cx, cz, strength, mask_png):
+    """Front-project the white-on-black rune mask onto the -Y side as emission. w, h, cx, cz: the panel in metres (object space)."""
     nt = mat.node_tree
     bsdf = next(n for n in nt.nodes if n.type == "BSDF_PRINCIPLED")
     img = bpy.data.images.load(mask_png, check_existing=True)
@@ -115,6 +127,8 @@ def rune_glow(mat, ob, w, h, cx, cz, strength, floor, mask_png):
         return mr.outputs["Result"]
 
     comb = nt.nodes.new("ShaderNodeCombineXYZ")
+    if w is None:  # keep the drawing's aspect: its width follows from the panel's height
+        w = h * ((u1 - u0) * iw) / ((v1 - v0) * ih)
     nt.links.new(remap(sep.outputs["X"], cx - w / 2, cx + w / 2, u0, u1), comb.inputs["X"])
     nt.links.new(remap(sep.outputs["Z"], cz - h / 2, cz + h / 2, v0, v1), comb.inputs["Y"])
     tex = nt.nodes.new("ShaderNodeTexImage")
@@ -139,7 +153,7 @@ def rune_glow(mat, ob, w, h, cx, cz, strength, floor, mask_png):
     nt.links.new(line.outputs[0], st.inputs[0])
     st.inputs[1].default_value = strength
     nt.links.new(st.outputs[0], bsdf.inputs["Emission Strength"])
-    return {"mask_box_uv": [round(float(v), 3) for v in (u0, u1, v0, v1)]}
+    return {"mask_box_uv": [round(float(v), 3) for v in (u0, u1, v0, v1)], "w_m": round(float(w), 3)}
 
 
 def mask_pass(pid, path, res=(1024, 1024)):
@@ -184,7 +198,8 @@ def main():
         for o in list(old.objects):
             bpy.data.objects.remove(o)
     glb = os.environ.get("RECON_GLB") or os.path.join(R, piece["mesh"])
-    out = {"piece": pid, "tag": tag, "import": recon_import.run(glb, pid, piece["dims_m"], piece["tris"], fit=piece.get("fit", "fit"))}
+    out = {"piece": pid, "tag": tag, "import": recon_import.run(glb, pid, piece["dims_m"], piece["tris"], fit=piece.get("fit", "fit"),
+                                                                yaw_deg=piece.get("mesh_yaw", 0.0), **K.get("loose", {}))}
     ob = bpy.data.objects[pid]
     out["facets"] = facets(ob, K["shade"], K["planar_deg"])
     out["curv"] = loop_mat.edge_mask(ob)
@@ -192,11 +207,16 @@ def main():
         m = tcommon._spec(loop_mat.material("M_recon_stone", rel("textures/stone_cut.png"), rough=1.0, **K["stone"]))
         if K["moss"] is not None:
             TC.paint_moss(m, thresh=K["moss"], col=TC.MOSS_COL)
-        out["rune"] = rune_glow(m, ob, mask_png=os.path.join(R, "style", "rune_mask.png"), **K["rune"])
+        W, _, H = out["import"]["size_m"]
+        box = piece.get("panel_box") or dict(cx=0.0, cz=0.45, w=0.5, h=0.7)  # fallback: a guess from the reference
+        g = K["rune"]["grow"]
+        panel = dict(w=None, h=box["h"] * H * g, cx=box["cx"] * W, cz=box["cz"] * H)
+        out["rune"] = dict(rune_glow(m, ob, mask_png=os.path.join(R, "style", "rune_mask.png"), strength=K["rune"]["strength"], **panel),
+                           panel_m={k: round(v, 3) for k, v in panel.items() if v is not None})
     else:
         m = tcommon._spec(loop_mat.material("M_recon_bark", rel("textures/bark.png"), rough=1.0, **K["bark"]))
         if K["moss"] is not None:
-            TC.paint_moss(m, thresh=K["moss"], col=TC.MOSS_BARK)
+            TC.paint_moss(m, col=TC.MOSS_BARK, **K["moss"])
     ob.data.materials.clear()
     ob.data.materials.append(m)
     out["qa_errors"] = qa_check.run(objects=[pid], profile="render").get("errors", [])

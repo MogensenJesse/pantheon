@@ -5,7 +5,8 @@
 
 Trellis output is always about 1 m tall, dense (hundreds of thousands of triangles), and carries one baked
 material. Steps, in this order:
-  import -> bake parent transforms and join the meshes into one object -> merge by distance ->
+  import -> bake parent transforms and join the meshes into one object -> turn by yaw_deg about Z (the piece comes
+  out of Trellis at any yaw; orient_fit.run finds the angle that matches the reference) -> merge by distance ->
   drop loose bits (small, separate, far smaller than the main body) -> recalculate normals outward ->
   decimate to about `tris` -> scale to `dims_m` -> origin at bottom-centre (z = 0 at the floor, x/y centred) ->
   strip the material, its images and any colour attributes (the retexture comes from loop_mat's box projection).
@@ -72,7 +73,7 @@ def _join(objs):
 
 
 def run(glb, name, dims_m, tris=12000, fit="fit", merge_frac=5e-4, min_face_frac=0.01, min_diag_frac=0.10,
-        collection=None):
+        collection=None, yaw_deg=0.0):
     if not os.path.isfile(glb):
         raise FileNotFoundError(glb)
     if fit not in ("fit", "height", "axes"):
@@ -97,7 +98,12 @@ def run(glb, name, dims_m, tris=12000, fit="fit", merge_frac=5e-4, min_face_frac
             bpy.data.objects.remove(o)
     obj = _join(meshes)
     me = obj.data
-    stats = {"name": name, "tris_in": _tris(me), "materials_removed": 0}
+    if yaw_deg:  # Trellis does not put the reference's view at the front: turn it first (orient_fit.run finds the angle)
+        from mathutils import Matrix
+
+        me.transform(Matrix.Rotation(math.radians(yaw_deg), 4, "Z"))
+        me.update()
+    stats = {"name": name, "tris_in": _tris(me), "materials_removed": 0, "yaw_deg": yaw_deg}
     co = _coords(me)
     stats["size_in_m"] = [round(float(v), 4) for v in co.max(0) - co.min(0)]
     diag = float(np.linalg.norm(co.max(0) - co.min(0)))
