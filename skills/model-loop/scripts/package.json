@@ -1,0 +1,9 @@
+{
+  "name": "model-loop-scripts",
+  "private": true,
+  "type": "module",
+  "description": "Node helpers for the model-loop skill (image calls, contact sheets, colour stats). Run `npm install` here once on a new machine.",
+  "dependencies": {
+    "sharp": "^0.35.4"
+  }
+}
