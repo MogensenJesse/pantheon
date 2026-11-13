@@ -1,11 +1,19 @@
 // scripts/checks/landmarks/landmarks-check.ts — the Phase 0 landmarks: waking one, the gate, the guide target, the save slice
 import assert from 'node:assert/strict';
+import { Euler, Matrix4, Quaternion, Vector3 } from 'three';
 import { allPropAssetEntries } from '../../../src/assets/assetManifest.ts';
 import { PHASE0 } from '../../../src/config/phase0.ts';
+import { landmark as LANDMARK_LOOK } from '../../../src/config/visual/landmark.ts';
 import { phase0Progress } from '../../../src/core/reveal/phase0Progress.ts';
 import { pickGuideTarget } from '../../../src/entities/guideLine/guideTarget.ts';
 import {
+  createLandmarkHover,
+  hoverIndexOf,
+  hoverPose,
+} from '../../../src/landmarks/landmarkHover.ts';
+import {
   LANDMARK_STAND_INS,
+  restoreProps,
   standInProps,
   withLandmarkStandIns,
 } from '../../../src/landmarks/landmarkStandIns.ts';
@@ -40,6 +48,7 @@ import {
   landmarkChapterId,
   MEMORY_FRAGMENTS,
 } from '../../../src/story/fragments.ts';
+import type { PropLodGroup } from '../../../src/world/mapProps/mapPropLod.ts';
 import { check, expectOk, expectRefuses, finish } from '../lib/check.ts';
 import { fakeSources, rawProfile } from '../lib/saveFixtures.ts';
 
@@ -192,6 +201,91 @@ await check('every landmark kind has stand-in props, and each uses an asset the 
 });
 
 await check(
+  'the runestones hang in the air, bob and turn, each out of step; nothing else does',
+  () => {
+    const { liftM, bobM, stones } = LANDMARK_LOOK.hover;
+    const indices = LANDMARK_STAND_INS.runestones.map((standIn) => hoverIndexOf(standIn.key));
+    assert.deepEqual(indices, [0, 1, 2], 'every runestone is a hovering stone, in order');
+    for (const standIn of LANDMARK_STAND_INS.runestones)
+      assert.equal(standIn.surfaceLift, liftM, `${standIn.key} hangs over the ground`);
+    assert.ok(bobM < liftM, 'the trough of the bob stays off the ground');
+    assert.equal(hoverIndexOf('stone_runic_1'), -1, 'the ordinary runic stones stay on the ground');
+    for (const kind of LANDMARK_KINDS) {
+      if (kind === 'runestones') continue;
+      for (const standIn of LANDMARK_STAND_INS[kind]) assert.equal(hoverIndexOf(standIn.key), -1);
+    }
+
+    // Asynchronous: each stone has its own phase and bob speed, and they do not all turn the same way.
+    assert.equal(new Set(stones.map((s) => s.phase)).size, stones.length, 'own phase');
+    assert.equal(new Set(stones.map((s) => s.speed)).size, stones.length, 'own bob speed');
+    assert.ok(
+      stones.some((s) => s.spin < 0) && stones.some((s) => s.spin > 0),
+      'not one way round',
+    );
+    let widest = 0;
+    for (let t = 0; t < 120; t += 0.25) {
+      const dys = indices.map((i) => hoverPose(i, t).dy);
+      for (const dy of dys) assert.ok(Math.abs(dy) <= bobM + 1e-9, 'the bob stays in its range');
+      widest = Math.max(widest, Math.max(...dys) - Math.min(...dys));
+    }
+    assert.ok(widest > bobM, 'they drift far apart: one up while another is down');
+    assert.notEqual(
+      indices.map((i) => hoverPose(i, 0).dy).join(),
+      indices.map((i) => hoverPose(i, 3).dy).join(),
+      'they move',
+    );
+    assert.ok(hoverPose(0, 0.5).yaw > 0, 'a slow turn');
+    assert.ok(
+      hoverPose(1, 3600).yaw < 2 * Math.PI,
+      'the turn stays within one lap, whichever way it goes',
+    );
+  },
+);
+
+await check(
+  'the hover moves the stones in their matrices, about their own axis, and nothing else',
+  () => {
+    const rest = new Matrix4().compose(
+      new Vector3(10, 1.5, -4),
+      new Quaternion().setFromEuler(new Euler(0.1, 0.7, 0)),
+      new Vector3(2, 2, 2),
+    );
+    const hovering = { key: 'stone_runic_hover_3', matrices: [rest.clone()], dirty: false };
+    const ordinary = { key: 'stone_runic_3', matrices: [rest.clone()], dirty: false };
+    const hover = createLandmarkHover([hovering, ordinary] as unknown as PropLodGroup[]);
+
+    hover.frame(2.5);
+    const { dy, yaw } = hoverPose(1, 2.5);
+    const moved = hovering.matrices[0]!;
+    const turned = rest.clone().multiply(new Matrix4().makeRotationY(yaw));
+    assert.ok(hovering.dirty, 'the prop LOD uploads the new matrix');
+    assert.ok(
+      Math.abs(moved.elements[12]! - 10) < 1e-9 && Math.abs(moved.elements[14]! + 4) < 1e-9,
+      'x and z stay',
+    );
+    assert.ok(Math.abs(moved.elements[13]! - (1.5 + dy)) < 1e-9, 'y moves by the bob');
+    for (const k of [0, 1, 2, 4, 5, 6, 8, 9, 10])
+      assert.ok(
+        Math.abs(moved.elements[k]! - turned.elements[k]!) < 1e-9,
+        'turned about its own axis',
+      );
+    assert.equal(ordinary.dirty, false, 'an ordinary runic stone is left alone');
+    assert.ok(ordinary.matrices[0]!.equals(rest));
+
+    hover.frame(0);
+    assert.ok(
+      hovering.matrices[0]!.equals(moved),
+      'the pose comes from the rest matrix: it does not pile up',
+    );
+
+    // The ground under the stone moved (a re-seat): the hover follows from where the stone is now.
+    hovering.matrices[0]!.elements[13] = 9;
+    hover.frame(0);
+    assert.ok(Math.abs(hovering.matrices[0]!.elements[13]! - (9 + dy)) < 1e-9);
+  },
+);
+
+await check(
   'stand-in props follow the landmark: moved, turned, and the map is otherwise unchanged',
   () => {
     const runestones = { type: 'landmark', kind: 'runestones', x: 100, z: 50, rotY: 0 } as const;
@@ -220,6 +314,30 @@ await check(
     assert.equal(withLandmark.filter((e) => e.type === 'landmark').length, 1, 'the landmark stays');
   },
 );
+
+await check('a landmark scale sizes its whole group: props, spread and lift', () => {
+  const near = (a: number, b: number) => Math.abs(a - b) < 1e-9;
+  const reach = (p: { x: number; z: number }) => Math.hypot(p.x - 100, p.z - 50);
+  for (const kind of LANDMARK_KINDS) {
+    const base = { type: 'landmark', kind, x: 100, z: 50, rotY: 0.7 } as const;
+    assert.deepEqual(standInProps({ ...base, scale: 1 }), standInProps(base), 'omitted means 1');
+    for (const phase of ['inProgress', 'restored'] as const) {
+      const props = restoreProps(base, phase);
+      const big = restoreProps({ ...base, scale: 2 }, phase);
+      big.forEach((p, i) => {
+        assert.ok(near(reach(p), 2 * reach(props[i])), `${kind} ${phase}: twice as far out`);
+        assert.ok(near(p.scale, 2 * props[i].scale), `${kind} ${phase}: twice as big`);
+      });
+    }
+    const one = standInProps(base);
+    standInProps({ ...base, scale: 2 }).forEach((p, i) => {
+      assert.ok(near(p.scale, 2 * one[i].scale), `${kind}: twice as big`);
+      assert.ok(near(reach(p), 2 * reach(one[i])), `${kind}: twice as far apart`);
+      assert.ok(near(p.surfaceLift ?? 0, 2 * (one[i].surfaceLift ?? 0)), `${kind}: twice as high`);
+      assert.equal(p.rotY, one[i].rotY, 'the size does not turn it');
+    });
+  }
+});
 
 await check('each landmark woken tells the next chapter, whatever kind it is', () => {
   const ids = LANDMARK_KINDS.map((_, i) => landmarkChapterId(i + 1));

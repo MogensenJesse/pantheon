@@ -1,0 +1,317 @@
+{
+ "asset": "great_tree",
+ "style": "chunky stylised Norse, low-poly angular forms with painted soft colour, mossy and ivy-grown, hand-painted look, same family as the temple ruin (assets-src/model-loop/temple_ruin) and the well (well_test)",
+ "notes": "World ash (proposal p2). Front is -Y: the pool, the waterfall and the centre runestone face the camera of input.png. The square ground tile of the image is NOT modelled (the game's terrain is the ground). Sizes are an assumption (runestones 3.2 m, tree 10.5 m tall); the whole model can be scaled later. Parts marked from=temple_ruin are the user-accepted, frozen parts of that run: appended from temple_work.blend, never rebuilt.",
+ "materials": {
+  "stone_cut": {
+   "from": "temple_ruin",
+   "texture": "../temple_ruin/textures/stone_cut.png",
+   "tile_m": 1.0,
+   "roughness": 0.88
+  },
+  "moss": {
+   "from": "temple_ruin",
+   "texture": "../temple_ruin/textures/moss.png",
+   "tile_m": 0.8,
+   "roughness": 0.9
+  },
+  "bark": {
+   "prompt": "grey-brown ash bark, broad soft vertical painted streaks, base RGB 110/96/80, darker 78/68/58, lighter 140/126/104",
+   "texture": "textures/bark.png",
+   "tile_m": 1.2,
+   "roughness": 0.88
+  },
+  "leaf": {
+   "prompt": "deep leaf green, soft painted blotches, base RGB 70/104/44, darker 44/72/34, lighter 112/140/58",
+   "texture": "textures/leaf.png",
+   "tile_m": 1.0,
+   "roughness": 0.85
+  },
+  "rune_glow": {
+   "prompt": "pale cyan emissive, RGB 150/225/230, plain (no texture)",
+   "texture": null,
+   "roughness": 0.5
+  }
+ },
+ "nodes": [
+  {
+   "id": "boulder",
+   "kind": "part",
+   "from": "temple_ruin",
+   "desc": "mossy faceted granite boulder",
+   "dims_m": [
+    1.2,
+    1.0,
+    1.1
+   ],
+   "materials": [
+    "stone_cut",
+    "moss"
+   ],
+   "variants": 3,
+   "ref": "../temple_ruin/refs/boulder.png",
+   "status": "accepted",
+   "frozen": true
+  },
+  {
+   "id": "rubble",
+   "kind": "part",
+   "from": "temple_ruin",
+   "desc": "small angular stone",
+   "dims_m": [
+    0.3,
+    0.25,
+    0.2
+   ],
+   "materials": [
+    "stone_cut"
+   ],
+   "variants": 4,
+   "ref": "../temple_ruin/refs/rubble.png",
+   "status": "accepted",
+   "frozen": true
+  },
+  {
+   "id": "moss_clump",
+   "kind": "part",
+   "from": "temple_ruin",
+   "desc": "low moss cushion",
+   "dims_m": [
+    0.4,
+    0.4,
+    0.25
+   ],
+   "materials": [
+    "moss"
+   ],
+   "variants": 3,
+   "ref": "../temple_ruin/refs/moss_clump.png",
+   "status": "accepted",
+   "frozen": true
+  },
+  {
+   "id": "vine",
+   "kind": "part",
+   "from": "temple_ruin",
+   "desc": "ivy strand with chunky leaves",
+   "dims_m": [
+    1.5,
+    0.2,
+    0.2
+   ],
+   "materials": [
+    "moss"
+   ],
+   "variants": 2,
+   "ref": "../temple_ruin/refs/vine.png",
+   "status": "accepted",
+   "frozen": true
+  },
+  {
+   "id": "bark_limb",
+   "kind": "part",
+   "desc": "one thick gnarled root or limb of the ash: a twisting, tapering strand with a faceted low-poly surface, long flat bark planes running along its length, grey-brown, moss on the upper faces",
+   "dims_m": [
+    3.0,
+    0.7,
+    0.7
+   ],
+   "materials": [
+    "bark",
+    "moss"
+   ],
+   "variants": 3,
+   "ref": "refs/bark_limb.png",
+   "ref_view": [
+    -40,
+    48,
+    85
+   ],
+   "review_at": 5,
+   "pass_at": 7,
+   "status": "review",
+   "best": {
+    "round": 4,
+    "overall": 5.6
+   },
+   "note": "2026-11-12: user chose to leave it at r07 (5.1, best 5.6 at r04) and start the trunk; not accepted, not frozen"
+  },
+  {
+   "id": "leaf_pad",
+   "kind": "part",
+   "desc": "one flat foliage pad of the canopy: a shallow dome of big chunky overlapping ash leaves, low-poly, dark green underneath and lighter on top",
+   "dims_m": [
+    3.4,
+    2.8,
+    1.0
+   ],
+   "materials": [
+    "leaf"
+   ],
+   "variants": 3,
+   "ref": "refs/leaf_pad.png",
+   "ref_view": [
+    35,
+    25,
+    85
+   ],
+   "review_at": 5,
+   "pass_at": 7,
+   "status": "todo",
+   "best": null
+  },
+  {
+   "id": "runestone",
+   "kind": "part",
+   "desc": "tall pointed standing stone of grey granite with a recessed panel on its face, carved with a glowing pale-cyan knotwork rune",
+   "dims_m": [
+    1.1,
+    0.6,
+    3.2
+   ],
+   "materials": [
+    "stone_cut",
+    "rune_glow"
+   ],
+   "variants": 2,
+   "ref": "refs/runestone.png",
+   "ref_view": [
+    25,
+    20,
+    85
+   ],
+   "review_at": 5,
+   "pass_at": 7,
+   "status": "review",
+   "best": {
+    "round": 3,
+    "overall": 5.0
+   }
+  },
+  {
+   "id": "trunk",
+   "kind": "group",
+   "children": [
+    "bark_limb"
+   ],
+   "desc": "braided trunk: three or four thick strands twisting round each other, a carved band of square knotwork spiralling up the front strand, flaring at the foot and splitting into five or six main limbs at the top (no leaves, no long roots, no stones)",
+   "dims_m": [
+    3.4,
+    3.4,
+    6.0
+   ],
+   "ref": "refs/trunk.png",
+   "ref_view": [
+    0,
+    22,
+    50
+   ],
+   "review_at": 5,
+   "pass_at": 8,
+   "status": "todo",
+   "best": null
+  },
+  {
+   "id": "roots",
+   "kind": "group",
+   "children": [
+    "bark_limb",
+    "vine",
+    "moss_clump"
+   ],
+   "desc": "root skirt under the trunk: about a dozen thick roots flowing down and outward, crossing and braiding, arching over a hollow in the middle, splitting into smaller roots that grip the ground, with ivy and moss (no boulders, no runestones, no water)",
+   "dims_m": [
+    10.5,
+    10.5,
+    4.0
+   ],
+   "ref": "refs/roots.png",
+   "ref_view": [
+    0,
+    28,
+    50
+   ],
+   "review_at": 5,
+   "pass_at": 8,
+   "status": "todo",
+   "best": null
+  },
+  {
+   "id": "crown",
+   "kind": "group",
+   "children": [
+    "bark_limb",
+    "leaf_pad"
+   ],
+   "desc": "the canopy: main limbs spreading wide and nine or ten separate flat leaf pads in layers at different heights, like a cloud-pruned tree, with branches visible between the pads (no trunk below the fork)",
+   "dims_m": [
+    14.0,
+    12.0,
+    6.0
+   ],
+   "ref": "refs/crown.png",
+   "ref_view": [
+    0,
+    22,
+    50
+   ],
+   "review_at": 5,
+   "pass_at": 8,
+   "status": "todo",
+   "best": null
+  },
+  {
+   "id": "rockery",
+   "kind": "group",
+   "children": [
+    "boulder",
+    "rubble",
+    "runestone",
+    "moss_clump",
+    "vine"
+   ],
+   "desc": "the rock base: mossy boulders stepping up toward the middle, three glowing runestones (left, right, and one in a niche at the centre), a thin waterfall from under the centre stone into a small turquoise pool at the front (no tree, no roots, no ground slab)",
+   "dims_m": [
+    12.0,
+    12.0,
+    3.4
+   ],
+   "ref": "refs/rockery.png",
+   "ref_view": [
+    0,
+    28,
+    50
+   ],
+   "review_at": 5,
+   "pass_at": 8,
+   "status": "todo",
+   "best": null
+  },
+  {
+   "id": "great_tree",
+   "kind": "group",
+   "children": [
+    "trunk",
+    "roots",
+    "crown",
+    "rockery"
+   ],
+   "desc": "world ash: braided trunk on a mound of roots woven over mossy boulders, three glowing runestones, a spring, wide layered canopy",
+   "dims_m": [
+    14.0,
+    12.5,
+    10.5
+   ],
+   "ref": "input.png",
+   "ref_view": [
+    0,
+    28,
+    50
+   ],
+   "review_at": 5,
+   "pass_at": 9,
+   "status": "todo",
+   "best": null
+  }
+ ]
+}

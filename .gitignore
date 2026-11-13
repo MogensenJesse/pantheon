@@ -55,3 +55,6 @@ public/**/*.glb.tmp
 
 # Local editor config with machine paths
 .cursor/mcp.json
+
+# Model-loop turntable renders (regenerable, ~2.4 GB)
+assets-src/model-loop/*/renders/

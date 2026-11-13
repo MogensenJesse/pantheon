@@ -25,6 +25,8 @@ import {
 import { cloneFromRegistry } from '../../assets/AssetLoader';
 import type { AssetRegistry } from '../../assets/assetManifest';
 import { PHASE0 } from '../../config/phase0';
+import { VISUAL } from '../../config/visualTuning';
+import { LANDMARK_STAND_INS } from '../../landmarks/landmarkStandIns';
 import type { LandmarkKind, MapEntity } from '../../map/MapTypes';
 import type { MapTerrainContext } from '../../world/MapTerrainBuilder';
 import { extractMeshes } from '../../world/mapProps/mapPropInstancing';
@@ -141,7 +143,8 @@ function disposePreviewObject(obj: Object3D): void {
   if (!obj.userData.isEditorMarker) return;
   obj.traverse((child) => {
     const mesh = child as Mesh;
-    if (!mesh.isMesh) return;
+    // A landmark's models share their geometry and materials with the asset registry: not ours to free.
+    if (!mesh.isMesh || mesh.userData.sharedAsset) return;
     mesh.geometry?.dispose();
     const mat = mesh.material as { dispose?: () => void };
     mat.dispose?.();
@@ -232,17 +235,59 @@ function applyVillageSeedTransform(
   obj.rotation.set(0, entity.rotY ?? 0, 0);
 }
 
-/** A tapering pillar on a ring; the nose points along the landmark's facing (+Z at rotY 0). */
-function makeLandmarkMarker(kind: LandmarkKind): Group {
+/** Where one of a landmark's models stands: its size, offset (m, in the landmark's frame) and lift over the ground. */
+interface ModelSpot {
+  scale: number;
+  dx: number;
+  dz: number;
+  lift: number;
+}
+
+/** Name of the group holding a landmark's ring, nose and fallback pillar: it takes the landmark's size as a whole. */
+const LANDMARK_FOOTPRINT = 'landmark-footprint';
+
+/**
+ * The landmark itself: the models the game stands there (its stand-in props, at editor detail), a ring on the
+ * ground and a nose pointing along its facing (+Z at rotY 0). Without its models (not in the registry) it keeps a
+ * tapering pillar instead.
+ */
+function makeLandmarkMarker(kind: LandmarkKind, assets: AssetRegistry): Group {
   const root = new Group();
   root.userData.isEditorMarker = true;
   const color = LANDMARK_MARKER_COLORS[kind];
 
-  const pillar = new Mesh(
-    new CylinderGeometry(0.5, 1.1, 4.5, 6),
-    new MeshBasicMaterial({ color, transparent: true, opacity: 0.9 }),
-  );
-  pillar.position.y = 2.25;
+  for (const standIn of LANDMARK_STAND_INS[kind]) {
+    let model: Object3D;
+    try {
+      model = cloneFromRegistry(assets, standIn.key, EDITOR_PROP_PREVIEW_LOD);
+    } catch {
+      continue;
+    }
+    model.rotation.y = standIn.rotY ?? 0;
+    model.userData.modelSpot = {
+      scale: standIn.scale,
+      dx: standIn.dx ?? 0,
+      dz: standIn.dz ?? 0,
+      lift: standIn.surfaceLift ?? 0,
+    } satisfies ModelSpot;
+    model.traverse((child) => {
+      child.userData.sharedAsset = true;
+      child.castShadow = false;
+      child.receiveShadow = false;
+    });
+    root.add(model);
+  }
+  const footprint = new Group();
+  footprint.name = LANDMARK_FOOTPRINT;
+  if (root.children.length === 0) {
+    const pillar = new Mesh(
+      new CylinderGeometry(0.5, 1.1, 4.5, 6),
+      new MeshBasicMaterial({ color, transparent: true, opacity: 0.9 }),
+    );
+    pillar.position.y = 2.25;
+    footprint.add(pillar);
+  }
+
   const ring = new Mesh(
     new RingGeometry(2.4, 2.9, 32),
     new MeshBasicMaterial({ color, transparent: true, opacity: 0.6, depthWrite: false }),
@@ -255,7 +300,8 @@ function makeLandmarkMarker(kind: LandmarkKind): Group {
   );
   nose.rotation.x = Math.PI / 2;
   nose.position.set(0, 0.5, 3.4);
-  root.add(pillar, ring, nose);
+  footprint.add(ring, nose);
+  root.add(footprint);
   return root;
 }
 
@@ -264,8 +310,26 @@ function applyLandmarkTransform(
   entity: Extract<MapEntity, { type: 'landmark' }>,
   terrain: MapTerrainContext,
 ): void {
-  obj.position.set(entity.x, terrain.getWorldY(entity.x, entity.z), entity.z);
-  obj.rotation.set(0, entity.rotY ?? 0, 0);
+  const baseY = terrain.getWorldY(entity.x, entity.z);
+  const rotY = entity.rotY ?? 0;
+  const size = entity.scale ?? 1;
+  obj.position.set(entity.x, baseY, entity.z);
+  obj.rotation.set(0, rotY, 0);
+  // Each model stands on the ground under its own spot, sized and lifted like its stand-in prop in the game.
+  const cos = Math.cos(rotY);
+  const sin = Math.sin(rotY);
+  for (const model of obj.children) {
+    if (model.name === LANDMARK_FOOTPRINT) model.scale.setScalar(size);
+    const spot = model.userData.modelSpot as ModelSpot | undefined;
+    if (!spot) continue;
+    const dx = spot.dx * size;
+    const dz = spot.dz * size;
+    const x = entity.x + dx * cos + dz * sin;
+    const z = entity.z - dx * sin + dz * cos;
+    const y = terrain.getWorldY(x, z) - baseY + spot.lift * size - VISUAL.props.surfaceSinkM;
+    model.position.set(dx, y, dz);
+    model.scale.setScalar(spot.scale * size);
+  }
 }
 
 const SHRINE_RING_SEGMENTS = 64;
@@ -660,7 +724,7 @@ export function createEntityPreviewMeshes(
       obj = makeShrineMarker();
       applyShrineTransform(obj, entity, terrain);
     } else if (entity.type === 'landmark') {
-      obj = makeLandmarkMarker(entity.kind);
+      obj = makeLandmarkMarker(entity.kind, assets);
       applyLandmarkTransform(obj, entity, terrain);
     }
     if (!obj) return;

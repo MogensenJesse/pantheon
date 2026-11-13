@@ -95,7 +95,13 @@ export function mapEntitiesEqual(a: MapEntity, b: MapEntity): boolean {
     return a.x === b.x && a.z === b.z && a.radiusM === b.radiusM && a.regenPerSec === b.regenPerSec;
   }
   if (a.type === 'landmark' && b.type === 'landmark') {
-    return a.x === b.x && a.z === b.z && (a.rotY ?? 0) === (b.rotY ?? 0) && a.kind === b.kind;
+    return (
+      a.x === b.x &&
+      a.z === b.z &&
+      (a.rotY ?? 0) === (b.rotY ?? 0) &&
+      (a.scale ?? 1) === (b.scale ?? 1) &&
+      a.kind === b.kind
+    );
   }
   return false;
 }

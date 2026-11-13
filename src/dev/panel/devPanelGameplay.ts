@@ -9,11 +9,13 @@ import { isEnergyCapReached } from '../../core/reveal/revealPhase';
 import { sunRevealState } from '../../core/reveal/sunRevealState';
 import { devSettings } from '../../core/settings';
 import { state } from '../../core/state/gameState';
+import { LANDMARK_KINDS, type LandmarkKind } from '../../map/MapTypes';
 import type { PostFXContext } from '../../rendering/PostFX';
 import type { SkySystemContext } from '../../rendering/sky/SkySystem';
 import { setFpsCounterEnabled } from '../../ui/FpsCounter';
 import { bindCheckbox, mountSection } from '../bindRange';
 import { syncTodStopFromElevation } from './devPanelTod';
+import { landmarkHook } from './landmarkHook';
 import {
   bindDayCyclePhaseScrub,
   dayCyclePhaseScrubHtml,
@@ -27,10 +29,17 @@ const ENERGY_BUMP = 25;
 
 /** Wakes every landmark of the map (the sunrise needs them as well as the full bar); the probe installs the hook. */
 function awakenAllLandmarks(): void {
-  const hook = (window as unknown as { __pantheonLandmarks?: { awakenAll: () => unknown } })
-    .__pantheonLandmarks;
-  hook?.awakenAll();
+  landmarkHook()?.awakenAll();
 }
+
+/**
+ * The teleport puts the orb this far east of a landmark: just outside its reach (`PHASE0.LANDMARK.RADIUS_M`), so
+ * going there does not start waking it, and clear of the big models (the temple, the monolith).
+ */
+const LANDMARK_TELEPORT_OFFSET_M = PHASE0.LANDMARK.RADIUS_M + 3;
+
+const landmarkLabel = (kind: LandmarkKind): string =>
+  (kind.charAt(0).toUpperCase() + kind.slice(1)).replace(/_/g, ' ');
 const TEST_PRESET_ELEVATION_DEG = 33;
 const TEST_PRESET_SPEED = 4;
 
@@ -67,6 +76,10 @@ export function initDevPanelGameplay(
         <button type="button" data-energy="100">100%</button>
         <button type="button" id="dev-energy-plus">+${ENERGY_BUMP}</button>
         <button type="button" id="dev-awaken-landmarks">Awaken landmarks</button>
+      </div>
+      <p class="dev-hint">Teleport to a landmark: the orb lands ${LANDMARK_TELEPORT_OFFSET_M} m east of it, just outside its reach (so it does not start waking). A landmark this map does not place is greyed out.</p>
+      <div class="dev-actions">
+        ${LANDMARK_KINDS.map((kind) => `<button type="button" data-landmark="${kind}">${landmarkLabel(kind)}</button>`).join('')}
       </div>
       <label class="dev-row">
         <span>Move speed</span>
@@ -203,6 +216,22 @@ export function initDevPanelGameplay(
   };
   awakenBtn?.addEventListener('click', onAwaken);
 
+  // One teleport button per landmark kind; the probe is installed before the panel, so it knows what the map places.
+  const placed = new Set(
+    landmarkHook()
+      ?.list()
+      .map((place) => place.kind),
+  );
+  const landmarkButtons = Array.from(
+    panel.querySelectorAll<HTMLButtonElement>('[data-landmark]'),
+  ).map((btn) => {
+    const kind = btn.dataset.landmark as LandmarkKind;
+    btn.disabled = !placed.has(kind);
+    const handler = () => landmarkHook()?.teleportTo(kind, LANDMARK_TELEPORT_OFFSET_M);
+    btn.addEventListener('click', handler);
+    return { btn, handler };
+  });
+
   const onSpeedChange = () => {
     devSettings.movementSpeedMultiplier = Number(speedSelect.value);
   };
@@ -260,6 +289,7 @@ export function initDevPanelGameplay(
     for (const { btn, handler } of buttonHandlers) btn.removeEventListener('click', handler);
     energyPlusBtn?.removeEventListener('click', onEnergyPlus);
     awakenBtn?.removeEventListener('click', onAwaken);
+    for (const { btn, handler } of landmarkButtons) btn.removeEventListener('click', handler);
     speedSelect.removeEventListener('change', onSpeedChange);
     testPreset?.removeEventListener('change', onTestPresetChange);
     dayCycleToggle?.removeEventListener('click', onDayCycleToggle);

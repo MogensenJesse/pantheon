@@ -1,0 +1,660 @@
+{
+  "asset": "temple_ruin",
+  "style": "chunky stylised Norse ruin, low-poly angular stone with painted soft colour, mossy, weathered timber, hand-painted look, same family as the well (assets-src/model-loop/well_test)",
+  "materials": {
+    "stone_cut": {
+      "prompt": "pale blue-grey cut granite with painted blotches, slightly warmer on edges",
+      "texture": "textures/stone_cut.png",
+      "tile_m": 1.0,
+      "roughness": 0.9
+    },
+    "moss": {
+      "prompt": "bright saturated green moss, painterly blotches, darker green hollows",
+      "texture": "textures/moss.png",
+      "tile_m": 0.5,
+      "roughness": 0.95
+    },
+    "timber_old": {
+      "prompt": "weathered grey-brown timber, lengthwise grain, bleached and cracked",
+      "texture": "textures/timber_old.png",
+      "tile_m": 1.0,
+      "roughness": 0.9
+    }
+  },
+  "notes": {
+    "concept": "input.png = the ruined Norse temple on dry ground; input_water.png = the same scene flooded, only to visualise: the temple is placed in water by hand in the game, so no water, base tile or sand is modelled",
+    "scope": "user 2026-10-31: model-loop for all SMALL elements only (leaf parts). Groups (colonnade, arch, stairs, roof, gable, walls, boulders) and the root come after the parts are accepted.",
+    "library": "reuse where it fits: well kit (assets-src/model-loop/well_test/kit/part_stone.blend stone_a/b/c squarer ashlar-like, d-i loaves; part_timber.blend timber_a-f beams), village kit (assets-src/village: temple_build.py dragon() / house_build.py HEAD_DRAGON profile, textures/carve.png knotwork, rune.png, beam.png, village_models.blend). Game rocks (public/models rock-medium, stone-pack) are scanned, not this style, not used."
+  },
+  "nodes": [
+    {
+      "id": "ashlar",
+      "kind": "part",
+      "desc": "ONE single squared grey-blue stone wall block (a single brick-like block, not a stack and not a wall) with chipped edges and a little moss on top",
+      "dims_m": [
+        0.5,
+        0.25,
+        0.25
+      ],
+      "materials": [
+        "stone_cut",
+        "moss"
+      ],
+      "variants": 3,
+      "reuse": "well kit stone_a/b/c shape (squarer), new material",
+      "ref": "refs/ashlar.png",
+      "ref_view": [
+        35,
+        25,
+        85
+      ],
+      "review_at": 5,
+      "pass_at": 7,
+      "status": "accepted",
+      "best": null,
+      "last_score": 4.8,
+      "frozen": true,
+      "note": "accepted by the user 2026-11-01 ('Good! We can start assembling the temple')"
+    },
+    {
+      "id": "voussoir",
+      "kind": "part",
+      "desc": "one wedge-shaped arch stone (voussoir) of the curved stone arch, grey-blue with moss",
+      "dims_m": [
+        0.5,
+        0.3,
+        0.3
+      ],
+      "materials": [
+        "stone_cut",
+        "moss"
+      ],
+      "variants": 2,
+      "ref": "refs/voussoir.png",
+      "ref_view": [
+        35,
+        25,
+        85
+      ],
+      "review_at": 5,
+      "pass_at": 7,
+      "status": "accepted",
+      "best": null,
+      "last_score": 5.1,
+      "frozen": true,
+      "note": "accepted by the user 2026-11-01 ('Good! We can start assembling the temple')"
+    },
+    {
+      "id": "roof_slab",
+      "kind": "part",
+      "desc": "thick flat grey stone roof slab (roof slate) with chipped corners and moss",
+      "dims_m": [
+        0.9,
+        0.5,
+        0.12
+      ],
+      "materials": [
+        "stone_cut",
+        "moss"
+      ],
+      "variants": 3,
+      "ref": "refs/roof_slab.png",
+      "ref_view": [
+        35,
+        25,
+        85
+      ],
+      "review_at": 5,
+      "pass_at": 7,
+      "status": "accepted",
+      "best": null,
+      "last_score": 5.0,
+      "frozen": true,
+      "note": "accepted by the user 2026-11-01 ('Good! We can start assembling the temple')"
+    },
+    {
+      "id": "rubble",
+      "kind": "part",
+      "desc": "a few small broken angular stone chunks, the rubble on the ground, grey with a little moss",
+      "dims_m": [
+        0.3,
+        0.25,
+        0.2
+      ],
+      "materials": [
+        "stone_cut",
+        "moss"
+      ],
+      "variants": 4,
+      "ref": "refs/rubble.png",
+      "ref_view": [
+        35,
+        25,
+        85
+      ],
+      "review_at": 5,
+      "pass_at": 7,
+      "status": "accepted",
+      "best": null,
+      "last_score": 4.8,
+      "frozen": true,
+      "note": "accepted by the user 2026-11-01 ('Good! We can start assembling the temple')"
+    },
+    {
+      "id": "step",
+      "kind": "part",
+      "desc": "one wide worn stone stair step with a rounded front edge and moss patches",
+      "dims_m": [
+        1.6,
+        0.45,
+        0.22
+      ],
+      "materials": [
+        "stone_cut",
+        "moss"
+      ],
+      "variants": 2,
+      "ref": "refs/step.png",
+      "ref_view": [
+        35,
+        25,
+        85
+      ],
+      "review_at": 5,
+      "pass_at": 7,
+      "status": "review",
+      "best": null,
+      "last_score": 4.1,
+      "note": "user 2026-11-01: fine to assemble with; not frozen, may still be reworked (weakest two)"
+    },
+    {
+      "id": "pillar",
+      "kind": "part",
+      "desc": "square grey stone pillar with carved square meander (Greek key) relief panels on its sides and a flat capital block, a little moss",
+      "dims_m": [
+        0.55,
+        0.55,
+        2.4
+      ],
+      "materials": [
+        "stone_cut",
+        "moss"
+      ],
+      "variants": 2,
+      "ref": "refs/pillar.png",
+      "ref_view": [
+        35,
+        25,
+        85
+      ],
+      "review_at": 5,
+      "pass_at": 7,
+      "status": "accepted",
+      "best": null,
+      "last_score": 5.3,
+      "frozen": true,
+      "note": "accepted by the user 2026-11-01 ('Good! We can start assembling the temple')"
+    },
+    {
+      "id": "stele",
+      "kind": "part",
+      "desc": "short carved stone marker (stele) with a meander relief panel on the front, chipped flat top and moss",
+      "dims_m": [
+        0.5,
+        0.3,
+        1.2
+      ],
+      "materials": [
+        "stone_cut",
+        "moss"
+      ],
+      "variants": 2,
+      "ref": "refs/stele.png",
+      "ref_view": [
+        35,
+        25,
+        85
+      ],
+      "review_at": 5,
+      "pass_at": 7,
+      "status": "accepted",
+      "best": null,
+      "last_score": 5.0,
+      "frozen": true,
+      "note": "accepted by the user 2026-11-01 ('Good! We can start assembling the temple')"
+    },
+    {
+      "id": "rafter",
+      "kind": "part",
+      "desc": "weathered grey-brown squared timber beam, an exposed roof rafter with split chipped ends",
+      "dims_m": [
+        3.0,
+        0.2,
+        0.25
+      ],
+      "materials": [
+        "timber_old"
+      ],
+      "variants": 3,
+      "reuse": "well kit timber_a-f shape, new material",
+      "ref": "refs/rafter.png",
+      "ref_view": [
+        35,
+        25,
+        85
+      ],
+      "review_at": 5,
+      "pass_at": 7,
+      "status": "review",
+      "best": null,
+      "last_score": 4.0,
+      "note": "user 2026-11-01: fine to assemble with; not frozen, may still be reworked (weakest two)"
+    },
+    {
+      "id": "bargeboard",
+      "kind": "part",
+      "desc": "long weathered timber gable board (bargeboard) with carved interlace knotwork along its face",
+      "dims_m": [
+        4.5,
+        0.35,
+        0.14
+      ],
+      "materials": [
+        "timber_old"
+      ],
+      "variants": 2,
+      "reuse": "village kit rake board and carve.png knotwork",
+      "ref": "refs/bargeboard.png",
+      "ref_view": [
+        35,
+        25,
+        85
+      ],
+      "review_at": 5,
+      "pass_at": 7,
+      "status": "accepted",
+      "best": null,
+      "last_score": 6.0,
+      "frozen": true,
+      "note": "accepted by the user 2026-11-01 ('Good! We can start assembling the temple')"
+    },
+    {
+      "id": "dragon_head",
+      "kind": "part",
+      "desc": "carved dragon-head finial in weathered grey-brown wood, as the two at the gable peak",
+      "dims_m": [
+        0.5,
+        0.3,
+        0.7
+      ],
+      "materials": [
+        "timber_old"
+      ],
+      "variants": 1,
+      "reuse": "village kit dragon profile (temple_build.py dragon, house_build.py HEAD_DRAGON)",
+      "ref": "refs/dragon_head.png",
+      "ref_view": [
+        35,
+        25,
+        85
+      ],
+      "review_at": 5,
+      "pass_at": 7,
+      "status": "accepted",
+      "best": null,
+      "last_score": 5.1,
+      "frozen": true,
+      "note": "accepted by the user 2026-11-01 ('Good! We can start assembling the temple')"
+    },
+    {
+      "id": "boulder",
+      "kind": "part",
+      "desc": "large angular low-poly grey boulder with bright green moss on its upper faces",
+      "dims_m": [
+        1.2,
+        1.0,
+        1.1
+      ],
+      "materials": [
+        "stone_cut",
+        "moss"
+      ],
+      "variants": 3,
+      "reuse": "well stone.py convex-polyhedron recipe, bigger and angular",
+      "ref": "refs/boulder.png",
+      "ref_view": [
+        35,
+        25,
+        85
+      ],
+      "review_at": 5,
+      "pass_at": 7,
+      "status": "accepted",
+      "best": null,
+      "last_score": 4.6,
+      "frozen": true,
+      "note": "accepted by the user 2026-11-01 ('Good! We can start assembling the temple')"
+    },
+    {
+      "id": "moss_clump",
+      "kind": "part",
+      "desc": "ONLY a clump of bright green blocky low-poly moss (a green tuft made of rounded polygon lumps) with nothing under it: no stone, no vines, floating on the plain background",
+      "dims_m": [
+        0.4,
+        0.4,
+        0.25
+      ],
+      "materials": [
+        "moss"
+      ],
+      "variants": 3,
+      "ref": "refs/moss_clump.png",
+      "ref_view": [
+        35,
+        25,
+        85
+      ],
+      "review_at": 5,
+      "pass_at": 7,
+      "status": "accepted",
+      "best": null,
+      "last_score": 4.8,
+      "frozen": true,
+      "note": "accepted by the user 2026-11-01 ('Good! We can start assembling the temple')"
+    },
+    {
+      "id": "vine",
+      "kind": "part",
+      "desc": "ONLY a free-hanging climbing ivy vine strand with small leaves, next to a separate twisted brown root, with no pillar, wall or stone behind or around them",
+      "dims_m": [
+        1.5,
+        0.2,
+        0.2
+      ],
+      "materials": [
+        "moss",
+        "timber_old"
+      ],
+      "variants": 2,
+      "ref": "refs/vine.png",
+      "ref_view": [
+        35,
+        25,
+        85
+      ],
+      "review_at": 5,
+      "pass_at": 7,
+      "status": "accepted",
+      "best": null,
+      "last_score": 5.0,
+      "frozen": true,
+      "note": "accepted by the user 2026-11-01 ('Good! We can start assembling the temple')"
+    },
+    {
+      "id": "colonnade",
+      "kind": "group",
+      "children": [
+        "pillar",
+        "ashlar",
+        "moss_clump",
+        "vine"
+      ],
+      "desc": "the row of four square grey stone pillars with carved square meander panels, standing in a line and carrying a course of stone lintel blocks across the top, with moss and ivy (no roof, no wall, no stairs, no arch)",
+      "dims_m": [
+        5.2,
+        0.7,
+        3.0
+      ],
+      "ref": "refs/colonnade.png",
+      "ref_view": [
+        35,
+        25,
+        70
+      ],
+      "review_at": 5,
+      "pass_at": 8,
+      "status": "review",
+      "best": {
+        "tag": "g05",
+        "overall": 5.5
+      }
+    },
+    {
+      "id": "arch",
+      "kind": "group",
+      "children": [
+        "voussoir",
+        "pillar",
+        "moss_clump",
+        "vine"
+      ],
+      "desc": "ONLY the freestanding curved stone arch standing on two square carved pillars, with moss and ivy (no roof, no wall, no stairs, no other pillars)",
+      "dims_m": [
+        2.6,
+        0.7,
+        3.6
+      ],
+      "ref": "refs/arch.png",
+      "ref_view": [
+        35,
+        25,
+        70
+      ],
+      "review_at": 5,
+      "pass_at": 8,
+      "status": "review",
+      "best": {
+        "tag": "g05",
+        "overall": 5.6
+      }
+    },
+    {
+      "id": "stairs",
+      "kind": "group",
+      "children": [
+        "step",
+        "moss_clump",
+        "vine"
+      ],
+      "desc": "ONLY the worn stone front stairs: four wide stone steps with a slanted side stone on each side and moss patches (no pillars, no wall, no big rocks)",
+      "dims_m": [
+        2.6,
+        2.2,
+        1.1
+      ],
+      "ref": "refs/stairs.png",
+      "ref_view": [
+        35,
+        25,
+        70
+      ],
+      "review_at": 5,
+      "pass_at": 8,
+      "status": "review",
+      "best": {
+        "tag": "g06",
+        "overall": 5.6
+      }
+    },
+    {
+      "id": "roof_ruin",
+      "kind": "group",
+      "children": [
+        "roof_slab",
+        "rafter",
+        "bargeboard",
+        "dragon_head",
+        "moss_clump"
+      ],
+      "desc": "ONLY the broken gable roof structure: grey stone slab roof with a gap showing bare timber rafters, the carved timber interlace bargeboards forming the front gable triangle with a crossing timber beam, and the two carved dragon heads at the peak (no walls, no pillars, no ground)",
+      "dims_m": [
+        6.4,
+        6.4,
+        3.4
+      ],
+      "ref": "refs/roof_ruin.png",
+      "ref_view": [
+        -35,
+        25,
+        70
+      ],
+      "review_at": 5,
+      "pass_at": 8,
+      "status": "review",
+      "best": {
+        "tag": "g06",
+        "overall": 5.5
+      }
+    },
+    {
+      "id": "walls",
+      "kind": "group",
+      "children": [
+        "ashlar",
+        "moss_clump",
+        "vine",
+        "stele"
+      ],
+      "desc": "ONLY the mossy broken stone-block walls: a long left wall and a back wall of ashlar blocks with ivy and a small window niche, with two small carved stele stones standing in front (no roof, no pillars, no arch, no stairs)",
+      "dims_m": [
+        7.0,
+        6.0,
+        2.6
+      ],
+      "ref": "refs/walls.png",
+      "ref_view": [
+        35,
+        25,
+        70
+      ],
+      "review_at": 5,
+      "pass_at": 8,
+      "status": "review",
+      "best": {
+        "tag": "g05",
+        "overall": 5.6
+      }
+    },
+    {
+      "id": "temple_ruin",
+      "kind": "group",
+      "children": [
+        "colonnade",
+        "arch",
+        "stairs",
+        "roof_ruin",
+        "walls",
+        "boulder",
+        "rubble",
+        "stele"
+      ],
+      "desc": "the whole ruined temple on a stone podium, hand-placed in water in the game",
+      "dims_m": [
+        10.5,
+        11.0,
+        7.5
+      ],
+      "ref": "input.png",
+      "ref_view": [
+        -38,
+        28,
+        35
+      ],
+      "ref_res": [
+        1376,
+        768
+      ],
+      "review_at": 5,
+      "pass_at": 9,
+      "status": "review",
+      "best": {
+        "round": "t10",
+        "overall": 5.8,
+        "renders": "renders/temple_ruin/t10_*.png",
+        "blend": "rounds/t10.blend"
+      },
+      "fit": 0.62
+    },
+    {
+      "id": "wall_block",
+      "kind": "part",
+      "desc": "tight wall stone for walls and podium facing (user note 2026-11-01: ashlar too pronounced and loose)",
+      "dims_m": [
+        0.6,
+        0.4,
+        0.3
+      ],
+      "materials": [
+        "stone"
+      ],
+      "variants": 3,
+      "status": "review",
+      "best": null,
+      "note": "not judged, built on the user's direction"
+    }
+  ],
+  "groups_later": [
+    {
+      "id": "colonnade",
+      "children": [
+        "pillar",
+        "ashlar"
+      ],
+      "desc": "front row of carved pillars with a stone beam"
+    },
+    {
+      "id": "arch",
+      "children": [
+        "voussoir",
+        "pillar",
+        "moss_clump",
+        "vine"
+      ],
+      "desc": "freestanding stone arch on two pillars"
+    },
+    {
+      "id": "stairs",
+      "children": [
+        "step",
+        "moss_clump",
+        "vine"
+      ],
+      "desc": "worn front stairs"
+    },
+    {
+      "id": "roof_ruin",
+      "children": [
+        "roof_slab",
+        "rafter",
+        "bargeboard",
+        "dragon_head",
+        "moss_clump"
+      ],
+      "desc": "broken gable roof with exposed rafters, carved boards and two dragon heads"
+    },
+    {
+      "id": "walls",
+      "children": [
+        "ashlar",
+        "moss_clump",
+        "vine",
+        "stele"
+      ],
+      "desc": "mossy broken walls with a window niche"
+    },
+    {
+      "id": "temple_ruin",
+      "children": [
+        "colonnade",
+        "arch",
+        "stairs",
+        "roof_ruin",
+        "walls",
+        "boulder",
+        "rubble",
+        "stele"
+      ],
+      "desc": "the whole ruined temple, hand-placed in water in the game"
+    }
+  ]
+}

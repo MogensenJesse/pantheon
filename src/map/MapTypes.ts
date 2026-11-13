@@ -87,6 +87,8 @@ export type MapEntity =
       z: number;
       /** Facing of the landmark model (rad). Omit → 0. */
       rotY?: number;
+      /** Size of the whole landmark (> 0): its models, their spread and their lift. Omit → 1. */
+      scale?: number;
       kind: LandmarkKind;
     };
 

@@ -1,12 +1,15 @@
 // scripts/checks/map/map-entities-check.ts — map entity validation and the editor palette's landmark entries
 import assert from 'node:assert/strict';
+import { LANDMARK_STAND_INS } from '../../../src/landmarks/landmarkStandIns.ts';
 import {
   EDITOR_PALETTE,
   getPaletteEntry,
   isValidMapEntity,
   landmarkKindOfPlaceId,
   landmarkPlaceId,
+  MAP_PROP_KEYS,
   markerThumbClass,
+  resolveThumbnailAssetKey,
 } from '../../../src/map/authoring/mapEntityCatalog.ts';
 import { isLandmarkKind, LANDMARK_KINDS } from '../../../src/map/MapTypes.ts';
 import { validateMapEntitiesArray } from '../../../src/map/validateMapPayload.ts';
@@ -25,6 +28,13 @@ await check('a landmark entity needs a known kind and finite numbers', () => {
   assert.ok(!isValidMapEntity({ type: 'landmark', x: 1, z: 2 }));
   assert.ok(!isValidMapEntity({ type: 'landmark', x: Number.NaN, z: 2, kind: 'tree' }));
   assert.ok(!isValidMapEntity({ type: 'landmark', x: 1, z: 2, rotY: 'a', kind: 'tree' }));
+});
+
+await check('a landmark size is optional, but when given it is a positive number', () => {
+  assert.ok(isValidMapEntity({ type: 'landmark', x: 1, z: 2, scale: 1.5, kind: 'tree' }));
+  for (const scale of [0, -1, Number.NaN, Number.POSITIVE_INFINITY, '2']) {
+    assert.ok(!isValidMapEntity({ type: 'landmark', x: 1, z: 2, scale, kind: 'tree' }), `${scale}`);
+  }
 });
 
 await check('a map holds each landmark kind at most once', () => {
@@ -56,7 +66,13 @@ await check('the palette has one landmark entry per kind, each producing a valid
     const entity = entry.entityFactory(5, 6);
     assert.ok(isValidMapEntity(entity));
     assert.deepEqual(entity, { type: 'landmark', x: 5, z: 6, rotY: 0, kind });
-    assert.equal(markerThumbClass(entry.placeId), 'landmark');
+    assert.equal(markerThumbClass(entry.placeId), null, 'a landmark shows its model, not a swatch');
+    const thumbKey = resolveThumbnailAssetKey(entry.placeId);
+    assert.equal(thumbKey, LANDMARK_STAND_INS[kind][0]?.key, 'the thumbnail is its main model');
+    assert.ok(
+      thumbKey && MAP_PROP_KEYS.has(thumbKey),
+      `${kind}'s model is an asset the editor loads`,
+    );
     assert.equal(landmarkKindOfPlaceId(entry.placeId), kind);
   }
   assert.equal(landmarkKindOfPlaceId('shrine'), null);

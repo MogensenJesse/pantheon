@@ -1,0 +1,394 @@
+{
+ "part_stone": {
+  "collection": "P_stone",
+  "file": "part_stone.blend",
+  "note": "chunky chiselled slate block: a/b/c the original squarer r05 stones, d-i six irregular loaves (VARIANTS in stone.py: own outline, end wedge/lean, pillowy cast), material v2: slate",
+  "builder": "build/stone.py",
+  "objects": [
+   {
+    "name": "stone_a",
+    "dims_m": [
+     0.427,
+     0.231,
+     0.251
+    ]
+   },
+   {
+    "name": "stone_b",
+    "dims_m": [
+     0.39,
+     0.224,
+     0.24
+    ]
+   },
+   {
+    "name": "stone_c",
+    "dims_m": [
+     0.448,
+     0.242,
+     0.261
+    ]
+   },
+   {
+    "name": "stone_d",
+    "dims_m": [
+     0.385,
+     0.27,
+     0.281
+    ]
+   },
+   {
+    "name": "stone_e",
+    "dims_m": [
+     0.307,
+     0.242,
+     0.315
+    ]
+   },
+   {
+    "name": "stone_f",
+    "dims_m": [
+     0.446,
+     0.261,
+     0.213
+    ]
+   },
+   {
+    "name": "stone_g",
+    "dims_m": [
+     0.336,
+     0.323,
+     0.3
+    ]
+   },
+   {
+    "name": "stone_h",
+    "dims_m": [
+     0.364,
+     0.246,
+     0.252
+    ]
+   },
+   {
+    "name": "stone_i",
+    "dims_m": [
+     0.415,
+     0.288,
+     0.244
+    ]
+   }
+  ],
+  "tris": 19258,
+  "materials": [
+   "M_stone"
+  ],
+  "size_kb": 319
+ },
+ "part_plank": {
+  "collection": "P_plank",
+  "file": "part_plank.blend",
+  "note": "wood plank with chiselled rim and groove, 3 variants (material v2: duller ochre)",
+  "builder": "build/plank.py",
+  "objects": [
+   {
+    "name": "plank_a",
+    "dims_m": [
+     0.62,
+     0.26,
+     0.073
+    ]
+   },
+   {
+    "name": "plank_b",
+    "dims_m": [
+     0.9,
+     0.24,
+     0.073
+    ]
+   },
+   {
+    "name": "plank_c",
+    "dims_m": [
+     1.15,
+     0.22,
+     0.068
+    ]
+   }
+  ],
+  "tris": 2522,
+  "materials": [
+   "M_plank"
+  ],
+  "size_kb": 107
+ },
+ "part_timber": {
+  "collection": "P_timber",
+  "file": "part_timber.blend",
+  "note": "squared beam, chamfers and chisel scoops; a/b straight, c-f each with its own bow, S-curve, twist and taper (VARIANTS in timber.py), redder v2 material",
+  "builder": "build/timber.py",
+  "objects": [
+   {
+    "name": "timber_a",
+    "dims_m": [
+     1.0,
+     0.163,
+     0.163
+    ]
+   },
+   {
+    "name": "timber_b",
+    "dims_m": [
+     1.4,
+     0.153,
+     0.153
+    ]
+   },
+   {
+    "name": "timber_c",
+    "dims_m": [
+     1.0,
+     0.191,
+     0.186
+    ]
+   },
+   {
+    "name": "timber_d",
+    "dims_m": [
+     1.0,
+     0.182,
+     0.195
+    ]
+   },
+   {
+    "name": "timber_e",
+    "dims_m": [
+     1.0,
+     0.18,
+     0.188
+    ]
+   },
+   {
+    "name": "timber_f",
+    "dims_m": [
+     1.0,
+     0.202,
+     0.176
+    ]
+   }
+  ],
+  "tris": 6300,
+  "materials": [
+   "M_timber"
+  ],
+  "size_kb": 154
+ },
+ "part_windlass": {
+  "collection": "P_windlass",
+  "file": "part_windlass.blend",
+  "note": "log with a 7-turn rope coil and a hanging strand; knob P['hang'] sets the strand length (0.24 m here)",
+  "builder": "build/windlass.py",
+  "objects": [
+   {
+    "name": "windlass",
+    "dims_m": [
+     0.85,
+     0.163,
+     0.164
+    ]
+   },
+   {
+    "name": "windlass_rope",
+    "dims_m": [
+     0.517,
+     0.289,
+     0.539
+    ]
+   }
+  ],
+  "tris": 21804,
+  "materials": [
+   "M_rope",
+   "M_timber"
+  ],
+  "size_kb": 387
+ },
+ "part_crank": {
+  "collection": "P_crank",
+  "file": "part_crank.blend",
+  "note": "plate, peg and bolt cap (plate material v2: darker brown)",
+  "builder": "build/crank.py",
+  "objects": [
+   {
+    "name": "crank",
+    "dims_m": [
+     0.048,
+     0.147,
+     0.335
+    ]
+   },
+   {
+    "name": "crank_peg",
+    "dims_m": [
+     0.191,
+     0.079,
+     0.076
+    ]
+   },
+   {
+    "name": "crank_cap",
+    "dims_m": [
+     0.029,
+     0.083,
+     0.083
+    ]
+   }
+  ],
+  "tris": 630,
+  "materials": [
+   "M_crank_iron",
+   "M_crank_peg",
+   "M_crank_wood"
+  ],
+  "size_kb": 96
+ },
+ "part_bucket": {
+  "collection": "P_bucket",
+  "file": "part_bucket.blend",
+  "note": "staved wooden bucket with an iron band, bail and grip",
+  "builder": "build/bucket.py",
+  "objects": [
+   {
+    "name": "bucket",
+    "dims_m": [
+     0.311,
+     0.313,
+     0.318
+    ]
+   },
+   {
+    "name": "bucket_band",
+    "dims_m": [
+     0.324,
+     0.324,
+     0.055
+    ]
+   },
+   {
+    "name": "bucket_bail",
+    "dims_m": [
+     0.415,
+     0.04,
+     0.265
+    ]
+   },
+   {
+    "name": "bucket_grip",
+    "dims_m": [
+     0.044,
+     0.045,
+     0.145
+    ]
+   }
+  ],
+  "tris": 3116,
+  "materials": [
+   "M_bucket_iron",
+   "M_bucket_wood"
+  ],
+  "size_kb": 108
+ },
+ "part_shingle": {
+  "collection": "P_shingle",
+  "file": "part_shingle.blend",
+  "note": "thin flat roof board, 3 variants a/b/c (v2: flat eave, redder)",
+  "builder": "build/shingle.py",
+  "objects": [
+   {
+    "name": "shingle_a",
+    "dims_m": [
+     0.23,
+     0.285,
+     0.021
+    ]
+   },
+   {
+    "name": "shingle_b",
+    "dims_m": [
+     0.242,
+     0.272,
+     0.02
+    ]
+   },
+   {
+    "name": "shingle_c",
+    "dims_m": [
+     0.222,
+     0.296,
+     0.022
+    ]
+   }
+  ],
+  "tris": 636,
+  "materials": [
+   "M_shingle",
+   "M_shingle_b",
+   "M_shingle_c"
+  ],
+  "size_kb": 100
+ },
+ "group_shaft": {
+  "collection": "G_shaft",
+  "file": "group_shaft.blend",
+  "note": "dry-stone ring, 3 courses of 11 linked copies of stone d-i picked by width, equal depth, fat top-course coping (shaft.py)",
+  "builder": "build/shaft.py",
+  "objects": 34,
+  "tris": 81344,
+  "materials": [
+   "M_core",
+   "M_stone"
+  ],
+  "size_kb": 265
+ },
+ "group_deck": {
+  "collection": "G_deck",
+  "file": "group_deck.blend",
+  "note": "packed plank deck, thin slabs (deck.py, t_scale knob)",
+  "builder": "build/deck.py",
+  "objects": 26,
+  "tris": 16416,
+  "materials": [
+   "M_deck_under",
+   "M_plank"
+  ],
+  "size_kb": 170
+ },
+ "group_frame": {
+  "collection": "G_frame",
+  "file": "group_frame.blend",
+  "note": "timber frame: posts, tie beam, braces, windlass, crank, bucket (frame.py)",
+  "builder": "build/frame.py",
+  "objects": 9,
+  "tris": 27508,
+  "materials": [
+   "M_rope",
+   "M_timber"
+  ],
+  "size_kb": 527
+ },
+ "group_roof": {
+  "collection": "G_roof",
+  "file": "group_roof.blend",
+  "note": "gable roof from linked shingles and slim plank finials (roof.py)",
+  "builder": "build/roof.py",
+  "objects": 63,
+  "tris": 17572,
+  "materials": [
+   "M_roof_under",
+   "M_shingle",
+   "M_shingle_b",
+   "M_shingle_c",
+   "M_timber"
+  ],
+  "size_kb": 175
+ }
+}

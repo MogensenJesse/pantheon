@@ -24,9 +24,9 @@ export const props = {
     /** Crown lean in steady wind, as a share of the model's height (a scaled-down copy still leans by the model's height). */
     baseLean: 0.012,
     /** Extra crown lean at the strongest part of a gust (same unit). */
-    gustLean: 0.03,
+    gustLean: 0.06,
     /** Share of the gust lean that wobbles across the wind instead of along it. */
-    sideShare: 0.35,
+    sideShare: 0.5,
     /** A model shorter than this (m) does not sway. */
     minHeightM: 0.5,
     /** Share of the gust that is the slow, broad wave (the rest is a faster, narrower one). */
@@ -37,7 +37,7 @@ export const props = {
     waveLengthM: 90,
     periodS: 7,
     /** Leaf flutter at the crown top (m) and its rate (Hz): near trees only (lod0). */
-    flutterM: 0.05,
+    flutterM: 0.065,
     flutterHz: 1.4,
     /** Flutter rises near the orb: the radius (m) and the extra share gained at its centre. */
     orbRadiusM: 7,

@@ -6,6 +6,7 @@ import {
 } from '../../assets/assetManifest.ts';
 import { PHASE0 } from '../../config/phase0.ts';
 import { VILLAGE } from '../../config/village.ts';
+import { LANDMARK_STAND_INS } from '../../landmarks/landmarkStandIns.ts';
 import { isLandmarkKind, LANDMARK_KINDS, type LandmarkKind, type MapEntity } from '../MapTypes.ts';
 
 export const MAP_PROP_KEYS = new Set<string>(allPropAssetEntries().map((e) => e.key));
@@ -124,14 +125,18 @@ export function getPaletteEntry(placeId: string): EditorPaletteEntry | undefined
   return EDITOR_PALETTE.find((e) => e.placeId === placeId);
 }
 
-/** GLTF registry key for thumbnail render; null = use CSS marker swatch. */
+/**
+ * GLTF registry key for thumbnail render; null = use CSS marker swatch. A landmark shows its main model: the
+ * first of its stand-in props.
+ */
 export function resolveThumbnailAssetKey(placeId: string): string | null {
+  const landmark = landmarkKindOfPlaceId(placeId);
+  if (landmark) return LANDMARK_STAND_INS[landmark][0]?.key ?? null;
   if (
     placeId === 'orb' ||
     placeId === 'playerStart' ||
     placeId === 'villageSeed' ||
-    placeId === 'shrine' ||
-    landmarkKindOfPlaceId(placeId)
+    placeId === 'shrine'
   ) {
     return null;
   }
@@ -139,14 +144,14 @@ export function resolveThumbnailAssetKey(placeId: string): string | null {
   return null;
 }
 
-export type MarkerThumbClass = 'playerStart' | 'orb' | 'villageSeed' | 'shrine' | 'landmark';
+export type MarkerThumbClass = 'playerStart' | 'orb' | 'villageSeed' | 'shrine';
 
+/** The swatch class of a marker without a model; null for a prop or a landmark (they render their model). */
 export function markerThumbClass(placeId: string): MarkerThumbClass | null {
   if (placeId === 'playerStart') return 'playerStart';
   if (placeId === 'orb') return 'orb';
   if (placeId === 'villageSeed') return 'villageSeed';
   if (placeId === 'shrine') return 'shrine';
-  if (landmarkKindOfPlaceId(placeId)) return 'landmark';
   return null;
 }
 
@@ -211,6 +216,7 @@ export function isValidMapEntity(entity: unknown): entity is MapEntity {
         finite(e.x) &&
         finite(e.z) &&
         (e.rotY === undefined || finite(e.rotY)) &&
+        (e.scale === undefined || (finite(e.scale) && e.scale > 0)) &&
         isLandmarkKind(e.kind)
       );
     default:

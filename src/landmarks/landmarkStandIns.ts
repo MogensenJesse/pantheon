@@ -6,6 +6,8 @@
 // camp (placeholders too).
 // (pure and node-runnable)
 
+import { HOVERING_STONE_PREFIX } from '../assets/assetManifest.ts';
+import { landmark as LOOK } from '../config/visual/landmark.ts';
 import type { LandmarkEntity, LandmarkKind, MapEntity } from '../map/MapTypes.ts';
 
 type PropEntity = Extract<MapEntity, { type: 'prop' }>;
@@ -22,35 +24,56 @@ type StandIn = {
   rotY?: number;
 };
 
-/** A ring of runic stones, a great pine, a standing church, a hut up to its eaves in the ground and a tall rock. */
+/**
+ * A ring of floating runic stones, a great birch, a ruined temple, a half-sunken Norse temple (its own model, sunk a
+ * little so its podium sits in the ground or the water) and a tall rock. The runestones hover `LOOK.hover.liftM` over the ground (the lift is in their instance matrix, so their
+ * shadows fall at the hover height) and the prop shader bobs them (the key says so: `config/propHover.ts`).
+ */
 export const LANDMARK_STAND_INS: Record<LandmarkKind, readonly StandIn[]> = {
   runestones: [
-    { key: 'stone_runic_1', scale: 1.2, dx: 2.6, dz: 0 },
-    { key: 'stone_runic_3', scale: 1.1, dx: -1.3, dz: 2.25, rotY: 2.1 },
-    { key: 'stone_runic_5', scale: 1.3, dx: -1.3, dz: -2.25, rotY: 4.2 },
+    { key: `${HOVERING_STONE_PREFIX}1`, scale: 1.2, dx: 2.6, dz: 0, surfaceLift: LOOK.hover.liftM },
+    {
+      key: `${HOVERING_STONE_PREFIX}3`,
+      scale: 1.1,
+      dx: -1.3,
+      dz: 2.25,
+      rotY: 2.1,
+      surfaceLift: LOOK.hover.liftM,
+    },
+    {
+      key: `${HOVERING_STONE_PREFIX}5`,
+      scale: 1.3,
+      dx: -1.3,
+      dz: -2.25,
+      rotY: 4.2,
+      surfaceLift: LOOK.hover.liftM,
+    },
   ],
-  tree: [{ key: 'pine_big_1', scale: 1.7 }],
-  temple_ruin: [{ key: 'stave_church', scale: 1.1 }],
-  sunken_ruin: [{ key: 'nordic_hut', scale: 2.2, surfaceLift: -2.4 }],
+  tree: [{ key: 'birch_rune', scale: 3 }],
+  temple_ruin: [{ key: 'temple_ruin', scale: 1 }],
+  // `assets-src/landmarks/sunken_ruin_build.py` (true size in metres, about 17 x 16 m): half of its 0.8 m podium sunk.
+  sunken_ruin: [{ key: 'sunken_ruin', scale: 1, surfaceLift: -0.4 }],
   monolith: [{ key: 'stone_big_1', scale: 3.6 }],
 };
 
-type Origin = { x: number; z: number; rotY?: number };
+/** `scale` sizes the whole group: the props, their offsets from the origin and their lift. Omit → 1. */
+type Origin = { x: number; z: number; rotY?: number; scale?: number };
 
 function toProps(origin: Origin, standIns: readonly StandIn[]): PropEntity[] {
   const cos = Math.cos(origin.rotY ?? 0);
   const sin = Math.sin(origin.rotY ?? 0);
+  const size = origin.scale ?? 1;
   return standIns.map((s) => {
-    const dx = s.dx ?? 0;
-    const dz = s.dz ?? 0;
+    const dx = (s.dx ?? 0) * size;
+    const dz = (s.dz ?? 0) * size;
     return {
       type: 'prop',
       key: s.key,
       x: origin.x + dx * cos + dz * sin,
       z: origin.z - dx * sin + dz * cos,
       rotY: (origin.rotY ?? 0) + (s.rotY ?? 0),
-      scale: s.scale,
-      ...(s.surfaceLift ? { surfaceLift: s.surfaceLift } : {}),
+      scale: s.scale * size,
+      ...(s.surfaceLift ? { surfaceLift: s.surfaceLift * size } : {}),
     };
   });
 }
@@ -87,8 +110,9 @@ export const LANDMARK_RESTORE_PROPS: Record<
     restored: ring('stone_mid_2', 1, 8, 6),
   },
   sunken_ruin: {
-    inProgress: ring('stone_small_2', 0.8, 5, 6),
-    restored: ring('stone_mid_3', 1, 7, 6),
+    // Outside the temple's podium and boulders (about 9 m from its centre).
+    inProgress: ring('stone_small_2', 0.8, 10, 8),
+    restored: ring('stone_mid_3', 1, 11.5, 8),
   },
   monolith: {
     inProgress: ring('stone_small_2', 0.8, 5, 6),

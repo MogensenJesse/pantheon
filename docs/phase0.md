@@ -5,6 +5,9 @@ How Phase 0 (God Particle) works in the code: the rules, the config keys, the ev
 ## Rules
 
 - The map holds up to five landmarks, each kind at most once: `runestones`, `tree`, `temple_ruin`, `sunken_ruin`, `monolith`. The kind is the identity (it picks the stand-in props or model, the beacon colour and the caption).
+- **The runestones float.** Their three stand-in stones are copies of runic stones under their own keys (`stone_runic_hover_*`, `HOVERING_STONE_PREFIX` in `assetManifest.ts`). The stand-in table lifts them (`surfaceLift`), and every drawn frame `landmarks/landmarkHover.ts` (a render hook in `main.ts`) writes a bob and a slow turn about the stone's own axis into their instance matrices, before the prop LOD uploads them. Each stone has its own phase, bob speed and spin (`VISUAL.landmark.hover`), so they drift in and out of step. The stones in the restored ring and every other runic stone stay on the ground.
+- **Models.** The tree is the shipped birch with a glowing bind rune (`birch_rune`), and the temple ruin is the artist's ruin (`temple_ruin`, 6 m high in the game, front on +Z at rotY 0). The sunken ruin is the model-loop temple (`sunken_ruin`, true size, about 17 x 16 m and 7 m high, front on +Z at rotY 0, its podium sunk 0.4 m; the water is the map's, placed by hand). All three live in `public/models/landmarks/` with their Blender sources in `assets-src/landmarks/` (build steps in each script's header). The monolith still stands in with a stone of the stone pack.
+- **Size.** A landmark entity may carry `scale` (> 0, omit → 1; in the editor the scale gizmo sets it, as for props). It sizes the whole group in `toProps` (`landmarkStandIns.ts`): the stand-in props, their spread around the landmark and their lift, and the restoration rings with them. It does not change the 8 m reach to wake it, the beacon and glow of `VISUAL.landmark`, the hover's bob height or the life at the place (`src/life/places/`).
 - The orb wakes a dormant landmark by standing within `PHASE0.LANDMARK.RADIUS_M` (8 m) for `DWELL_S` (4 s) of game time. Leaving resets the count. Any visiting order works.
 - Waking pays `PHASE0.LANDMARK.ENERGY` (14) through `addEnergy`, then tells the Nth chapter (N = how many are awake now).
 - **The gate**: the sunrise and phase 1 need the bar at the cap **and** every landmark of the map awake (`isPhase0Complete`). A map without landmarks keeps the old rule, the bar alone. With the bar full and landmarks left, the world waits and fragment 17 ("something is unfinished") is shown once.
@@ -44,6 +47,8 @@ How Phase 0 (God Particle) works in the code: the rules, the config keys, the ev
 ## DEV hooks
 
 `window.__pantheonLandmarks`: `list()`, `state()`, `allAwake()`, `nextTarget()`, `awaken(kind)`, `awakenAll()`, `teleportTo(kind, offsetM?)`. With `__pantheonSkills.setEnergy(...)` this walks the whole gate from the console.
+
+The DEV panel's **Gameplay** section has one button per landmark kind that teleports the orb to it (`teleportTo`, 11 m east of the landmark: just outside its 8 m reach, so going there does not start waking it); a kind the map does not place is greyed out. Code: `dev/panel/devPanelGameplay.ts`, with the typed hook in `dev/panel/landmarkHook.ts`.
 
 ## Checks
 

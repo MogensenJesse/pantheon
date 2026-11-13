@@ -38,6 +38,7 @@ import { initGameplay } from './gameplay/initGameplay';
 import { initLandmarkBoons } from './gameplay/landmarkBoons';
 import { initProgression } from './gameplay/progression';
 import { setupSaving } from './gameplay/setupSaving';
+import { createLandmarkHover } from './landmarks/landmarkHover';
 import { initLandmarkRestoreProps } from './landmarks/landmarkRestoreProps';
 import { initLandmarks } from './landmarks/landmarkRuntime';
 import { landmarkPropKeys, withLandmarkStandIns } from './landmarks/landmarkStandIns';
@@ -615,6 +616,8 @@ async function main(): Promise<void> {
   });
   // The hand carries its tree with the orb as it is drawn.
   const offHandHook = gameplay.handUi ? frameTick.addRenderHook(gameplay.handUi.frame) : () => {};
+  // The runestones hang in the air: a bob and a slow turn, written into their matrices before the prop LOD uploads them.
+  const offHoverHook = frameTick.addRenderHook(createLandmarkHover(propLodGroups).frame);
   // The hand lifts and puts down from the overview too, with the orb as the cursor.
   const overviewHand =
     overviewUi && village && gameplay.handUi && gameplay.handRuntime
@@ -735,6 +738,7 @@ async function main(): Promise<void> {
     overviewUi?.dispose();
     overview.dispose();
     offHandHook();
+    offHoverHook();
     gameplay.dispose();
     disposeProgression();
     disposeLandmarkBoons();

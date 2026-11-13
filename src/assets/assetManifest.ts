@@ -146,6 +146,8 @@ function birchEntries(): NaturePropAssetEntry[] {
   return [
     prop('birch_web', 'birch1', 'autumn_birch_web', 'FOREST', 3),
     prop('birch_pendula', 'birch2', 'autumn_birch_betula_pendula', 'FOREST', 3),
+    // The tree landmark: birch 1 with a glowing bind rune on its trunk (`assets-src/landmarks`). Weight 0: never scattered.
+    prop('birch_rune', 'landmarks', 'birch_rune', 'FOREST', 0),
   ];
 }
 
@@ -175,10 +177,21 @@ function pinePackEntries(): NaturePropAssetEntry[] {
   return entries;
 }
 
+/**
+ * Copies of three runic stones for the runestones landmark. The key tells `landmarks/landmarkHover.ts` to hang them
+ * in the air; the ordinary runic stones stay on the ground. The stones are numbered like the ones they copy.
+ */
+export const HOVERING_STONE_PREFIX = 'stone_runic_hover_';
+export const HOVERING_STONE_NUMBERS = [1, 3, 5] as const;
+
 /** Stone pack RootNode children → individual rock props (two Mid_4 pieces). */
 function stonePackEntries(): NaturePropAssetEntry[] {
   const pack = 'stone-pack';
   const pieces: Array<{ key: string; nodeName: string; index?: number }> = [
+    ...HOVERING_STONE_NUMBERS.map((n) => ({
+      key: `${HOVERING_STONE_PREFIX}${n}`,
+      nodeName: `Runic_${n}`,
+    })),
     { key: 'stone_mid_4a', nodeName: 'Mid_4', index: 0 },
     { key: 'stone_big_5', nodeName: 'Big_5' },
     { key: 'stone_small_8', nodeName: 'Small_8' },
@@ -222,6 +235,10 @@ function stonePackEntries(): NaturePropAssetEntry[] {
 const STRUCTURE_HEIGHT_M = {
   hut: 3.5,
   church: 12,
+  /** The temple ruin landmark (a low ruin, about 10 m wide at this height). */
+  ruin: 6,
+  /** The sunken ruin landmark at its true size (about 16 x 16 m, 7.9 m to the dragon heads). */
+  sunkenRuin: 7.87,
 } as const;
 
 function structureProp(
@@ -229,8 +246,9 @@ function structureProp(
   file: string,
   targetHeightM: number,
   biome: BiomeKey = 'SHORE',
+  family = 'village',
 ): NaturePropAssetEntry {
-  return { key, path: glb('village', file), biome, weight: 1, targetHeightM };
+  return { key, path: glb(family, file), biome, weight: 1, targetHeightM };
 }
 
 export const ASSET_MANIFEST = {
@@ -242,6 +260,16 @@ export const ASSET_MANIFEST = {
   structures: [
     structureProp('nordic_hut', 'nordic-hut', STRUCTURE_HEIGHT_M.hut),
     structureProp('stave_church', 'stave-church', STRUCTURE_HEIGHT_M.church),
+    // The temple ruin landmark (`assets-src/landmarks/temple_ruin_build.py`).
+    structureProp('temple_ruin', 'temple_ruin', STRUCTURE_HEIGHT_M.ruin, 'HILLS', 'landmarks'),
+    // The sunken ruin landmark (`assets-src/landmarks/sunken_ruin_build.py`, LODs `sunken_ruin_lods.py`).
+    structureProp(
+      'sunken_ruin',
+      'sunken_ruin',
+      STRUCTURE_HEIGHT_M.sunkenRuin,
+      'SHORE',
+      'landmarks',
+    ),
   ],
 } as const;
 

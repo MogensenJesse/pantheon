@@ -35,6 +35,26 @@ export const landmark = {
     baseHdr: 0.35,
     fillHdr: 2.2,
   },
+  /**
+   * The runestones hang in the air, bob the way the orb does (`PHASE0.ORB`: 0.12 m at 2 rad/s, wider and slower for
+   * stones) and turn slowly about their own axis. Height over the ground and bob in metres; bob speed and spin in
+   * radians per second (a turn takes about 35 s).
+   */
+  hover: {
+    liftM: 1.6,
+    bobM: 0.22,
+    speed: 1.1,
+    spin: 0.18,
+    /**
+     * One entry per stone: its own phase (rad), its share of the bob speed and of the spin (negative turns the other
+     * way). They differ on purpose, so the stones drift in and out of step instead of rising and falling together.
+     */
+    stones: [
+      { phase: 0, speed: 1, spin: 1 },
+      { phase: 2.1, speed: 0.78, spin: -0.7 },
+      { phase: 4.2, speed: 1.27, spin: 1.35 },
+    ],
+  },
   /** After waking: a pulse that dies away, then a steady glow. */
   awaken: {
     pulseS: 3.5,

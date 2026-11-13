@@ -28,6 +28,7 @@ import {
 } from 'three/tsl';
 import { MeshBasicNodeMaterial, NodeMaterial } from 'three/webgpu';
 import { VISUAL } from '../../../config/visualTuning';
+import { uHdrBloomScale } from '../../../rendering/glowMaterial';
 import { configureAlphaCutoutTexture } from '../../../rendering/loaders/configureAlphaCutoutTexture';
 import {
   createFarOnlySunShadowNode,
@@ -64,6 +65,24 @@ export function syncPropLeafAlphaTest(): void {
   for (const material of leafPropMaterials) {
     material.alphaTest = threshold;
   }
+}
+
+/**
+ * A material named like this glows: its glTF emissive is added to the shaded colour, times the HDR bloom scale, so it
+ * blooms (the bind rune on the landmark tree). Opt-in by name: other models carry an emissive that the prop shader
+ * has always ignored (the stone pack's runes, the village's glow quads), and they must stay as they are.
+ */
+const GLOW_MATERIAL_PREFIX = 'rune_glow';
+
+function propGlowNode(base: Material): TslNode | null {
+  const { emissive, emissiveIntensity } = base as Material & {
+    emissive?: Color;
+    emissiveIntensity?: number;
+  };
+  if (!emissive || !base.name.startsWith(GLOW_MATERIAL_PREFIX)) return null;
+  return color(emissive)
+    .mul(emissiveIntensity ?? 1)
+    .mul(uHdrBloomScale);
 }
 
 function prepareBaseMaterial(base: Material): TexturedMaterial {
@@ -277,6 +296,9 @@ export function createMapPropNodeMaterial(
       lodBand,
     );
   }
+
+  const glow = propGlowNode(base);
+  if (glow) material.colorNode = (material.colorNode as TslNode).add(glow);
 
   if (VISUAL.props.vertexDepthBias && !largeFaces) {
     // Same pull toward the camera, applied to the clip position along the view ray (xy unchanged)

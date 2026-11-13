@@ -35,7 +35,7 @@ function canRotate(entity: MapEntity): boolean {
 }
 
 function canScale(entity: MapEntity): boolean {
-  return entity.type === 'prop';
+  return entity.type === 'prop' || entity.type === 'landmark';
 }
 
 function readRotY(entity: MapEntity): number {
@@ -47,6 +47,7 @@ function readRotY(entity: MapEntity): number {
 
 function readScale(entity: MapEntity): number {
   if (entity.type === 'prop') return entity.scale;
+  if (entity.type === 'landmark') return entity.scale ?? 1;
   return 1;
 }
 

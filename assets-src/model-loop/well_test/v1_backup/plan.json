@@ -1,0 +1,456 @@
+{
+  "asset": "well_test",
+  "style": "chunky stylised hand-painted fantasy game prop, soft rounded bevels, warm saturated colours",
+  "materials": {
+    "stone": {
+      "prompt": "dark slate-grey rough stone, soft painted highlights, slightly bluish",
+      "texture": "textures/stone.png",
+      "tile_m": 0.6,
+      "roughness": 0.9
+    },
+    "plank": {
+      "prompt": "warm honey-orange weathered wood grain planks",
+      "texture": "textures/plank.png",
+      "tile_m": 1,
+      "roughness": 0.75
+    },
+    "timber": {
+      "prompt": "dark reddish-brown painted timber wood grain",
+      "texture": "textures/timber.png",
+      "tile_m": 1,
+      "roughness": 0.7
+    },
+    "shingle": {
+      "prompt": "orange-red terracotta coloured wooden shingles wood grain",
+      "texture": "textures/shingle.png",
+      "tile_m": 0.5,
+      "roughness": 0.7
+    },
+    "rope": {
+      "prompt": "tan twisted hemp rope fibres",
+      "texture": "textures/rope.png",
+      "tile_m": 0.3,
+      "roughness": 0.9
+    },
+    "iron": {
+      "prompt": "dark worn wrought iron",
+      "texture": "textures/iron.png",
+      "tile_m": 0.3,
+      "roughness": 0.6
+    }
+  },
+  "nodes": [
+    {
+      "id": "stone",
+      "kind": "part",
+      "desc": "one chunky rounded dark-grey stone block from the well shaft, slightly curved front face, soft bevelled irregular edges, flat chipped facets",
+      "dims_m": [
+        0.42,
+        0.26,
+        0.22
+      ],
+      "materials": [
+        "stone"
+      ],
+      "variants": 3,
+      "ref": "refs/stone.png",
+      "ref_view": [
+        35,
+        25,
+        50
+      ],
+      "status": "accepted",
+      "best": {
+        "renders": "renders/stone/frozen_*.png",
+        "builder": "build/stone.py"
+      },
+      "pass_at": 7,
+      "frozen": true,
+      "note": "user picked the shaft-r02 first-render variant as the best style (2026-10-30); frozen",
+      "review_at": 5
+    },
+    {
+      "id": "plank",
+      "kind": "part",
+      "desc": "one short thick honey-coloured floor plank with rounded edges and an angled cut end",
+      "dims_m": [
+        1.1,
+        0.24,
+        0.07
+      ],
+      "materials": [
+        "plank"
+      ],
+      "variants": 3,
+      "ref": "refs/plank.png",
+      "ref_view": [
+        55,
+        28,
+        85
+      ],
+      "status": "accepted",
+      "best": {
+        "renders": "renders/plank/final_*.png",
+        "builder": "build/plank.py",
+        "judged_best": "r05 7.5"
+      },
+      "pass_at": 7,
+      "review_at": 5,
+      "frozen": true,
+      "note": "user: round-5 shape + darker edges + chiselled rim (boolean V-chips), accepted 2026-10-30"
+    },
+    {
+      "id": "timber",
+      "kind": "part",
+      "desc": "one squared dark reddish-brown timber beam with chamfered, slightly uneven edges and soft painted wood grain; used for posts, braces, tie beams and bargeboards",
+      "dims_m": [
+        1,
+        0.16,
+        0.16
+      ],
+      "materials": [
+        "timber"
+      ],
+      "variants": 2,
+      "ref": "refs/timber.png",
+      "ref_view": [
+        -40,
+        28,
+        85
+      ],
+      "status": "accepted",
+      "best": {
+        "round": 4,
+        "overall": 7,
+        "renders": "renders/timber/r04_*.png"
+      },
+      "review_at": 5,
+      "pass_at": 7,
+      "frozen": true,
+      "note": "user accepted round 4 (7.0/10), 2026-10-30"
+    },
+    {
+      "id": "windlass",
+      "kind": "part",
+      "desc": "the well windlass: a round wooden log axle with a thick coil of tan rope wound around its middle (6-8 turns) and one rope strand hanging down",
+      "dims_m": [
+        0.85,
+        0.29,
+        0.75
+      ],
+      "materials": [
+        "timber",
+        "rope"
+      ],
+      "variants": 1,
+      "ref": "refs/windlass.png",
+      "ref_view": [
+        35,
+        25,
+        50
+      ],
+      "status": "accepted",
+      "best": {
+        "round": 2,
+        "overall": 7,
+        "renders": "renders/windlass/r02_*.png"
+      },
+      "review_at": 5,
+      "pass_at": 7,
+      "frozen": true,
+      "note": "user accepted round 2 (7.0/10), 2026-10-30 | measured 2026-10-30 in the merged blend: log 0.85 x 0.163 x 0.164 m, rope coil plus hanging strand 0.517 x 0.289 x 0.749 m; the original dims_m (1.4 x 0.16 x 0.5) were an estimate and wrong."
+    },
+    {
+      "id": "crank",
+      "kind": "part",
+      "desc": "the windlass crank: a short thick plank arm with a round wooden peg handle sticking out, bolted with a dark iron cap",
+      "dims_m": [
+        0.12,
+        0.45,
+        0.35
+      ],
+      "materials": [
+        "timber",
+        "iron"
+      ],
+      "variants": 1,
+      "ref": "refs/crank.png",
+      "ref_view": [
+        35,
+        25,
+        50
+      ],
+      "status": "accepted",
+      "best": {
+        "round": "r06 (judged round 1)",
+        "overall": 6.1,
+        "renders": "renders/crank/r06_*.png",
+        "builder": "build/crank.py",
+        "blend": "rounds/crank_final.blend"
+      },
+      "review_at": 5,
+      "pass_at": 7,
+      "frozen": true,
+      "size_m": [
+        0.213,
+        0.147,
+        0.335
+      ],
+      "note": "user accepted r06 (6.1/10), 2026-10-30. Orientation: plate thin along X (inner face x=0, 0.048 thick, 0.145 wide, 0.335 tall), peg 0.08 dia along +X to x=0.213 at z=0.07, bolt cap centred z=0.24 (windlass axis), up to x=0.075. Materials M_crank_wood (copy of M_plank, grain along Z), M_crank_peg (copy of M_timber, brighter), M_crank_iron (iron.png)."
+    },
+    {
+      "id": "bucket",
+      "kind": "part",
+      "desc": "a small wooden stave bucket with one dark iron band and a wire handle",
+      "dims_m": [
+        0.3,
+        0.3,
+        0.32
+      ],
+      "materials": [
+        "plank",
+        "iron"
+      ],
+      "variants": 1,
+      "ref": "refs/bucket.png",
+      "ref_view": [
+        35,
+        25,
+        50
+      ],
+      "status": "accepted",
+      "best": {
+        "round": "r01",
+        "overall": 5.5,
+        "renders": "renders/bucket/r01_*.png",
+        "builder": "build/bucket.py",
+        "blend": "rounds/bucket_final.blend"
+      },
+      "review_at": 5,
+      "pass_at": 7,
+      "frozen": true,
+      "note": "user accepted r01 (5.5/10), 2026-10-30. Size about 0.415 x 0.324 x 0.504 m with bail (body 0.31 wide at rim, 0.27 tall): larger than the plan estimate, scale per copy in the frame. Materials M_bucket_wood (plank.png rotated, contrast x2) and M_bucket_iron. Open part defects: rust-mottled iron, over-orange wood, 11-12 narrow staves instead of 8-9.",
+      "size_m": [
+        0.415,
+        0.324,
+        0.504
+      ]
+    },
+    {
+      "id": "shingle",
+      "kind": "part",
+      "desc": "one stylised wooden roof shingle: a thin orange-red board with a slightly rounded, uneven bottom edge and soft wood grain",
+      "dims_m": [
+        0.22,
+        0.32,
+        0.025
+      ],
+      "materials": [
+        "shingle"
+      ],
+      "variants": 3,
+      "ref": "refs/shingle.png",
+      "ref_view": [
+        35,
+        25,
+        50
+      ],
+      "status": "accepted",
+      "best": {
+        "round": "r05 (judged round 1)",
+        "overall": 6.6,
+        "renders": "renders/shingle/r05_*.png",
+        "builder": "build/shingle.py",
+        "blend": "rounds/shingle_final.blend"
+      },
+      "review_at": 5,
+      "pass_at": 7,
+      "frozen": true,
+      "note": "user accepted r05 (6.6/10), 2026-10-30. Variants shingle_a/b/c (306 tris each), lie flat on z=0, long side along Y, uneven eave edge at -Y, board thickest at -Y. Materials M_shingle, M_shingle_b, M_shingle_c (one texture, different grain crops). Open part defects: blurry grain, strong dark middle band, eave step on variant a too deep.",
+      "size_m": [
+        [
+          0.23,
+          0.287,
+          0.021
+        ],
+        [
+          0.242,
+          0.272,
+          0.02
+        ],
+        [
+          0.222,
+          0.3,
+          0.022
+        ]
+      ]
+    },
+    {
+      "id": "shaft",
+      "kind": "group",
+      "children": [
+        "stone"
+      ],
+      "desc": "round dry-stone well shaft, 3 courses of chunky stone blocks in a ring, open top, staggered joints",
+      "dims_m": [
+        1.6,
+        1.6,
+        0.75
+      ],
+      "ref": "refs/shaft.png",
+      "ref_view": [
+        35,
+        25,
+        50
+      ],
+      "status": "accepted",
+      "best": {
+        "round": 6,
+        "overall": 6.5,
+        "renders": "renders/shaft/r06_*.png"
+      },
+      "pass_at": 8,
+      "review_at": 5,
+      "frozen": true,
+      "note": "user accepted r06 (6.5/10) on the frozen stone, 2026-10-30"
+    },
+    {
+      "id": "deck",
+      "kind": "group",
+      "children": [
+        "plank"
+      ],
+      "desc": "an irregular round deck of chunky honey-coloured planks laid in mixed directions around the well shaft, about 2.6 m across",
+      "dims_m": [
+        2.6,
+        2.6,
+        0.08
+      ],
+      "ref": "refs/deck.png",
+      "ref_view": [
+        35,
+        25,
+        50
+      ],
+      "status": "accepted",
+      "best": {
+        "round": "r01",
+        "overall": 5.3,
+        "renders": "renders/deck/r01_*.png",
+        "builder": "build/deck.py",
+        "blend": "rounds/deck_final.blend"
+      },
+      "review_at": 5,
+      "pass_at": 8,
+      "frozen": true,
+      "note": "user accepted r01 (5.3/10), 2026-10-30. G_deck: 25 pieces (14 whole linked frozen planks + 11 clipped off-cuts), 2.63 x 2.61 x 0.087 m, centred on origin, z 0..0.088, dark underlay M_deck_under, seed 3. Open group defects: loose 5-15 cm gaps with underlay showing, parallel-row layout, uniform plank length.",
+      "size_m": [
+        2.63,
+        2.61,
+        0.087
+      ]
+    },
+    {
+      "id": "frame",
+      "kind": "group",
+      "children": [
+        "timber",
+        "windlass",
+        "crank",
+        "bucket"
+      ],
+      "desc": "the well's timber frame: two square posts on opposite sides of the shaft, diagonal knee braces up to a tie beam, the windlass axle between the posts with its rope and hanging bucket, and the crank on one post",
+      "dims_m": [
+        1.9,
+        0.5,
+        2.3
+      ],
+      "ref": "refs/frame.png",
+      "ref_view": [
+        35,
+        25,
+        50
+      ],
+      "status": "accepted",
+      "best": {
+        "round": "r04 (judged round 1)",
+        "overall": 7.1,
+        "renders": "renders/frame/r04_*.png",
+        "builder": "build/frame.py",
+        "blend": "rounds/frame_final.blend"
+      },
+      "review_at": 5,
+      "pass_at": 8,
+      "frozen": true,
+      "size_m": [
+        1.72,
+        0.38,
+        1.82
+      ],
+      "note": "user accepted r04 (7.1/10), 2026-10-30. G_frame: windlass axle along X, posts at the X ends, centred x=y=0, post feet z=0. Posts 0.18 m square, 1.82 m tall (timber stretched about 1.8x lengthwise), clear gap 1.02 m, windlass log stretched 1.27x along X, crank on one post (collection instance of P_crank, scale 1.22), bucket a collection instance of P_bucket (scale 1.0). Open defects: frozen timber too brown, tie beam reads as two boards (reduce depth 0.15 to 0.12), log slightly thin (log_fat 1.25), frozen crank cap octagon and rope-end tab."
+    },
+    {
+      "id": "roof",
+      "kind": "group",
+      "children": [
+        "shingle",
+        "timber"
+      ],
+      "desc": "a small gable roof: two slopes of overlapping orange-red wooden shingles in staggered rows, a ridge, and thick dark red bargeboards on both gables that cross past the ridge into X-shaped finials",
+      "dims_m": [
+        2,
+        1.7,
+        1
+      ],
+      "ref": "refs/roof.png",
+      "ref_view": [
+        35,
+        25,
+        50
+      ],
+      "status": "accepted",
+      "best": {
+        "round": "r03 (judged round 1)",
+        "overall": 6.6,
+        "renders": "renders/roof/r03_*.png",
+        "builder": "build/roof.py",
+        "blend": "rounds/roof_final.blend"
+      },
+      "review_at": 5,
+      "pass_at": 8,
+      "frozen": true,
+      "size_m": [
+        2.054,
+        1.791,
+        1.035
+      ],
+      "note": "user accepted r03 (6.6/10), 2026-10-30. G_roof: ridge along X, gable ends at +-X, slopes face +-Y, eave near z=0, ridge near z=1.0; 56 linked shingles (4 courses x 7 per slope) at about 33 degree pitch (the frozen M_shingle switches texture projection by world normal z, a 45 degree roof showed plaid), 4 bargeboards (timber x1.35), ridge beam x1.3, 2 underlay boards (M_roof_under). Gable post and tie beam are in the frame. Open defects: frozen shingle scalloped, ridge ruler-straight (ref bowed 3-4 cm), finial arms too short, shingle widths too uniform."
+    },
+    {
+      "id": "well_test",
+      "kind": "group",
+      "children": [
+        "deck",
+        "shaft",
+        "frame",
+        "roof"
+      ],
+      "desc": "stylised village well with shingle roof, timber frame, windlass and bucket on a plank deck",
+      "dims_m": [
+        2.4,
+        2.4,
+        2.9
+      ],
+      "ref": "input.png",
+      "ref_view": [
+        30,
+        22,
+        50
+      ],
+      "status": "todo",
+      "best": null,
+      "pass_at": 9,
+      "review_at": 5
+    }
+  ]
+}
