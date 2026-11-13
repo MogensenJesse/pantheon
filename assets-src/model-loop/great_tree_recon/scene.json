@@ -232,8 +232,8 @@
    ],
    "review_at": 5,
    "pass_at": 7,
-   "status": "todo",
-   "best": null,
+   "status": "review",
+   "best": "r01",
    "mesh_yaw": 130,
    "mesh_yaw_fit": {
     "best_first": [
@@ -288,7 +288,8 @@
     "h": 0.5636,
     "faces": 8220,
     "area_frac": 0.0481
-   }
+   },
+   "last_score": 4.8
   },
   {
    "id": "trunk_roots",
@@ -326,8 +327,8 @@
    "note": "trunk and roots as one organic mass (one Trellis run); cut off above the point where the limbs spread",
    "review_at": 5,
    "pass_at": 8,
-   "status": "todo",
-   "best": null,
+   "status": "review",
+   "best": "r01",
    "mesh_yaw": 235,
    "mesh_yaw_fit": {
     "best_first": [
@@ -374,7 +375,8 @@
      "silhouette_iou",
      "colour"
     ]
-   }
+   },
+   "last_score": 4.3
   },
   {
    "id": "crown",
@@ -429,6 +431,36 @@
     921
    ],
    "status": "later"
+  }
+ ],
+ "weave_runs": [
+  {
+   "piece": "runestone",
+   "model": "Trellis 2 (fal-ai/trellis-2)",
+   "credits": 30,
+   "prediction": "aa15a750-2c5e-4457-9635-0d509f02981f",
+   "input": "refs/runestone.png",
+   "params": {
+    "resolution": 1024,
+    "texture_size": 1024,
+    "decimation_target": 100000,
+    "remesh": true
+   },
+   "date": "2026-11-13"
+  },
+  {
+   "piece": "trunk_roots",
+   "model": "Trellis 2 (fal-ai/trellis-2)",
+   "credits": 30,
+   "prediction": "20658d72-bdc3-497f-8388-8e51de19838f",
+   "input": "refs/trunk_roots.png",
+   "params": {
+    "resolution": 1024,
+    "texture_size": 1024,
+    "decimation_target": 200000,
+    "remesh": true
+   },
+   "date": "2026-11-13"
   }
  ]
 }

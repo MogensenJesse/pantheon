@@ -112,6 +112,26 @@ Trellis output is raw: about 1 m tall, dense, one baked material, UVs fragmented
 - `run_bpy.sh` sets `PYTHONDONTWRITEBYTECODE=1` because `../model-loop/scripts/__pycache__` is tracked.
 - Blender 5: after `bpy.data.objects.remove(...)` call `view_layer.update()` before iterating `view_layer.objects` (stale `None` entries).
 
+## Orientation and other things a raw Trellis mesh needs (first run, great_tree_recon, 2026-11-13)
+- **Yaw.** Trellis puts the piece at any yaw (runestone 130 deg, trunk 235 deg off). `orient_fit.run(glb, ref_png, ref_view)` renders the raw mesh
+  with its baked colours at a ring of yaws and returns the best match; pass it as `recon_import.run(..., yaw_deg=)`. Check the top two scores:
+  a near-symmetric piece (the trunk) has a broad peak, so look at the candidates once. Run it once per mesh and store the yaw in `scene.json`.
+- **Baked colours as data, not as look.** `orient_fit.colour_box` finds where a baked colour sits on the front (the rune panel), so a
+  projected mask can be placed on it. Keep the mask's own aspect: stretching it to the box made the knot 1.7x too fat.
+- **Weave upload** is a file picker in the user's browser. From a cloud session, pass `image_url` an https URL instead: for a public repo, the
+  pushed file's `raw.githubusercontent.com/<owner>/<repo>/<commit>/<path>` (pin the commit, check it returns the same bytes).
+- **Download host**: outputs come from `www.figma.com/blobs/...`; it must be in the environment's allowed hosts.
+- **Detached islands.** Thin roots break off in Trellis output (53 islands on the trunk). qa_check fails them as floating; pass
+  `min_face_frac` / `min_diag_frac` per piece so they are dropped.
+- **Colour.** model-loop's knob sets were tuned on EEVEE; Cycles renders them darker. Measure with the run's `build/colmeasure.py` (object pixels
+  through the mask pass, not colstats' saturated pixels), but do not trust one pass: the runestone's measured match (top #98958d against #949289)
+  was still judged far too pale. Compare the sheet by eye as well and stay under the measured gain.
+- **What one round showed** (judge: runestone 4.8, trunk_roots 4.3). Trellis gets the gesture and silhouette quickly, but: it invents the unseen
+  side (a second rune panel), carves its own relief that a GPT mask will not line up with, leaves hollow cut ends and thin fins, and gives
+  organic masses many thin strands where the reference has few thick ones. Random flat-shaded triangles from a plain decimate read as crumpled
+  paper: planar-decimate into larger facets or shade smooth by angle. The judge's high defects on structure are the mesh itself and need a new
+  Trellis input (a straight-on front view, a simpler close-up), not knobs.
+
 ## Verification at the end of a run
 - The source run's md5 listing matches the one taken before the copy.
 - `camera_fit` self-check passes; the tile corners reproject within 3 px.
