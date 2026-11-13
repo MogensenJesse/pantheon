@@ -142,6 +142,30 @@ def rune_glow(mat, ob, w, h, cx, cz, strength, floor, mask_png):
     return {"mask_box_uv": [round(float(v), 3) for v in (u0, u1, v0, v1)]}
 
 
+def mask_pass(pid, path, res=(1024, 1024)):
+    """Object-only alpha render from REF_CAM (everything else hidden, transparent film): the mask colmeasure.py uses."""
+    sc = bpy.context.scene
+    keep = {o.name for o in bpy.data.collections["P_" + pid].all_objects}
+    saved = {o: o.hide_render for o in bpy.data.objects}
+    state = (sc.camera, sc.render.film_transparent, sc.render.filepath, sc.render.resolution_x, sc.render.resolution_y,
+             sc.render.image_settings.color_mode, sc.cycles.samples)
+    try:
+        for o in bpy.data.objects:
+            o.hide_render = o.name not in keep
+        sc.camera = bpy.data.objects["REF_CAM"]
+        sc.render.engine, sc.cycles.samples, sc.render.film_transparent = "CYCLES", 1, True
+        sc.render.resolution_x, sc.render.resolution_y = res
+        sc.render.image_settings.file_format, sc.render.image_settings.color_mode = "PNG", "RGBA"
+        sc.render.filepath = path
+        bpy.ops.render.render(write_still=True)
+    finally:
+        for o, h in saved.items():
+            o.hide_render = h
+        (sc.camera, sc.render.film_transparent, sc.render.filepath, sc.render.resolution_x, sc.render.resolution_y,
+         sc.render.image_settings.color_mode, sc.cycles.samples) = state
+    return path
+
+
 def main():
     args = sys.argv[sys.argv.index("--") + 1:]
     pid, tag = args[0], args[1]
@@ -186,6 +210,7 @@ def main():
             continue
     else:
         raise RuntimeError("loop_render.run kept failing")
+    out["mask"] = mask_pass(pid, os.path.join(rdir, f"{tag}_mask.png"))
     bpy.ops.wm.save_mainfile()
     os.makedirs(os.path.join(OUT, "rounds"), exist_ok=True)
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, "rounds", f"{pid}_{tag}.blend"), copy=True)
