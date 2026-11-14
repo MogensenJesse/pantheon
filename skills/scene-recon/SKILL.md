@@ -146,6 +146,23 @@ Trellis output is raw: about 1 m tall, dense, one baked material, UVs fragmented
 - A height map must be its own Non-Color image, or qa_check fails the material.
 - Not reachable with knobs: anything the mesh does not have (a carved band, separate braided strands, split root tips, a crisp stepped frame).
 
+## More pieces and a first assembly (crown 5.5, rockery 5.3 in their first rounds)
+- **Two materials from one Trellis mesh.** `orient_fit.colour_points` gives the raw mesh's baked colours in box-normalised coordinates; a k-d
+  tree over them tells each face of the cleaned mesh whether it was leaf or bark (`piece.py` `split`). The crown (limbs and leaf pads in one
+  run) needed no pad placement that way.
+- **Check that a mesh is closed before a voxel pass.** The rockery came back as an open shell (36,668 boundary edges); `voxel_m` shredded it
+  into fences and 1253 loose triangles. Count boundary edges first; skip the voxel pass on an open mesh.
+- **Hanging clumps** (leaf pads Trellis did not join): `piece.py` `settle_islands` drops the crumbs and slides each bigger island along the
+  shortest gap to the piece's SURFACE and a little further. Moving vertex to vertex let two leaf tips pass each other; qa_check then still
+  calls the island floating (it wants a vertex within 2 mm of another island, or crossing triangles).
+- **Coplanar pairs lying on each other** (qa_check z-fighting): `drop_overlaps` deletes one face of each pair.
+- **Long result lines**: `run_bpy.sh` cuts lines at 2500 characters; write the result to a file and read that (`round.sh` does).
+- **Assembly** (`build/assemble.py`): a piece's position on rocks or roots comes from casting the fitted camera's ray through its pixel onto
+  the assembled geometry, not onto the ground plane. Take the depth from the ray through the piece's MIDDLE pixel and stand it in front of
+  that surface; a base placed on the first hit of its bottom pixel ends up buried. The ID map says where the input has ivy and water.
+- **Layout is not solved by good pieces.** A Trellis root skirt is round and has no gap for the pool; the rockery's basin ended up under it.
+  Decide the layout (which piece yields) before judging the whole scene.
+
 ## Verification at the end of a run
 - The source run's md5 listing matches the one taken before the copy.
 - `camera_fit` self-check passes; the tile corners reproject within 3 px.

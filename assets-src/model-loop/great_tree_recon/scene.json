@@ -389,7 +389,7 @@
     1130,
     406
    ],
-   "status": "todo",
+   "status": "review",
    "note": "limbs and all leaf pads as ONE Trellis mesh (user approved 2026-11-14); leaves and bark are told apart by the baked colour. Its trunk stub overlaps the top of trunk_roots in the assembly.",
    "ref_view": [
     0,
@@ -411,7 +411,7 @@
    ],
    "review_at": 5,
    "pass_at": 8,
-   "best": null,
+   "best": "r01",
    "mesh_yaw": 325,
    "mesh_yaw_fit": {
     "best_first": [
@@ -458,7 +458,8 @@
      "silhouette_iou",
      "colour"
     ]
-   }
+   },
+   "last_score": 5.5
   },
   {
    "id": "leaf_pad",
@@ -477,7 +478,7 @@
     1164,
     972
    ],
-   "status": "todo",
+   "status": "review",
    "ref_view": [
     0,
     30,
@@ -498,7 +499,7 @@
    "note": "the ring of boulders alone (GPT close-up without runestones, water or roots); runestones are instances, water is procedural",
    "review_at": 5,
    "pass_at": 8,
-   "best": null,
+   "best": "r01",
    "mesh_yaw": 315,
    "mesh_yaw_fit": {
     "best_first": [
@@ -546,7 +547,8 @@
      "colour"
     ]
    },
-   "dims_note": "the ring spans the tile's diagonal (11.4 m); Trellis kept the close-up's proportions, which makes it about 4.7 m tall. The input suggests about 3.4 m: squash it in the assembly if it pokes through the roots."
+   "dims_note": "the ring spans the tile's diagonal (11.4 m); Trellis kept the close-up's proportions, which makes it about 4.7 m tall. The input suggests about 3.4 m: squash it in the assembly if it pokes through the roots.",
+   "last_score": 5.3
   },
   {
    "id": "water",
@@ -557,8 +559,9 @@
     852,
     875
    ],
-   "status": "later",
-   "note": "pool and thin waterfall"
+   "status": "built",
+   "note": "pool (flat teal polygon traced from the ID map's water pixels) and a waterfall ribbon from the centre runestone. Placement is NOT settled: in the input the pool lies in a gap between the front roots; this Trellis root skirt has no gap and covers the rockery's basin, so the only spot the camera sees is outside the rock ring (assembly a03). Needs a layout decision, not a water change.",
+   "build": "build/assemble.py"
   },
   {
    "id": "ivy",
@@ -569,7 +572,9 @@
     1186,
     921
    ],
-   "status": "later"
+   "status": "built",
+   "build": "build/assemble.py",
+   "note": "617 three-leaf clusters on up-facing rock and root faces whose pixel in the object-ID map is ivy and that the camera sees; one mesh, flat green."
   }
  ],
  "weave_runs": [
@@ -629,5 +634,24 @@
    },
    "date": "2026-11-14"
   }
- ]
+ ],
+ "assembly": {
+  "build": "build/assemble.py",
+  "blend": "great_tree_recon_scene.blend",
+  "latest": "a03",
+  "render": "renders/scene/a03_cam.png (ignored; copy in review_assembly_a03.png)",
+  "status": "first preview, not judged (the whole-scene compare loop is a later step)",
+  "placement": {
+   "rockery": "tile centre, squashed to 3.4 m",
+   "trunk_roots": "tile centre",
+   "crown": "on the trunk from z = 3.3 m, scaled so the tree is 10.5 m",
+   "runestones": "depth from the ray through each stone's middle pixel, 0.6 m in front of the surface behind it; base on the bottom pixel's ray, dropped if it hangs"
+  },
+  "known_issues": [
+   "pool outside the rock ring (the roots cover the basin)",
+   "crown pads hang lower and wider than the input and hide the trunk and its (missing) knot band",
+   "root skirt mostly buried in the rockery",
+   "no camera-matched compare yet beyond this side-by-side"
+  ]
+ }
 }
