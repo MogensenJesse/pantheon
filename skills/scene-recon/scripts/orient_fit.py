@@ -154,8 +154,11 @@ def run(glb, ref_png, ref_view=(0, 20, 85), step=15, refine=5, res=192, keep=Non
     return {"yaw": ranked[0][0], "scores": [(k, round(s, 4), round(i, 4), round(col, 4)) for k, s, i, col in ranked[:6]], "renders": out}
 
 
-def colour_box(glb, yaw, test, facing=-0.5):
-    """Where on the turned mesh's front (-Y) the baked colour passes `test`: box as fractions of the mesh's width and height."""
+def colour_box(glb, yaw, test, facing=-0.8):
+    """Where on the turned mesh's front (-Y) the baked colour passes `test`: box as fractions of the mesh's width and height.
+    The centre is the area-weighted median and the size twice the interquartile range (exact for an evenly filled box):
+    colour that spills onto a frame leg or a second panel seen edge-on only makes a tail and does not move the box
+    (a 3-97 % span put the runestone's rune 15 cm off its recess)."""
     ob = _load(glb)
     me = ob.data
     img = None
@@ -196,15 +199,14 @@ def colour_box(glb, yaw, test, facing=-0.5):
     sel = test(col) & (nor[:, 1] < facing)
     if sel.sum() < 10:
         return None
-    # weighted 3..97 % box: stray texels on the rim do not stretch it
-    def span(v, wts):
+    def quart(v, wts):  # area-weighted 25 / 50 / 75 %
         o = np.argsort(v)
         cw = np.cumsum(wts[o]) / wts.sum()
-        return float(v[o][np.searchsorted(cw, 0.03)]), float(v[o][min(np.searchsorted(cw, 0.97), len(v) - 1)])
+        return [float(v[o][min(np.searchsorted(cw, q), len(v) - 1)]) for q in (0.25, 0.5, 0.75)]
 
-    x0, x1 = span(cen[sel, 0], area[sel])
-    z0, z1 = span(cen[sel, 2], area[sel])
+    xa, xm, xb = quart(cen[sel, 0], area[sel])
+    za, zm, zb = quart(cen[sel, 2], area[sel])
     W, H = float(hi[0] - lo[0]), float(hi[2] - lo[2])
     xc = float((hi[0] + lo[0]) / 2)
-    return {"cx": ((x0 + x1) / 2 - xc) / W, "cz": ((z0 + z1) / 2 - float(lo[2])) / H, "w": (x1 - x0) / W, "h": (z1 - z0) / H,
+    return {"cx": (xm - xc) / W, "cz": (zm - float(lo[2])) / H, "w": 2 * (xb - xa) / W, "h": 2 * (zb - za) / H,
             "faces": int(sel.sum()), "area_frac": float(area[sel].sum() / area.sum())}

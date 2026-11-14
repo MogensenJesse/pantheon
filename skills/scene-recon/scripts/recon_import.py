@@ -8,7 +8,9 @@ material. Steps, in this order:
   import -> bake parent transforms and join the meshes into one object -> turn by yaw_deg about Z (the piece comes
   out of Trellis at any yaw; orient_fit.run finds the angle that matches the reference) -> merge by distance ->
   drop loose bits (small, separate, far smaller than the main body) -> recalculate normals outward ->
-  decimate to about `tris` -> scale to `dims_m` -> origin at bottom-centre (z = 0 at the floor, x/y centred) ->
+  scale to `dims_m`, origin at bottom-centre (z = 0 at the floor, x/y centred) -> optional cleanup in metres
+  (inflate_m: fatten thin strands along their normals; voxel_m: voxel remesh into one closed skin) ->
+  decimate to about `tris` ->
   strip the material, its images and any colour attributes (the retexture comes from loop_mat's box projection).
 The object is named `name`, with a mesh of the same name, and sits in collection `collection` (default
 `P_<name>`, created if missing).
@@ -73,7 +75,7 @@ def _join(objs):
 
 
 def run(glb, name, dims_m, tris=12000, fit="fit", merge_frac=5e-4, min_face_frac=0.01, min_diag_frac=0.10,
-        collection=None, yaw_deg=0.0):
+        collection=None, yaw_deg=0.0, inflate_m=0.0, voxel_m=0.0):
     if not os.path.isfile(glb):
         raise FileNotFoundError(glb)
     if fit not in ("fit", "height", "axes"):
@@ -143,12 +145,47 @@ def run(glb, name, dims_m, tris=12000, fit="fit", merge_frac=5e-4, min_face_frac
     obj = _join(keep)
     me = obj.data
 
-    # outward normals, then decimate
+    # outward normals
     bm = bmesh.new()
     bm.from_mesh(me)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     bm.to_mesh(me)
     bm.free()
+
+    def to_dims(me):
+        """Scale to dims_m by `fit`, origin at the bottom-centre. Returns the scale."""
+        co = _coords(me)
+        size = co.max(0) - co.min(0)
+        dx, dy, dz = (float(v) for v in dims_m)
+        if fit == "axes":
+            k = np.array([dx / size[0], dy / size[1], dz / size[2]])
+        elif fit == "height":
+            k = np.full(3, dz / size[2])
+        else:
+            k = np.full(3, min(dx / size[0], dy / size[1], dz / size[2]))
+        co = (co - [(co[:, 0].max() + co[:, 0].min()) / 2, (co[:, 1].max() + co[:, 1].min()) / 2, co[:, 2].min()]) * k
+        me.vertices.foreach_set("co", co.ravel())
+        me.update()
+        return k
+
+    # real size first, so the cleanup knobs below are in metres
+    s = to_dims(me)
+    obj.location, obj.rotation_euler, obj.scale = (0, 0, 0), (0, 0, 0), (1, 1, 1)
+    if inflate_m:  # fatten thin strands: push every vertex out along its normal (the voxel pass then merges what overlaps)
+        co = _coords(me)
+        nor = np.empty(len(me.vertices) * 3, dtype=np.float64)
+        me.vertex_normals.foreach_get("vector", nor)
+        me.vertices.foreach_set("co", (co + nor.reshape(-1, 3) * inflate_m).ravel())
+        me.update()
+    if voxel_m:  # one closed skin: unions overlapping shells, removes inner faces, thin fins and slits narrower than a voxel
+        mod = obj.modifiers.new("recon_voxel", "REMESH")
+        mod.mode, mod.voxel_size, mod.adaptivity = "VOXEL", voxel_m, 0.0
+        _select([obj], obj)
+        bpy.ops.object.modifier_apply(modifier=mod.name)
+        me = obj.data
+        stats["tris_after_voxel"] = _tris(me)
+    if inflate_m or voxel_m:
+        s = s * to_dims(me)
     now = _tris(me)
     if now > tris:
         mod = obj.modifiers.new("recon_decimate", "DECIMATE")
@@ -156,21 +193,7 @@ def run(glb, name, dims_m, tris=12000, fit="fit", merge_frac=5e-4, min_face_frac
         _select([obj], obj)
         bpy.ops.object.modifier_apply(modifier=mod.name)
         me = obj.data
-
-    # scale to dims_m, origin at the bottom-centre
-    co = _coords(me)
-    size = co.max(0) - co.min(0)
-    dx, dy, dz = (float(v) for v in dims_m)
-    if fit == "axes":
-        s = np.array([dx / size[0], dy / size[1], dz / size[2]])
-    elif fit == "height":
-        s = np.full(3, dz / size[2])
-    else:
-        s = np.full(3, min(dx / size[0], dy / size[1], dz / size[2]))
-    co = (co - [(co[:, 0].max() + co[:, 0].min()) / 2, (co[:, 1].max() + co[:, 1].min()) / 2, co[:, 2].min()]) * s
-    me.vertices.foreach_set("co", co.ravel())
-    me.update()
-    obj.location, obj.rotation_euler, obj.scale = (0, 0, 0), (0, 0, 0), (1, 1, 1)
+        to_dims(me)  # the collapse moves the bounds a little
 
     # strip the Trellis material, images and colour attributes
     stats["materials_removed"] = len([m for m in me.materials if m])

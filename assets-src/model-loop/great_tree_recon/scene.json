@@ -170,10 +170,10 @@
    "mesh": "meshes/runestone.glb",
    "dims_m": [
     1.1,
-    0.6,
+    0.65,
     3.2
    ],
-   "fit": "height",
+   "fit": "axes",
    "tris": 5000,
    "materials": [
     "stone_cut",
@@ -282,14 +282,15 @@
     ]
    },
    "panel_box": {
-    "cx": -0.0685,
-    "cz": 0.422,
-    "w": 0.5659,
-    "h": 0.5636,
-    "faces": 8220,
-    "area_frac": 0.0481
+    "cx": 0.0524,
+    "cz": 0.4277,
+    "w": 0.3294,
+    "h": 0.5678,
+    "faces": 5539,
+    "area_frac": 0.0335
    },
-   "last_score": 4.8
+   "last_score": 4.8,
+   "dims_note": "r02: per-axis scale (judge r01: as deep as wide, 1.33 m against 0.6). Trellis made a wedge; this squashes it into the reference's slab."
   },
   {
    "id": "trunk_roots",
