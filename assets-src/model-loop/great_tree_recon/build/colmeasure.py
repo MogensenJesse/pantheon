@@ -1,6 +1,6 @@
 """Measure a material's colour on the reference and on a render, and print the tint / gain change that would match them.
 
-    python3 build/colmeasure.py <stone|bark> <ref.png> <render_ref.png> <render_mask.png> [tint r,g,b] [gain]
+    python3 build/colmeasure.py <stone|bark|leaf> <ref.png> <render_ref.png> <render_mask.png> [tint r,g,b] [gain]
 
 colstats.mjs (model-loop) only counts saturated pixels: on grey stone that is the glow, on bark the moss. This one
 measures the material itself: object pixels (reference: unlike its plain border colour; render: the alpha of the
@@ -18,6 +18,8 @@ def stats(rgb, obj, kind):
     r, g, b = (rgb[..., i].astype(float) for i in range(3))
     if kind == "stone":
         keep = obj & ~((b > r + 18) & (g > r + 10))          # not the cyan rune
+    elif kind == "leaf":
+        keep = obj & (g > r + 4)                             # only the green
     else:
         keep = obj & ~(g > r + 4)                            # not the moss
     px = rgb[keep].astype(float)

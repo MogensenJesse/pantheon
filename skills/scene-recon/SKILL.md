@@ -132,6 +132,20 @@ Trellis output is raw: about 1 m tall, dense, one baked material, UVs fragmented
   paper: planar-decimate into larger facets or shade smooth by angle. The judge's high defects on structure are the mesh itself and need a new
   Trellis input (a straight-on front view, a simpler close-up), not knobs.
 
+## Knobs that moved the score without a new Trellis run (round r02: runestone 4.8 -> 5.5, trunk_roots 4.3 -> 4.8)
+- `recon_import.run(..., voxel_m=)`: one closed skin (voxel remesh at real size). Unions shells that do not meet, drops inner faces. It did not
+  remove every thin fin; a shell standing proud of the body survives.
+- `recon_import.run(..., inflate_m=)` before the voxel pass: fattens thin strands (roots 10 cm a side) and lets them merge.
+- Per-axis scale (`"fit": "axes"`) when Trellis guessed the depth wrong (the runestone came out as deep as wide). It also thins the top: check
+  the side views.
+- Planar facets: decimate hard, then limited-dissolve (`planar_deg`) so each chiselled plane is one facet with one `fvar` value. Plain decimate
+  plus flat shading reads as crumpled paper; smooth shading reads as clay. Expect the judge's note on shading to flip between rounds.
+- A box from baked colours: use the area-weighted median and twice the interquartile range, not a percentile span; colour on a frame leg pulled a
+  3-97 % span 15 cm sideways.
+- A rectangular floor tint behind a pointed panel shows its corners. Shape the tint like the panel or leave it out.
+- A height map must be its own Non-Color image, or qa_check fails the material.
+- Not reachable with knobs: anything the mesh does not have (a carved band, separate braided strands, split root tips, a crisp stepped frame).
+
 ## Verification at the end of a run
 - The source run's md5 listing matches the one taken before the copy.
 - `camera_fit` self-check passes; the tile corners reproject within 3 px.

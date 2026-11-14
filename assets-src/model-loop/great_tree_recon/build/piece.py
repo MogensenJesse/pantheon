@@ -103,25 +103,35 @@ KNOBS = {
         imp=dict(min_face_frac=0.004, min_diag_frac=0.06),
         texture="textures/bark.png",
         mat=dict(tile_m=1.1, mask="curv", ridge=0.10, crease=0.3, top_light=0.15, ao=0.12, tex_contrast=0.5, tex_sat=0.7,
-                 tint=(0.95, 0.94, 0.90), gain=0.86, face_var=0.10),   # the trunk's r02 bark
+                 tint=(0.92, 0.94, 0.96), gain=1.3, face_var=0.10),   # the trunk's r02 bark, lifted and greyer: under the canopy it measured
+        # #3d3521 on the lit tops against the reference's #645f51
         bump=None,
         moss=dict(col=srgb(92, 98, 50), thresh=0.66, soft=0.14, scale=0.9, w_up=0.25, up_min=0.2, up_soft=0.5, strength=0.5),
         rune=None,
-        # second material where the baked colour is leaf green (greener than red and blue); great_tree's LEAF knobs
+        # Trellis left 28 clumps hanging free (one a whole leaf pad): drop the crumbs, slide the rest into contact; 7 coplanar pairs overlapped
+        settle=dict(drop_below=0.0015, overlap_m=0.03), drop_overlaps=True,
+        # second material where the baked colour is leaf green (greener than red and blue). great_tree's LEAF knobs rendered lime in Cycles
+        # (pre-judge look): darker, less top light
         split=dict(name="leaf", test="green", texture="textures/leaf.png",
-                   mat=dict(tile_m=0.9, mask="curv", ridge=0.0, crease=0.25, top_light=0.5, ao=0.3, tex_contrast=0.6, tex_sat=0.9,
-                            tint=(1.0, 1.0, 1.0), gain=0.8, face_var=0.3)),
+                   # (measured: leaves #546b17 / #41530c against the reference's #606b33 / #36432a: too saturated, a little bright)
+                   mat=dict(tile_m=0.9, mask="curv", ridge=0.0, crease=0.3, top_light=0.3, ao=0.3, tex_contrast=0.7, tex_sat=0.62,
+                            tint=(0.95, 0.97, 1.0), gain=0.46, face_var=0.3)),
     ),
     "rockery": dict(
         tris=30000, planar_deg=10.0, shade="flat",
-        imp=dict(voxel_m=0.03, min_face_frac=0.01, min_diag_frac=0.08),
+        # (first try with voxel_m=0.03 shredded it into thin fences and 1253 loose triangles: this mesh is not a closed volume,
+        # and a voxel skin of an open shell is junk) -> no voxel pass
+        imp=dict(min_face_frac=0.01, min_diag_frac=0.08),
         texture="textures/stone_cut.png",
         mat=dict(tile_m=0.9, mask="curv", ridge=0.15, crease=0.5, ridge_col=(0.86, 0.85, 0.82, 1), top_light=0.3, ao=0.35,
                  tex_contrast=0.85, tex_sat=0.25, tint=(1.0, 0.98, 0.93), gain=0.52, face_var=0.12, bottom_dark=0.10),   # the runestone's r02 stone, 15 % darker (its judge)
         bump=None,
         # the reference's boulders wear a moss cap: olive green on every top, crisp-ish edge
-        moss=dict(col=srgb(112, 124, 52), thresh=0.30, soft=0.12, scale=1.6, w_up=0.55, up_min=0.5, up_soft=0.3, strength=0.9),
+        # (pre-judge look: srgb(112, 124, 52) lit up lime under the studio key -> darker olive)
+        # (srgb(88, 100, 44) still read lime on the lit tops: darker again, and a little less of it)
+        moss=dict(col=srgb(64, 74, 34), thresh=0.36, soft=0.12, scale=1.6, w_up=0.55, up_min=0.5, up_soft=0.3, strength=0.9),
         rune=None,
+        drop_overlaps=True,   # 4 coplanar pairs lay on top of each other
     ),
 }
 
@@ -154,6 +164,101 @@ def facets(ob, shade, planar_deg=0.0, smooth_deg=40.0, seed=1):
         me.set_sharp_from_angle(angle=math.radians(smooth_deg))
     me.update()
     return n
+
+
+def settle_islands(ob, drop_below=0.0015, overlap_m=0.02, tol=0.002):
+    """Trellis leaves some clumps hanging in the air (qa_check: floating / detached). Islands under `drop_below` of the
+    vertices are debris and go; a bigger one (a leaf pad) is slid along the shortest gap to the rest of the piece's
+    SURFACE and `overlap_m` further, so its triangles really cross it (vertex-to-vertex moves let two leaf tips pass
+    each other without touching)."""
+    import bmesh
+    from mathutils.bvhtree import BVHTree
+
+    me = ob.data
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bm.verts.ensure_lookup_table()
+    seen, islands = set(), []
+    for v in bm.verts:
+        if v.index in seen:
+            continue
+        stack, isl = [v], []
+        seen.add(v.index)
+        while stack:
+            u = stack.pop()
+            isl.append(u)
+            for e in u.link_edges:
+                w = e.other_vert(u)
+                if w.index not in seen:
+                    seen.add(w.index)
+                    stack.append(w)
+        islands.append(isl)
+    islands.sort(key=len, reverse=True)
+    total = len(bm.verts)
+    dropped = [isl for isl in islands[1:] if len(isl) < drop_below * total]
+    for isl in dropped:
+        bmesh.ops.delete(bm, geom=isl, context="VERTS")
+    keep = [isl for isl in islands if isl[0].is_valid]
+    bm.verts.index_update()
+    bm.faces.ensure_lookup_table()
+    moved = 0
+    for isl in keep[1:]:
+        mine = {v.index for v in isl}
+        co = [v.co.copy() for v in bm.verts]
+        rest = BVHTree.FromPolygons(co, [[v.index for v in f.verts] for f in bm.faces if f.verts[0].index not in mine], epsilon=0.0)
+        own = [[v.index for v in f.verts] for f in bm.faces if f.verts[0].index in mine]
+        for _ in range(6):
+            if BVHTree.FromPolygons([v.co.copy() for v in bm.verts], own, epsilon=0.0).overlap(rest):
+                break
+            best = None
+            for v in isl:
+                loc, _, _, d = rest.find_nearest(v.co)
+                if loc is not None and (best is None or d < best[0]):
+                    best = (d, loc - v.co)
+            if best is None:
+                break
+            step = best[1] + (best[1].normalized() if best[1].length > 1e-9 else best[1]) * overlap_m
+            for v in isl:
+                v.co += step
+            moved += 1
+    bm.to_mesh(me)
+    bm.free()
+    me.update()
+    return {"islands": len(islands), "dropped": len(dropped), "moves": moved}
+
+
+def drop_overlaps(ob, eps=0.001):
+    """Delete one face of every pair of coplanar faces lying on top of each other (qa_check: z-fighting)."""
+    import bmesh
+    from mathutils.bvhtree import BVHTree
+
+    me = ob.data
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bmesh.ops.triangulate(bm, faces=bm.faces)
+    bm.faces.ensure_lookup_table()
+    bvh = BVHTree.FromBMesh(bm, epsilon=0.0)
+    kill = set()
+    for f in bm.faces:
+        if f.index in kill or f.normal.length < 0.5:
+            continue
+        cen = f.calc_center_median()
+        mine = {v.index for v in f.verts}
+        for p in [cen] + [cen.lerp(v.co, 0.6) for v in f.verts]:
+            for _, n2, j, _ in bvh.find_nearest_range(p, eps):
+                if j is None or j == f.index or j in kill:
+                    continue
+                g = bm.faces[j]
+                if mine & {v.index for v in g.verts}:
+                    continue
+                if f.normal.dot(g.normal) > 0.98:
+                    kill.add(max(f.index, j) if f.calc_area() >= g.calc_area() else f.index)
+    if kill:
+        bmesh.ops.delete(bm, geom=[bm.faces[i] for i in kill], context="FACES")
+    bm.to_mesh(me)
+    bm.free()
+    me.update()
+    return len(kill)
 
 
 def _nodes(mat):
@@ -348,7 +453,11 @@ def main():
            "import": recon_import.run(glb, pid, piece["dims_m"], K.get("tris", piece["tris"]), fit=piece.get("fit", "fit"),
                                       yaw_deg=piece.get("mesh_yaw", 0.0), **K.get("imp", {}))}
     ob = bpy.data.objects[pid]
+    if K.get("settle"):
+        out["settle"] = settle_islands(ob, **K["settle"])
     out["facets"] = facets(ob, K["shade"], K.get("planar_deg", 0.0), K.get("smooth_deg", 40.0))
+    if K.get("drop_overlaps"):
+        out["overlaps_dropped"] = drop_overlaps(ob)
     out["curv"] = loop_mat.edge_mask(ob)
     old_mat = bpy.data.materials.get("M_recon_" + pid)
     if old_mat:  # loop_mat reuses a material by name but only resets its own nodes: start clean so bump / moss / rune do not pile up

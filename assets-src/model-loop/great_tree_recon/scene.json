@@ -411,7 +411,54 @@
    ],
    "review_at": 5,
    "pass_at": 8,
-   "best": null
+   "best": null,
+   "mesh_yaw": 325,
+   "mesh_yaw_fit": {
+    "best_first": [
+     [
+      325,
+      0.5319,
+      0.7614,
+      0.3971
+     ],
+     [
+      330,
+      0.5295,
+      0.7539,
+      0.4048
+     ],
+     [
+      335,
+      0.525,
+      0.7422,
+      0.4147
+     ],
+     [
+      320,
+      0.521,
+      0.755,
+      0.3802
+     ],
+     [
+      340,
+      0.5188,
+      0.7385,
+      0.405
+     ],
+     [
+      315,
+      0.5068,
+      0.741,
+      0.3678
+     ]
+    ],
+    "columns": [
+     "yaw",
+     "score",
+     "silhouette_iou",
+     "colour"
+    ]
+   }
   },
   {
    "id": "leaf_pad",
@@ -440,7 +487,7 @@
    "dims_m": [
     11.4,
     11.4,
-    3.4
+    4.8
    ],
    "fit": "fit",
    "tris": 30000,
@@ -451,7 +498,55 @@
    "note": "the ring of boulders alone (GPT close-up without runestones, water or roots); runestones are instances, water is procedural",
    "review_at": 5,
    "pass_at": 8,
-   "best": null
+   "best": null,
+   "mesh_yaw": 315,
+   "mesh_yaw_fit": {
+    "best_first": [
+     [
+      315,
+      0.7364,
+      0.9053,
+      0.6269
+     ],
+     [
+      320,
+      0.7292,
+      0.896,
+      0.6275
+     ],
+     [
+      310,
+      0.7159,
+      0.8957,
+      0.5986
+     ],
+     [
+      325,
+      0.7044,
+      0.8816,
+      0.5981
+     ],
+     [
+      305,
+      0.7036,
+      0.8837,
+      0.5923
+     ],
+     [
+      330,
+      0.687,
+      0.8616,
+      0.5947
+     ]
+    ],
+    "columns": [
+     "yaw",
+     "score",
+     "silhouette_iou",
+     "colour"
+    ]
+   },
+   "dims_note": "the ring spans the tile's diagonal (11.4 m); Trellis kept the close-up's proportions, which makes it about 4.7 m tall. The input suggests about 3.4 m: squash it in the assembly if it pokes through the roots."
   },
   {
    "id": "water",
