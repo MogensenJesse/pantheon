@@ -295,13 +295,13 @@
   {
    "id": "trunk_roots",
    "source": "trellis",
-   "ref": "refs/trunk_roots.png",
+   "ref": "refs/trunk_roots_v2.png",
    "ref_view": [
     0,
-    24,
+    20,
     85
    ],
-   "mesh": "meshes/trunk_roots.glb",
+   "mesh": "meshes/trunk_roots_v2.glb",
    "bbox_px": [
     367,
     330,
@@ -320,64 +320,30 @@
     6.5
    ],
    "fit": "fit",
-   "tris": 40000,
+   "tris": 45000,
    "materials": [
     "bark",
     "moss"
    ],
-   "note": "trunk and roots as one organic mass (one Trellis run); cut off above the point where the limbs spread",
+   "note": "trunk and roots as one organic mass (one Trellis run). Second mesh, from a close-up with a front opening for the pool.",
    "review_at": 5,
    "pass_at": 8,
-   "status": "review",
-   "best": "r02",
-   "mesh_yaw": 235,
-   "mesh_yaw_fit": {
-    "best_first": [
-     [
-      235,
-      0.6785,
-      0.7579,
-      0.7905
-     ],
-     [
-      240,
-      0.6783,
-      0.7606,
-      0.7836
-     ],
-     [
-      245,
-      0.6612,
-      0.7422,
-      0.7816
-     ],
-     [
-      255,
-      0.6547,
-      0.7381,
-      0.774
-     ],
-     [
-      345,
-      0.6447,
-      0.7262,
-      0.7754
-     ],
-     [
-      250,
-      0.644,
-      0.7271,
-      0.7714
-     ]
+   "status": "todo",
+   "best": null,
+   "last_score": 4.8,
+   "mesh_v1": {
+    "mesh": "meshes/trunk_roots.glb",
+    "ref": "refs/trunk_roots.png",
+    "ref_view": [
+     0,
+     24,
+     85
     ],
-    "columns": [
-     "yaw",
-     "score",
-     "silhouette_iou",
-     "colour"
-    ]
-   },
-   "last_score": 4.8
+    "mesh_yaw": 235,
+    "best": "r02",
+    "last_score": 4.8,
+    "why_replaced": "round skirt of thin roots with no gap for the pool, one-tube trunk, hollow top, no knot band: not reachable by knobs"
+   }
   },
   {
    "id": "crown",
@@ -630,6 +596,20 @@
     "resolution": 1024,
     "texture_size": 1024,
     "decimation_target": 200000,
+    "remesh": true
+   },
+   "date": "2026-11-14"
+  },
+  {
+   "piece": "trunk_roots (v2)",
+   "model": "Trellis 2 (fal-ai/trellis-2)",
+   "credits": 30,
+   "prediction": "e5765d8b-41bf-4ff3-aa99-94727253acc3",
+   "input": "refs/trunk_roots_v2.png",
+   "params": {
+    "resolution": 1024,
+    "texture_size": 1024,
+    "decimation_target": 250000,
     "remesh": true
    },
    "date": "2026-11-14"

@@ -73,27 +73,22 @@ KNOBS = {
                   floor=dict(col=srgb(95, 115, 125), mix=0.85, pad=1.16, edge_m=0.04)),
     ),
     "trunk_roots": dict(
-        planar_deg=0.0,
-        # r02 (judge r01 4.3: "large smooth triangles", flat-shaded noise on thin roots) -> smooth by angle
-        shade="smooth", smooth_deg=35.0,
-        # Trellis broke some thin roots off (qa_check: floating): drop islands under 3 % of the triangles unless they span a quarter
-        # of the piece. r02 (judge: roots 0.3-0.45 m thick against 0.8-1.0, airy cage): fatten every strand by 10 cm a side, then
-        # one closed skin so what now overlaps merges
-        imp=dict(min_face_frac=0.03, min_diag_frac=0.25, inflate_m=0.10, voxel_m=0.045),
+        # r03 = NEW MESH (Trellis run on refs/trunk_roots_v2.png: braided strands, flat top, knot band, about twelve thick roots with
+        # claws, a front opening). The r01/r02 knobs belonged to the first mesh (meshes/trunk_roots.glb, best r02 4.8) and are in git.
+        # Shading: the r02 judge called smooth shading "a clay sculpt" and asked for flat chiselled planes 0.2-0.5 m across -> planar facets, flat
+        planar_deg=7.0, shade="flat",
+        # roots are thick in this mesh: no inflate. Islands under 2 % of the triangles go unless they span a quarter of the piece
+        imp=dict(min_face_frac=0.02, min_diag_frac=0.25),
+        settle=dict(drop_below=0.002, overlap_m=0.03), drop_overlaps=True,
         texture="textures/bark.png",
-        # r01 pre-judge: tint (0.87, 0.95, 1.0) gain 1.14 measured right on the tops but was judged "pale bone-beige" -> r02: warm
-        # olive-taupe (judge: about #7A6F58, crevices #4A4435), the bark texture's streaks visible, softer creases (top/side contrast
-        # was 4.1 against 2.5)
-        # (pre-judge measure of r02 with tint (0.97, 0.93, 0.82) gain 0.78: tops #665a3d against #7e735b, too yellow and a little dark
-        # -> half-way back, less saturated)
-        mat=dict(tile_m=1.1, mask="curv", ridge=0.10, crease=0.3, top_light=0.15, ao=0.12, tex_contrast=0.5, tex_sat=0.7,
-                 tint=(0.95, 0.94, 0.90), gain=0.86, face_var=0.05),
-        # r02 (judge: no bark relief): the bark texture's value as a bump (shading only; the outline does not change)
-        bump=dict(strength=0.6, distance=0.05),
-        # r02 (judge: hard-edged saturated camouflage blotches, also on vertical faces): soft-edged desaturated olive (#6B7038),
-        # up-facing surfaces only, about 15 % cover
-        # (pre-judge look at r02: at strength 0.7 / thresh 0.60 it lit up yellow-green under the studio key and covered about a quarter)
-        moss=dict(col=srgb(92, 98, 50), thresh=0.64, soft=0.14, scale=0.9, w_up=0.25, up_min=0.2, up_soft=0.5, strength=0.55),
+        # r02 judge: bark close but slightly light, yellow and uniform -> about #7A6F58 with a cooler grey-olive cast, 10-15 % value change from
+        # plate to plate (face_var on the planar facets)
+        mat=dict(tile_m=1.1, mask="curv", ridge=0.10, crease=0.35, top_light=0.15, ao=0.15, tex_contrast=0.35, tex_sat=0.65,
+                 tint=(0.93, 0.94, 0.92), gain=0.80, face_var=0.13),
+        # r02 judge: the bump read as "a fine pinstripe wrapping round the limbs like lathe marks" -> off; the facets carry the relief
+        bump=None,
+        # r02 judge: moss soft-edged now but saturated yellow-green in large patches -> desaturated olive (#6B6F45), 10-15 % cover, 30-50 % blend
+        moss=dict(col=srgb(80, 84, 52), thresh=0.70, soft=0.14, scale=0.9, w_up=0.25, up_min=0.25, up_soft=0.5, strength=0.45),
         rune=None,
     ),
     "crown": dict(
