@@ -343,6 +343,53 @@
     "best": "r02",
     "last_score": 4.8,
     "why_replaced": "round skirt of thin roots with no gap for the pool, one-tube trunk, hollow top, no knot band: not reachable by knobs"
+   },
+   "mesh_yaw": 175,
+   "mesh_yaw_fit": {
+    "best_first": [
+     [
+      175,
+      0.7309,
+      0.8618,
+      0.6962
+     ],
+     [
+      180,
+      0.7307,
+      0.8635,
+      0.6926
+     ],
+     [
+      165,
+      0.7253,
+      0.8575,
+      0.6918
+     ],
+     [
+      170,
+      0.7251,
+      0.8558,
+      0.6946
+     ],
+     [
+      185,
+      0.7213,
+      0.8487,
+      0.6998
+     ],
+     [
+      315,
+      0.7192,
+      0.8622,
+      0.6683
+     ]
+    ],
+    "columns": [
+     "yaw",
+     "score",
+     "silhouette_iou",
+     "colour"
+    ]
    }
   },
   {
