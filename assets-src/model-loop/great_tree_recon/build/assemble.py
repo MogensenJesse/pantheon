@@ -40,8 +40,11 @@ P = dict(
     stone_sink=0.15,        # runestones stand this far into what they stand on
     stone_front_m=0.6,      # and this far in front of the surface behind their middle
     stone_scale=dict(runestone_l=1.0, runestone_c=0.92, runestone_r=0.92),   # visible heights 211 / 184 / 185 px
-    pool=dict(z_above_floor=0.22, grow=1.0),
-    bay=dict(margin_m=0.7, depth=1.5, height_m=3.2),   # None = leave the roots whole
+    # a07: the pool as the input draws it, from the waterfall forward: 3.1 m wide (223 px at 72 px/m), 2.2 m deep, on the ground
+    pool=dict(size_m=(3.1, 2.2), gap_m=0.35, floor_z=0.05, z_above_floor=0.15,
+              front_cap_m=0.3, front_keep=0.18, front_soft_m=0.9, front_margin_m=0.5),
+    bay=dict(side_m=0.6, back_m=0.25, front_m=1.6, height_m=2.6),   # None = leave the roots whole
+    crown_xy=1.2,           # a07: canopy 10.7 m wide in the input (768 px at 72 px/m); scaled to the tree's height it was 8.9 m
     ivy=dict(count=1400, leaf_m=0.24, seed=3),
 )
 
@@ -92,9 +95,10 @@ def place(name, key, loc=(0, 0, 0), scale=(1, 1, 1), yaw=0.0):
 out = {"tag": tag}
 rock_h = src["rockery"].dimensions.z
 rockery = place("A_rockery", "rockery", scale=(1, 1, P["rockery_h"] / rock_h))
+rockery.data = rockery.data.copy()  # the front gets lowered below: on a copy, the judged piece stays as it is
 roots = place("A_trunk_roots", "trunk_roots", loc=(0, P["tree_y"], 0))
 ks = (P["tree_h"] - P["crown_base"]) / src["crown"].dimensions.z
-crown = place("A_crown", "crown", loc=(0, P["tree_y"], P["crown_base"]), scale=(ks, ks, ks))
+crown = place("A_crown", "crown", loc=(0, P["tree_y"], P["crown_base"]), scale=(ks * P["crown_xy"], ks * P["crown_xy"], ks))
 bpy.context.view_layer.update()
 Cw = Vector(cam.C)
 fwd = Vector(cam.ray([(C["size_px"][0] / 2, C["size_px"][1] / 2)])[0])
@@ -109,102 +113,14 @@ r_, g_, b_ = idm[..., 0], idm[..., 1], idm[..., 2]
 is_water = (r_ < 70) & (g_ < 140) & (b_ > 190)
 is_ivy = (r_ > 200) & (g_ < 90) & (b_ > 150)
 
-# the pool's place. a01: its pixel cast onto the first surface (a front boulder). a02: the lowest rock near the pixel's ground
-# point (the rockery's basin, under the roots). a03-a05: the lowest spot the camera sees (outside the ring, or peeping under the
-# rocks). a06: the pool belongs in the rockery's basin, so find it on the ROCKERY ALONE and make the roots yield (the bay below).
-ys, xs = np.nonzero(is_water)
-low = ys > np.percentile(ys, 35)  # below the waterfall's thin strip
-cx_px, cy_px = float(np.median(xs[low])), float(np.median(ys[low]))
-g0 = cam.ground_xy([(cx_px, cy_px)], z=0.0)[0]
-rocks_only, _, _ = world_bvh([rockery])
-best = None
-for gx in np.arange(g0[0] - 2.5, g0[0] + 2.51, 0.25):
-    for gy in np.arange(g0[1] - 2.5, g0[1] + 2.51, 0.25):
-        h = rocks_only.ray_cast(Vector((float(gx), float(gy), 50.0)), Vector((0, 0, -1)))
-        if h[0] is None:
-            continue
-        cost = h[0].z + 0.3 * math.hypot(gx - g0[0], gy - g0[1])
-        if best is None or cost < best[0]:
-            best = (cost, float(gx), float(gy), h[0].z)
-if best is None:
-    best = (0.0, float(g0[0]), float(g0[1]), 0.0)
-_, bx_, by_, floor_z = best
-shift = np.array([bx_ - g0[0], by_ - g0[1]])
-edge_xy = []
-for a in np.linspace(0, 2 * math.pi, 28, endpoint=False):  # outline: the furthest water pixel in each direction from the blob's centre
-    far = None
-    for rad in range(4, 200, 3):
-        x, y = int(cx_px + math.cos(a) * rad), int(cy_px + math.sin(a) * rad * 0.55)
-        if 0 <= x < iw and 0 <= y < ih and is_water[y, x]:
-            far = (x, y)
-    g = cam.ground_xy([far or (cx_px, cy_px)], z=0.0)[0] + shift
-    edge_xy.append((float(g[0]), float(g[1])))
-pc = np.mean(np.array(edge_xy), axis=0)
-edge_xy = [tuple(pc + (np.array(e) - pc) * P["pool"]["grow"]) for e in edge_xy]
-pool_r = float(np.max(np.linalg.norm(np.array(edge_xy) - pc, axis=1)))
-
-# the bay: this root skirt is round (4.6 m) and has no real gap; the input's roots stop at the pool. Cut an egg-shaped bay out of a
-# COPY of the trunk mesh around the pool (the judged piece is not changed); the cut ends take the bark material.
-if P["bay"]:
-    roots.data = roots.data.copy()
-    bm_ = bpy.data.meshes.new("bay_cutter")
-    import bmesh as _bm
-
-    b = _bm.new()
-    _bm.ops.create_icosphere(b, subdivisions=3, radius=1.0)
-    rx, rz = pool_r + P["bay"]["margin_m"], P["bay"]["height_m"]
-    for v in b.verts:
-        v.co = Vector((v.co.x * rx, v.co.y * rx * P["bay"]["depth"], v.co.z * rz))
-    b.to_mesh(bm_)
-    b.free()
-    cutter = bpy.data.objects.new("bay_cutter", bm_)
-    cutter.location = (float(pc[0]), float(pc[1]) - rx * (P["bay"]["depth"] - 1) * 0.6, floor_z)  # reaches further toward the front
-    G.objects.link(cutter)
-    mod = roots.modifiers.new("bay", "BOOLEAN")
-    mod.operation, mod.solver, mod.object = "DIFFERENCE", "EXACT", cutter
-    for o in bpy.context.view_layer.objects:
-        o.select_set(False)
-    roots.select_set(True)
-    bpy.context.view_layer.objects.active = roots
-    t0 = len(roots.data.polygons)
-    bpy.ops.object.modifier_apply(modifier=mod.name)
-    bpy.data.objects.remove(cutter)
-    for p_ in roots.data.polygons:
-        p_.use_smooth = False
-    out["bay"] = {"faces_before": t0, "faces_after": len(roots.data.polygons), "radius_m": round(rx, 2)}
-    bpy.context.view_layer.update()
-
 ground, gverts, gpolys = world_bvh([rockery, roots])
 
 
-def top_z(x, y):
-    """Height of the highest rock / root surface over (x, y); None where there is none."""
-    h = ground.ray_cast(Vector((x, y, 50.0)), Vector((0, 0, -1)))
+def top_z(x, y, bvh=None):
+    """Height of the highest surface over (x, y); None where there is none."""
+    h = (bvh or ground).ray_cast(Vector((x, y, 50.0)), Vector((0, 0, -1)))
     return None if h[0] is None else h[0].z
 
-
-def seen(pt):
-    d = (pt - Cw)
-    h = ground.ray_cast(Cw, d.normalized())
-    return h[0] is None or (h[0] - Cw).length > d.length - 0.25
-
-
-# water level: from just over the basin floor, raised until the camera sees at least half of the pool (front rocks hide a low one)
-pz = floor_z + P["pool"]["z_above_floor"]
-for _ in range(14):
-    vis = sum(seen(Vector((x, y, pz))) for x, y in edge_xy + [tuple(pc)]) / (len(edge_xy) + 1)
-    if vis >= 0.5:
-        break
-    pz += 0.1
-edge = [(x, y, pz) for x, y in edge_xy]
-ctr = np.array([pc[0], pc[1], pz])
-me = bpy.data.meshes.new("water")
-me.from_pydata([tuple(ctr)] + edge, [], [(0, 1 + i, 1 + (i + 1) % len(edge)) for i in range(len(edge))])
-me.materials.append(flat_mat("M_recon_water", srgb(52, 150, 150), rough=0.15, emit=srgb(70, 190, 185), strength=0.35))
-pool = bpy.data.objects.new("A_water", me)
-G.objects.link(pool)
-out["pool"] = {"centre_m": [round(float(v), 2) for v in ctr], "basin_floor_z": round(floor_z, 2), "width_m": round(float(np.ptp(np.array(edge)[:, 0])), 2),
-               "seen_fraction": round(float(vis), 2), "moved_from_pixel_cast_m": [round(float(v), 2) for v in shift]}
 
 # runestones. a01 put each base where the ray through its lowest visible pixel first met rocks or roots: the centre stone ended up
 # buried. a02: take the DEPTH from the ray through the stone's middle pixel (the surface right behind it), step toward the camera so
@@ -231,12 +147,123 @@ for inst in stones:
     place("A_" + inst["id"], "runestone", loc=(pos.x, pos.y, pos.z - P["stone_sink"]), scale=(s, s, s))
     out["stones"][inst["id"]] = {"pos_m": [round(v, 2) for v in pos], "how": how}
 
+# the pool. a01-a06 searched for it from the pool's pixels; at this view angle a pixel's ground point slides metres in depth, and the
+# pool ended up under the centre stone (a06). a07: as in the input, the waterfall drops from just below the centre stone into the
+# pool's back edge: the pool is an ellipse w x d on the ground right in front of that stone.
+PP = P["pool"]
+sc_ = bpy.data.objects["A_runestone_c"].location
+pw, pd = PP["size_m"]
+pc = np.array([sc_.x, sc_.y - PP["gap_m"] - pd / 2])
+rnd_p = random.Random(7)
+edge_xy = []
+for a in np.linspace(0, 2 * math.pi, 32, endpoint=False):
+    k = 1.0 + rnd_p.uniform(-0.08, 0.08)
+    edge_xy.append((float(pc[0] + math.cos(a) * pw / 2 * k), float(pc[1] + math.sin(a) * pd / 2 * k)))
+floor_z = PP["floor_z"]
+
+# the rocks in front of and under the pool: the input's front is open (low paving, one front boulder). Lower every rockery vertex in
+# that corridor above `cap` (relief kept at `keep`), with a soft edge. On the copy made above; vertices are in local space (scale z).
+inv = rockery.matrix_world.inverted()
+mw = rockery.matrix_world
+cap, keep, soft = floor_z + PP["front_cap_m"], PP["front_keep"], PP["front_soft_m"]
+lowered = 0
+for v in rockery.data.vertices:
+    wv = mw @ v.co
+    dx = abs(wv.x - pc[0]) - (pw / 2 + PP["front_margin_m"])
+    dy = (wv.y - (pc[1] + pd / 2 + PP["front_margin_m"]))  # > 0: behind the pool (untouched)
+    out_dist = max(dx, dy, 0.0)
+    if out_dist >= soft or wv.z <= cap:
+        continue
+    wt = 1.0 - out_dist / soft
+    wt = wt * wt * (3 - 2 * wt)
+    z_new = cap + (wv.z - cap) * keep
+    wv.z = wv.z * (1 - wt) + z_new * wt
+    v.co = inv @ wv
+    lowered += 1
+# a08: inside the pool's own outline the rocks go under the water (a07: lowered to 0.35 m they still covered it, 0 % seen)
+pressed = 0
+for v in rockery.data.vertices:
+    wv = mw @ v.co
+    e = math.hypot((wv.x - pc[0]) / (pw / 2), (wv.y - pc[1]) / (pd / 2))
+    if e >= 1.12 or wv.z <= floor_z:
+        continue
+    wt = 1.0 if e <= 0.95 else (1.12 - e) / 0.17
+    wv.z = wv.z * (1 - wt) + (floor_z - 0.03 + (wv.z - floor_z) * 0.03) * wt
+    v.co = inv @ wv
+    pressed += 1
+rockery.data.update()
+out["rocks_pressed_under_water"] = pressed
+out["rocks_lowered"] = lowered
+
+# the bay: this root skirt (4.6 m) closes the front; cut an ellipsoid out of a COPY of the trunk mesh around the pool, reaching
+# forward from just behind the pool's back edge (the centre stone stands behind it, on roots that stay). Sized in metres (a06 sized it
+# from the pool's cast outline: 3.9 m, most front roots gone).
+if P["bay"]:
+    B = P["bay"]
+    roots.data = roots.data.copy()
+    import bmesh as _bm
+
+    bm_ = bpy.data.meshes.new("bay_cutter")
+    b = _bm.new()
+    _bm.ops.create_icosphere(b, subdivisions=3, radius=1.0)
+    rx, ry, rz = pw / 2 + B["side_m"], pd / 2 + B["back_m"] / 2 + B["front_m"] / 2, B["height_m"]
+    for v in b.verts:
+        v.co = Vector((v.co.x * rx, v.co.y * ry, v.co.z * rz))
+    b.to_mesh(bm_)
+    b.free()
+    cutter = bpy.data.objects.new("bay_cutter", bm_)
+    back_y = pc[1] + pd / 2 + B["back_m"]
+    cutter.location = (float(pc[0]), float(back_y - ry), floor_z)
+    G.objects.link(cutter)
+    mod = roots.modifiers.new("bay", "BOOLEAN")
+    mod.operation, mod.solver, mod.object = "DIFFERENCE", "EXACT", cutter
+    for o in bpy.context.view_layer.objects:
+        o.select_set(False)
+    roots.select_set(True)
+    bpy.context.view_layer.objects.active = roots
+    t0 = len(roots.data.polygons)
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+    bpy.data.objects.remove(cutter)
+    for p_ in roots.data.polygons:
+        p_.use_smooth = False
+    out["bay"] = {"faces_before": t0, "faces_after": len(roots.data.polygons), "radii_m": [round(rx, 2), round(ry, 2), rz]}
+
+bpy.context.view_layer.update()
+ground, gverts, gpolys = world_bvh([rockery, roots])
+
+
+def seen(pt):
+    d = (pt - Cw)
+    h = ground.ray_cast(Cw, d.normalized())
+    return h[0] is None or (h[0] - Cw).length > d.length - 0.25
+
+
+# a stone that lost its footing to the bay or the lowered front drops onto what is under it now
+for inst in stones:
+    o = bpy.data.objects["A_" + inst["id"]]
+    h = top_z(o.location.x, o.location.y)
+    base = o.location.z + P["stone_sink"]
+    if h is not None and base > h + 0.2:
+        o.location.z = h - P["stone_sink"]
+        out["stones"][inst["id"]]["how"] += "; dropped after the cuts"
+
+pz = floor_z + PP["z_above_floor"]
+vis = sum(seen(Vector((x, y, pz))) for x, y in edge_xy + [tuple(pc)]) / (len(edge_xy) + 1)
+edge = [(x, y, pz) for x, y in edge_xy]
+ctr = np.array([pc[0], pc[1], pz])
+me = bpy.data.meshes.new("water")
+me.from_pydata([tuple(ctr)] + edge, [], [(0, 1 + i, 1 + (i + 1) % len(edge)) for i in range(len(edge))])
+me.materials.append(flat_mat("M_recon_water", srgb(52, 150, 150), rough=0.15, emit=srgb(70, 190, 185), strength=0.35))
+pool = bpy.data.objects.new("A_water", me)
+G.objects.link(pool)
+out["pool"] = {"centre_m": [round(float(v), 2) for v in ctr], "size_m": [pw, pd], "seen_fraction": round(float(vis), 2)}
+
 # waterfall: a ribbon from under the centre runestone down to the pool's back edge
 cst = bpy.data.objects["A_runestone_c"].location
 top = Vector((cst.x, cst.y - 0.35, cst.z + 0.25))
 back = max(edge, key=lambda e: e[1])
 bot = Vector((ctr[0], back[1] - 0.25, pz))
-n, w = 8, 0.5
+n, w = 8, 0.32   # a08: the input's fall is a thin strand (a07: 0.5 m read as a lit panel)
 verts, faces = [], []
 for i in range(n + 1):
     t = i / n
@@ -247,7 +274,7 @@ for i in range(n + 1):
         faces.append((2 * i - 2, 2 * i - 1, 2 * i + 1, 2 * i))
 mf = bpy.data.meshes.new("waterfall")
 mf.from_pydata(verts, [], faces)
-mf.materials.append(flat_mat("M_recon_waterfall", srgb(150, 215, 220), rough=0.2, emit=srgb(170, 230, 235), strength=0.5))
+mf.materials.append(flat_mat("M_recon_waterfall", srgb(120, 200, 205), rough=0.2, emit=srgb(150, 220, 225), strength=0.25))
 fall = bpy.data.objects.new("A_waterfall", mf)
 G.objects.link(fall)
 
