@@ -84,8 +84,10 @@ KNOBS = {
         # r01 pre-judge: tint (0.87, 0.95, 1.0) gain 1.14 measured right on the tops but was judged "pale bone-beige" -> r02: warm
         # olive-taupe (judge: about #7A6F58, crevices #4A4435), the bark texture's streaks visible, softer creases (top/side contrast
         # was 4.1 against 2.5)
-        mat=dict(tile_m=1.1, mask="curv", ridge=0.10, crease=0.3, top_light=0.15, ao=0.12, tex_contrast=0.5, tex_sat=0.8,
-                 tint=(0.97, 0.93, 0.82), gain=0.78, face_var=0.05),
+        # (pre-judge measure of r02 with tint (0.97, 0.93, 0.82) gain 0.78: tops #665a3d against #7e735b, too yellow and a little dark
+        # -> half-way back, less saturated)
+        mat=dict(tile_m=1.1, mask="curv", ridge=0.10, crease=0.3, top_light=0.15, ao=0.12, tex_contrast=0.5, tex_sat=0.7,
+                 tint=(0.95, 0.94, 0.90), gain=0.86, face_var=0.05),
         # r02 (judge: no bark relief): the bark texture's value as a bump (shading only; the outline does not change)
         bump=dict(strength=0.6, distance=0.05),
         # r02 (judge: hard-edged saturated camouflage blotches, also on vertical faces): soft-edged desaturated olive (#6B7038),

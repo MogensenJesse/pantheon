@@ -233,7 +233,7 @@
    "review_at": 5,
    "pass_at": 7,
    "status": "review",
-   "best": "r01",
+   "best": "r02",
    "mesh_yaw": 130,
    "mesh_yaw_fit": {
     "best_first": [
@@ -289,7 +289,7 @@
     "faces": 5539,
     "area_frac": 0.0335
    },
-   "last_score": 4.8,
+   "last_score": 5.5,
    "dims_note": "r02: per-axis scale (judge r01: as deep as wide, 1.33 m against 0.6). Trellis made a wedge; this squashes it into the reference's slab."
   },
   {
@@ -329,7 +329,7 @@
    "review_at": 5,
    "pass_at": 8,
    "status": "review",
-   "best": "r01",
+   "best": "r02",
    "mesh_yaw": 235,
    "mesh_yaw_fit": {
     "best_first": [
@@ -377,7 +377,7 @@
      "colour"
     ]
    },
-   "last_score": 4.3
+   "last_score": 4.8
   },
   {
    "id": "crown",

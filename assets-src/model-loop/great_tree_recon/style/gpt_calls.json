@@ -78,5 +78,19 @@
   "prompt": "From this image, make a material swatch sheet: a grid of six large flat square swatches, three in the top row and three in the bottom row, with thin light-grey gaps between them. Each swatch shows only the flat painted surface of one material from the image, seen straight on, with no lighting, no shadows, no objects and no perspective. Top row, left to right: tree bark, moss, leaf green. Bottom row, left to right: grey stone, pool water, glowing pale-cyan rune light. Keep exactly the colours and the hand-painted brushwork of the image. No text, no labels.",
   "model": "gpt-image-2",
   "quality": "medium"
+ },
+ "style/rune_mask_v2.png": {
+  "image": "refs/runestone.png",
+  "size": "1024x1536",
+  "model": "gpt-image-2",
+  "quality": "medium",
+  "prompt": "From this image, draw only the glowing knotwork carving of the stone as a flat mask: pure white on a pure black background, seen exactly straight on from the front (orthographic, no perspective, no tilt). Draw it as it is on the stone: ONE interlaced band that forms two stacked lozenge (diamond) loops with a small solid diamond in the centre of each loop, and a pointed finial at the top and at the bottom. The band is THICK and uniform: about one sixth as wide as the whole design is wide, with clear black gaps where it weaves. No outer border line, no frame, no extra strokes, no thin lines. The design is tall and narrow (about four times as tall as wide), centred, filling the frame height with a small margin. No stone, no texture, no shading, no glow, no grey: only solid white on solid black."
+ },
+ "refs/rocks.png": {
+  "image": "input.png",
+  "size": "1024x1024",
+  "model": "gpt-image-2",
+  "quality": "medium",
+  "prompt": "From this image, show only the rock base of the scene as one single object: the ring of mossy grey faceted boulders that steps up toward the middle, with the empty stone basin of the pool at the front. Remove everything else: no tree, no trunk, no roots, no standing runestones, no water, no waterfall, no ivy leaves, no ground tile. Where roots or runestones hid the rocks, show the boulders continuing, with a dark empty gap in the middle where the tree stood. Keep the moss on the tops of the boulders. Isolated, centred, the whole object in frame, three-quarter view from slightly above, plain light-grey background, soft even light, no other objects. Keep exactly the same style, colours, proportions and wear as in the image."
  }
 }
