@@ -163,6 +163,19 @@ Trellis output is raw: about 1 m tall, dense, one baked material, UVs fragmented
 - **Layout is not solved by good pieces.** A Trellis root skirt is round and has no gap for the pool; the rockery's basin ended up under it.
   Decide the layout (which piece yields) before judging the whole scene.
 
+## Re-drawing the close-up fixes structure; the layout still needs its own decisions (trunk_roots 4.8 -> 5.6 on a second mesh)
+- When the judge's high defects are structural (one-tube trunk, hollow top, thin roots), a new GPT close-up that SPELLS OUT the structure
+  ("three or four fat strands twisted like a rope, cut off flat and solid, about twelve thick roots, each splitting into claws") and a new
+  Trellis run is worth more than further knob rounds. Keep the first mesh and its scores (`mesh_v1` in scene.json).
+- Trellis follows a drawn silhouette but thins strands again, closes a drawn gap most of the way, and drops surface carving (the knot band
+  survives only in the baked colours). Ask for more than you need of each.
+- Where the tree stands: not at the tile centre by default. Work it out from the input (here about 1.3 m behind it): a centred, round root
+  skirt left no room for anything in front of it.
+- A piece that must yield to another (roots to the pool) can be cut in the assembly on a COPY of its mesh (`assemble.py` bay); the judged
+  piece stays as it is. Size the cut from metres you chose, not from an outline cast onto the ground: at a low view angle that stretches
+  several times in depth.
+- A pool the camera cannot see is no pool: look for its place on the piece it belongs to (the rockery alone), then check the camera sees it.
+
 ## Verification at the end of a run
 - The source run's md5 listing matches the one taken before the copy.
 - `camera_fit` self-check passes; the tile corners reproject within 3 px.

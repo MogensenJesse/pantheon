@@ -328,9 +328,9 @@
    "note": "trunk and roots as one organic mass (one Trellis run). Second mesh, from a close-up with a front opening for the pool.",
    "review_at": 5,
    "pass_at": 8,
-   "status": "todo",
-   "best": null,
-   "last_score": 4.8,
+   "status": "review",
+   "best": "r03",
+   "last_score": 5.6,
    "mesh_v1": {
     "mesh": "meshes/trunk_roots.glb",
     "ref": "refs/trunk_roots.png",
@@ -573,7 +573,7 @@
     875
    ],
    "status": "built",
-   "note": "pool (flat teal polygon traced from the ID map's water pixels) and a waterfall ribbon from the centre runestone. Placement is NOT settled: in the input the pool lies in a gap between the front roots; this Trellis root skirt has no gap and covers the rockery's basin, so the only spot the camera sees is outside the rock ring (assembly a03). Needs a layout decision, not a water change.",
+   "note": "pool (flat teal polygon traced from the ID map's water pixels) and a waterfall ribbon from the centre runestone. Assembly a06 puts it in the rockery's basin, in a bay cut out of the roots; the water level had to be raised to 1.7 m to show over the rockery's front rocks, and only 38 % of it is seen. A rough fit: the rockery's front is too tall and its basin too small for the input's low, open pool.",
    "build": "build/assemble.py"
   },
   {
@@ -665,20 +665,21 @@
  "assembly": {
   "build": "build/assemble.py",
   "blend": "great_tree_recon_scene.blend",
-  "latest": "a03",
-  "render": "renders/scene/a03_cam.png (ignored; copy in review_assembly_a03.png)",
+  "latest": "a06",
+  "render": "renders/scene/a06_cam.png (ignored; copy in review_assembly_a06.png)",
   "status": "first preview, not judged (the whole-scene compare loop is a later step)",
   "placement": {
    "rockery": "tile centre, squashed to 3.4 m",
-   "trunk_roots": "tile centre",
-   "crown": "on the trunk from z = 3.3 m, scaled so the tree is 10.5 m",
+   "tree (trunk_roots + crown)": "1.3 m behind the tile centre; crown from z = 4.3 m, scaled so the tree is 10.5 m",
+   "bay": "an egg-shaped volume cut out of a copy of the trunk mesh around the pool, so the roots stop at it (the judged piece is unchanged)",
+   "pool": "the lowest spot of the rockery alone near the input's pool; water level raised until the camera sees it",
    "runestones": "depth from the ray through each stone's middle pixel, 0.6 m in front of the surface behind it; base on the bottom pixel's ray, dropped if it hangs"
   },
   "known_issues": [
-   "pool outside the rock ring (the roots cover the basin)",
-   "crown pads hang lower and wider than the input and hide the trunk and its (missing) knot band",
-   "root skirt mostly buried in the rockery",
-   "no camera-matched compare yet beyond this side-by-side"
+   "pool: raised to 1.7 m and only 38 % seen (the rockery's front rocks hide a low pool); it reads as a thin sliver, not the input's open basin",
+   "bay: 3.9 m radius, larger than meant (the pool's outline is stretched in depth when its pixels are cast onto the ground at this view angle); the front roots are mostly gone",
+   "crown: narrower than the input's canopy after scaling to the tree's height (9 m against 10.7 m)",
+   "no ground tile (by plan); not judged: the whole-scene compare loop is a later step"
   ]
  }
 }
