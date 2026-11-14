@@ -92,5 +92,13 @@
   "model": "gpt-image-2",
   "quality": "medium",
   "prompt": "From this image, show only the rock base of the scene as one single object: the ring of mossy grey faceted boulders that steps up toward the middle, with the empty stone basin of the pool at the front. Remove everything else: no tree, no trunk, no roots, no standing runestones, no water, no waterfall, no ivy leaves, no ground tile. Where roots or runestones hid the rocks, show the boulders continuing, with a dark empty gap in the middle where the tree stood. Keep the moss on the tops of the boulders. Isolated, centred, the whole object in frame, three-quarter view from slightly above, plain light-grey background, soft even light, no other objects. Keep exactly the same style, colours, proportions and wear as in the image."
+ },
+ "refs/trunk_roots_v2.png": {
+  "image": "input.png",
+  "size": "1024x1024",
+  "model": "gpt-image-2",
+  "quality": "medium",
+  "why": "the first close-up gave Trellis a round skirt of thin roots, a one-tube trunk, a hollow top and no knot band; the pool had no place (assembly a03)",
+  "prompt": "From this image, show only the tree's braided trunk together with its root skirt, as one single object, redrawn clearly for a sculptor. TRUNK: three or four fat strands twisted round each other like a rope, each strand clearly separate with deep grooves between them; a raised carved band of square knotwork runs up the front strand, facing the viewer; the trunk is cut off flat and solid just above where the limbs would start (no crown, no branches, no leaves, no hollow). ROOTS: about twelve thick primary roots, each as thick as a trunk strand where it leaves the trunk and tapering toward the ground, flowing down and outward in broad S-curves and crossing over each other; packed shoulder to shoulder with no see-through gaps in the upper part; each root splits near the ground into two to four short pointed rootlets that lie flat on the ground like claws. IMPORTANT: at the front centre the roots part and arch to leave one clear open gap, a hollow like a doorway about a quarter of the skirt's width, where a pool will go; no roots cross that gap at ground level. Remove everything else: no standing stones, no boulders, no rocks, no water, no ivy, no ground tile. Isolated, centred, the whole object in frame, seen from the front and slightly above, plain light-grey background, soft even light. Keep exactly the same low-poly faceted style, colours and wear as in the image."
  }
 }
