@@ -389,26 +389,69 @@
     1130,
     406
    ],
-   "status": "later",
-   "note": "limbs; leaf pads as instances of one pad"
+   "status": "todo",
+   "note": "limbs and all leaf pads as ONE Trellis mesh (user approved 2026-11-14); leaves and bark are told apart by the baked colour. Its trunk stub overlaps the top of trunk_roots in the assembly.",
+   "ref_view": [
+    0,
+    15,
+    85
+   ],
+   "mesh": "meshes/crown.glb",
+   "dims_m": [
+    11.0,
+    11.0,
+    7.5
+   ],
+   "fit": "fit",
+   "tris": 70000,
+   "materials": [
+    "bark",
+    "leaf",
+    "moss"
+   ],
+   "review_at": 5,
+   "pass_at": 8,
+   "best": null
   },
   {
    "id": "leaf_pad",
    "source": "instance",
    "ref": "refs/leaf_pad.png",
-   "status": "later"
+   "status": "merged",
+   "note": "not a separate piece in this run: the pads come with the crown's Trellis mesh"
   },
   {
    "id": "rockery",
    "source": "trellis",
-   "ref": "refs/rockery.png",
+   "ref": "refs/rocks.png",
    "bbox_px": [
     344,
     522,
     1164,
     972
    ],
-   "status": "later"
+   "status": "todo",
+   "ref_view": [
+    0,
+    30,
+    85
+   ],
+   "mesh": "meshes/rockery.glb",
+   "dims_m": [
+    11.4,
+    11.4,
+    3.4
+   ],
+   "fit": "fit",
+   "tris": 30000,
+   "materials": [
+    "stone_cut",
+    "moss"
+   ],
+   "note": "the ring of boulders alone (GPT close-up without runestones, water or roots); runestones are instances, water is procedural",
+   "review_at": 5,
+   "pass_at": 8,
+   "best": null
   },
   {
    "id": "water",
@@ -462,6 +505,34 @@
     "remesh": true
    },
    "date": "2026-11-13"
+  },
+  {
+   "piece": "crown",
+   "model": "Trellis 2 (fal-ai/trellis-2)",
+   "credits": 30,
+   "prediction": "b2a69c05-7f04-40ee-8c02-5efd3c65d4bf",
+   "input": "refs/crown.png",
+   "params": {
+    "resolution": 1024,
+    "texture_size": 1024,
+    "decimation_target": 300000,
+    "remesh": true
+   },
+   "date": "2026-11-14"
+  },
+  {
+   "piece": "rockery",
+   "model": "Trellis 2 (fal-ai/trellis-2)",
+   "credits": 30,
+   "prediction": "696fcfb5-768d-41b1-80b2-69890b922940",
+   "input": "refs/rocks.png",
+   "params": {
+    "resolution": 1024,
+    "texture_size": 1024,
+    "decimation_target": 200000,
+    "remesh": true
+   },
+   "date": "2026-11-14"
   }
  ]
 }

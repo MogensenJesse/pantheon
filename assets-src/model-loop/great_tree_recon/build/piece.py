@@ -96,6 +96,33 @@ KNOBS = {
         moss=dict(col=srgb(92, 98, 50), thresh=0.64, soft=0.14, scale=0.9, w_up=0.25, up_min=0.2, up_soft=0.5, strength=0.55),
         rune=None,
     ),
+    "crown": dict(
+        # limbs and leaf pads in one Trellis mesh. No voxel skin (leaves are thinner than a useful voxel); flat facets, the look the
+        # trunk judge asked for in r02
+        planar_deg=6.0, shade="flat",
+        imp=dict(min_face_frac=0.004, min_diag_frac=0.06),
+        texture="textures/bark.png",
+        mat=dict(tile_m=1.1, mask="curv", ridge=0.10, crease=0.3, top_light=0.15, ao=0.12, tex_contrast=0.5, tex_sat=0.7,
+                 tint=(0.95, 0.94, 0.90), gain=0.86, face_var=0.10),   # the trunk's r02 bark
+        bump=None,
+        moss=dict(col=srgb(92, 98, 50), thresh=0.66, soft=0.14, scale=0.9, w_up=0.25, up_min=0.2, up_soft=0.5, strength=0.5),
+        rune=None,
+        # second material where the baked colour is leaf green (greener than red and blue); great_tree's LEAF knobs
+        split=dict(name="leaf", test="green", texture="textures/leaf.png",
+                   mat=dict(tile_m=0.9, mask="curv", ridge=0.0, crease=0.25, top_light=0.5, ao=0.3, tex_contrast=0.6, tex_sat=0.9,
+                            tint=(1.0, 1.0, 1.0), gain=0.8, face_var=0.3)),
+    ),
+    "rockery": dict(
+        tris=30000, planar_deg=10.0, shade="flat",
+        imp=dict(voxel_m=0.03, min_face_frac=0.01, min_diag_frac=0.08),
+        texture="textures/stone_cut.png",
+        mat=dict(tile_m=0.9, mask="curv", ridge=0.15, crease=0.5, ridge_col=(0.86, 0.85, 0.82, 1), top_light=0.3, ao=0.35,
+                 tex_contrast=0.85, tex_sat=0.25, tint=(1.0, 0.98, 0.93), gain=0.52, face_var=0.12, bottom_dark=0.10),   # the runestone's r02 stone, 15 % darker (its judge)
+        bump=None,
+        # the reference's boulders wear a moss cap: olive green on every top, crisp-ish edge
+        moss=dict(col=srgb(112, 124, 52), thresh=0.30, soft=0.12, scale=1.6, w_up=0.55, up_min=0.5, up_soft=0.3, strength=0.9),
+        rune=None,
+    ),
 }
 
 
@@ -264,12 +291,48 @@ def mask_pass(pid, path, res=(1024, 1024)):
     return path
 
 
+TESTS = {  # baked-colour tests for a second material (rgb as the image stores it, 0..1)
+    "green": lambda c: (c[:, 1] > c[:, 0] * 1.06) & (c[:, 1] > c[:, 2] * 1.25),
+}
+
+
+def split_faces(ob, pts, rgb, test):
+    """Which faces of the cleaned mesh sat where the raw mesh's baked colour passes `test`: nearest raw face centre in
+    box-normalised coordinates (the cleaned mesh is the raw one scaled per axis, give or take its trimmed islands)."""
+    import numpy as np
+    from mathutils.kdtree import KDTree
+
+    hit = TESTS[test](rgb)
+    kd = KDTree(len(pts))
+    for i, p in enumerate(pts):
+        kd.insert(p, i)
+    kd.balance()
+    me = ob.data
+    n = len(me.polygons)
+    cen = np.empty(n * 3, dtype=np.float32)
+    me.polygons.foreach_get("center", cen)
+    cen = cen.reshape(-1, 3)
+    co = np.empty(len(me.vertices) * 3, dtype=np.float32)
+    me.vertices.foreach_get("co", co)
+    co = co.reshape(-1, 3)
+    lo, hi = co.min(0), co.max(0)
+    q = (cen - lo) / np.maximum(hi - lo, 1e-9)
+    idx = np.fromiter((kd.find(v)[1] for v in q), dtype=np.int64, count=n)
+    return hit[idx]
+
+
 def main():
     args = sys.argv[sys.argv.index("--") + 1:]
     pid, tag = args[0], args[1]
     scene = json.load(open(os.path.join(R, "scene.json")))
     piece = next(p for p in scene["pieces"] if p["id"] == pid)
     K = KNOBS[pid]
+    glb = os.environ.get("RECON_GLB") or os.path.join(R, piece["mesh"])
+    baked = None
+    if K.get("split"):  # reads the raw mesh in an empty scene: before the run's .blend is opened
+        import orient_fit
+
+        baked = orient_fit.colour_points(glb, piece.get("mesh_yaw", 0.0))
     blend = os.path.join(OUT, "great_tree_recon.blend")
     os.makedirs(OUT, exist_ok=True)
     if os.path.isfile(blend):
@@ -281,7 +344,6 @@ def main():
     if old:  # rebuild this piece only
         for o in list(old.objects):
             bpy.data.objects.remove(o)
-    glb = os.environ.get("RECON_GLB") or os.path.join(R, piece["mesh"])
     out = {"piece": pid, "tag": tag,
            "import": recon_import.run(glb, pid, piece["dims_m"], K.get("tris", piece["tris"]), fit=piece.get("fit", "fit"),
                                       yaw_deg=piece.get("mesh_yaw", 0.0), **K.get("imp", {}))}
@@ -304,6 +366,17 @@ def main():
                                 mask_png=os.path.join(R, rk["mask"]), strength=rk["strength"], glow=rk["glow"], line=rk["line"], floor=rk.get("floor"))
     ob.data.materials.clear()
     ob.data.materials.append(m)
+    if K.get("split"):
+        sp = K["split"]
+        old2 = bpy.data.materials.get(f"M_recon_{pid}_{sp['name']}")
+        if old2:
+            bpy.data.materials.remove(old2)
+        m2 = tcommon._spec(loop_mat.material(f"M_recon_{pid}_{sp['name']}", rel(sp["texture"]), rough=1.0, **sp["mat"]))
+        ob.data.materials.append(m2)
+        sel = split_faces(ob, baked[0], baked[1], sp["test"])
+        ob.data.polygons.foreach_set("material_index", sel.astype("int32"))
+        ob.data.update()
+        out["split"] = {"name": sp["name"], "faces": int(sel.sum()), "of": int(len(sel))}
     out["qa_errors"] = qa_check.run(objects=[pid], profile="render").get("errors", [])
     rdir = os.path.join(OUT, "renders", pid)
     rv = tuple(piece["ref_view"])
@@ -316,6 +389,7 @@ def main():
     else:
         raise RuntimeError("loop_render.run kept failing")
     out["mask"] = mask_pass(pid, os.path.join(rdir, f"{tag}_mask.png"))
+    out["ref"] = piece["ref"]
     bpy.ops.wm.save_mainfile()
     os.makedirs(os.path.join(OUT, "rounds"), exist_ok=True)
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, "rounds", f"{pid}_{tag}.blend"), copy=True)

@@ -10,7 +10,8 @@ import sys, json
 for l in sys.stdin:
     if l.startswith('@@RESULT@@'):
         d = json.loads(l[10:]); i = d['import']
-        print(d['piece'], d['tag'], 'tris', i['tris_in'], '->', i.get('tris_after_voxel', '-'), '->', i['tris_out'], 'facets', d['facets'], 'loose', i['loose_removed'], 'size', i['size_m'], 'qa', d['qa_errors'], d.get('rune', ''))
+        print(d['piece'], d['tag'], d.get('split', ''), 'tris', i['tris_in'], '->', i.get('tris_after_voxel', '-'), '->', i['tris_out'], 'facets', d['facets'], 'loose', i['loose_removed'], 'size', i['size_m'], 'qa', d['qa_errors'], d.get('rune', ''))
     else: print(l.rstrip()[:400])"
-  node skills/model-loop/scripts/sheet.mjs --out $R/renders/$p/${tag}_sheet.png --cols 6 --h 420 ref=$R/refs/$p.png render_ref=$R/renders/$p/${tag}_ref.png front=$R/renders/$p/${tag}_front.png right=$R/renders/$p/${tag}_right.png back=$R/renders/$p/${tag}_back.png left=$R/renders/$p/${tag}_left.png > /dev/null
+  ref=$(python3 -c "import json,sys; print(next(x['ref'] for x in json.load(open('$R/scene.json'))['pieces'] if x['id'] == '$p'))")
+  node skills/model-loop/scripts/sheet.mjs --out $R/renders/$p/${tag}_sheet.png --cols 6 --h 420 ref=$R/$ref render_ref=$R/renders/$p/${tag}_ref.png front=$R/renders/$p/${tag}_front.png right=$R/renders/$p/${tag}_right.png back=$R/renders/$p/${tag}_back.png left=$R/renders/$p/${tag}_left.png > /dev/null
 done

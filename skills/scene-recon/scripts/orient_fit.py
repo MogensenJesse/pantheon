@@ -10,6 +10,9 @@ for this alignment only; the look still comes from the retexture.
     r["yaw"]            # degrees about Z: pass to recon_import.run(..., yaw_deg=r["yaw"])
     r["scores"]         # [(yaw, score, iou, colour)] best first; a small gap between the first two = ambiguous
 
+    orient_fit.colour_points(glb, yaw)      # (points, rgb): face centres of the turned mesh as fractions of its box, and their baked
+                                            # colour; a k-d tree over them tells a cleaned mesh's faces which material they were
+                                            # (leaf or bark), see great_tree_recon/build/piece.py
     orient_fit.colour_box(glb, yaw, test)   # box of the front-facing faces whose baked colour passes test(rgb array) -> bool array,
                                             # relative to the turned mesh: {"cx", "cz", "w", "h"} as fractions of its width / height
                                             # (cx from the centre, cz from the bottom), e.g. where a glowing panel sits
@@ -210,3 +213,45 @@ def colour_box(glb, yaw, test, facing=-0.8):
     xc = float((hi[0] + lo[0]) / 2)
     return {"cx": (xm - xc) / W, "cz": (zm - float(lo[2])) / H, "w": 2 * (xb - xa) / W, "h": 2 * (zb - za) / H,
             "faces": int(sel.sum()), "area_frac": float(area[sel].sum() / area.sum())}
+
+
+def colour_points(glb, yaw, limit=120000, seed=1):
+    """Face centres of the turned raw mesh as fractions of its bounding box (x, y, z in 0..1), and their baked colour.
+    For telling a cleaned, decimated copy of the mesh which parts were which colour (the copy keeps no baked material)."""
+    ob = _load(glb)
+    me = ob.data
+    img = None
+    for m in me.materials:
+        bsdf = next((n for n in m.node_tree.nodes if n.type == "BSDF_PRINCIPLED"), None)
+        if bsdf and bsdf.inputs["Base Color"].links and bsdf.inputs["Base Color"].links[0].from_node.type == "TEX_IMAGE":
+            img = bsdf.inputs["Base Color"].links[0].from_node.image
+    if img is None:
+        raise ValueError("no base-colour image on the mesh")
+    w, h = img.size
+    tex = np.empty(w * h * 4, dtype=np.float32)
+    img.pixels.foreach_get(tex)
+    tex = tex.reshape(h, w, 4)[..., :3]
+    uv = np.empty(len(me.loops) * 2, dtype=np.float32)
+    me.uv_layers.active.data.foreach_get("uv", uv)
+    uv = uv.reshape(-1, 2)
+    npoly = len(me.polygons)
+    start = np.empty(npoly, dtype=np.int32)
+    total = np.empty(npoly, dtype=np.int32)
+    me.polygons.foreach_get("loop_start", start)
+    me.polygons.foreach_get("loop_total", total)
+    fuv = np.add.reduceat(uv, start, axis=0) / total[:, None]
+    col = tex[np.clip((fuv[:, 1] % 1.0 * h).astype(int), 0, h - 1), np.clip((fuv[:, 0] % 1.0 * w).astype(int), 0, w - 1)]
+    cen = np.empty(npoly * 3, dtype=np.float32)
+    me.polygons.foreach_get("center", cen)
+    a = math.radians(yaw)
+    rot = np.array([[math.cos(a), -math.sin(a), 0], [math.sin(a), math.cos(a), 0], [0, 0, 1]], dtype=np.float32)
+    cen = cen.reshape(-1, 3) @ rot.T
+    co = np.empty(len(me.vertices) * 3, dtype=np.float32)
+    me.vertices.foreach_get("co", co)
+    co = co.reshape(-1, 3) @ rot.T
+    lo, hi = co.min(0), co.max(0)
+    pts = (cen - lo) / np.maximum(hi - lo, 1e-9)
+    if npoly > limit:
+        keep = np.random.default_rng(seed).choice(npoly, limit, replace=False)
+        pts, col = pts[keep], col[keep]
+    return pts.astype(np.float64), col.astype(np.float64)
