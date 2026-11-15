@@ -669,9 +669,9 @@
  "assembly": {
   "build": "build/assemble.py",
   "blend": "great_tree_recon_scene.blend",
-  "latest": "a08",
-  "render": "renders/scene/a06_cam.png (ignored; copy in review_assembly_a06.png)",
-  "status": "judged: whole scene 5.6 at a08 (root node, review gate 5, pass 9)",
+  "latest": "a10",
+  "render": "renders/scene/a10_cam.png (ignored; copy in review_assembly_a10.png)",
+  "status": "judged: whole scene a08 5.6 (wrong camera), a10 5.5 (correct camera, keep). Review gate 5 passed; pass mark 9 not reached.",
   "placement": {
    "rockery": "tile centre, squashed to 3.4 m",
    "tree (trunk_roots + crown)": "1.3 m behind the tile centre; crown from z = 4.3 m, scaled so the tree is 10.5 m",
@@ -685,6 +685,6 @@
    "crown: narrower than the input's canopy after scaling to the tree's height (9 m against 10.7 m)",
    "no ground tile (by plan); not judged: the whole-scene compare loop is a later step"
   ],
-  "last_score": 5.6
+  "last_score": 5.5
  }
 }
