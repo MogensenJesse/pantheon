@@ -176,6 +176,20 @@ Trellis output is raw: about 1 m tall, dense, one baked material, UVs fragmented
   several times in depth.
 - A pool the camera cannot see is no pool: look for its place on the piece it belongs to (the rockery alone), then check the camera sees it.
 
+## Whole-scene loop (great_tree: a08 5.6, then a10)
+- **Test the camera with roll.** `camera_fit.blender()` once returned the Y Euler angle negated; with roll-free test cameras the Blender
+  cross-check still passed, and every assembly render came out 45 px off the input. The judge read it as "everything 0.5 m to the right".
+  `test_camera_fit_bpy.py` now has rolled cameras. When a whole-scene judge says everything is shifted, measure a feature (the rune glow) in
+  the input and the render before moving pieces.
+- **Knob rounds on Trellis pieces stall fast.** After the first good round, colour and moss rounds scored lower on all three pieces
+  (crown 5.5 -> 5.0, rockery 5.3 -> 4.3, trunk 5.6 -> 5.1): the judge's remaining high defects are geometry, and a highlight or a moss tone
+  pushed by its numbers overshoots under the studio key (near-white ridges, lime moss). Revert to the best round; spend effort on the
+  layout or on a new close-up instead.
+- **A rule that fixes one region hits others.** "No leaf below 35 %" cleared the crown's grass skirt and also turned the low pads'
+  undersides into bark. Bound such rules in space (`near_axis_m`).
+- **Change the layout one knob at a time.** a09 widened the roots, lowered them and capped all rocks at once: the ring became a flat plate,
+  the side stones lost their footing and the pool vanished. a10 kept the front ring and lowered only the tiers behind the tree.
+
 ## Verification at the end of a run
 - The source run's md5 listing matches the one taken before the copy.
 - `camera_fit` self-check passes; the tile corners reproject within 3 px.
