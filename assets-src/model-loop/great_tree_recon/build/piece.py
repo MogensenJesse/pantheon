@@ -85,15 +85,18 @@ KNOBS = {
         # plate to plate (face_var on the planar facets)
         # r04 (judge r03: faint fine parallel lines across the limbs; bark slightly warm and brown, reference about RGB 120,112,90) -> flatter
         # texture, a little greyer
-        mat=dict(tile_m=1.1, mask="curv", ridge=0.10, crease=0.35, top_light=0.15, ao=0.15, tex_contrast=0.2, tex_sat=0.55,
-                 tint=(0.92, 0.94, 0.93), gain=0.82, face_var=0.14),
+        # r04 tried tex_contrast 0.2, tex_sat 0.55, tint (0.92, 0.94, 0.93), gain 0.82, face_var 0.14: stripes judged fixed, but the round
+        # scored 5.1 against r03's 5.6 (on an unchanged mesh: judge noise). Back to r03 (best), per model-loop's rule.
+        mat=dict(tile_m=1.1, mask="curv", ridge=0.10, crease=0.35, top_light=0.15, ao=0.15, tex_contrast=0.35, tex_sat=0.65,
+                 tint=(0.93, 0.94, 0.92), gain=0.80, face_var=0.13),
         # r02 judge: the bump read as "a fine pinstripe wrapping round the limbs like lathe marks" -> off; the facets carry the relief
         bump=None,
         # r02 judge: moss soft-edged now but saturated yellow-green in large patches -> desaturated olive (#6B6F45), 10-15 % cover, 30-50 % blend
         # r04 (judge r03: moss almost invisible, under 5 %; reference olive patches about RGB 110,120,50 on up-facing faces at 15-20 %, 0.3-1 m;
         # the cap a pale yellow-green disc) -> more and stronger, and none on the cut top
         # (pre-judge look: srgb(96, 104, 48) at 0.65 read as lime stripes) -> darker, softer
-        moss=dict(col=srgb(78, 84, 46), thresh=0.6, soft=0.14, scale=1.1, w_up=0.3, up_min=0.2, up_soft=0.5, strength=0.55, z_max=6.15),
+        # (r04 tried col srgb(78, 84, 46), thresh 0.6, scale 1.1, strength 0.55, z_max 6.15: cover judged fixed, stripes along the crests)
+        moss=dict(col=srgb(80, 84, 52), thresh=0.70, soft=0.14, scale=0.9, w_up=0.25, up_min=0.25, up_soft=0.5, strength=0.45),
         rune=None,
     ),
     "crown": dict(
@@ -102,10 +105,10 @@ KNOBS = {
         planar_deg=6.0, shade="flat",
         imp=dict(min_face_frac=0.004, min_diag_frac=0.06),
         texture="textures/bark.png",
-        # r02 (judge r01: "high-contrast cream and dark brown stripes, almost white patches at the base"; reference mid grey-brown, #6b655c lit,
-        # #3f3a35 in the grooves, soft gradients, per-facet value): the texture's streaks pulled flat, greyer, a per-facet value, no ridge lift
-        mat=dict(tile_m=1.1, mask="curv", ridge=0.03, crease=0.3, top_light=0.12, ao=0.15, tex_contrast=0.18, tex_sat=0.45,
-                 tint=(0.95, 0.95, 0.95), gain=1.15, face_var=0.16),
+        # r02 tried tex_contrast 0.18, tex_sat 0.45, ridge 0.03, gain 1.15: lit bark went near white, the round scored 5.0 against r01's 5.5 ->
+        # back to r01's bark (r03)
+        mat=dict(tile_m=1.1, mask="curv", ridge=0.10, crease=0.3, top_light=0.15, ao=0.12, tex_contrast=0.5, tex_sat=0.7,
+                 tint=(0.92, 0.94, 0.96), gain=1.3, face_var=0.10),
         bump=None,
         moss=dict(col=srgb(92, 98, 50), thresh=0.66, soft=0.14, scale=0.9, w_up=0.25, up_min=0.2, up_soft=0.5, strength=0.5),
         rune=None,
@@ -116,21 +119,25 @@ KNOBS = {
         # r02 (judge r01: "a dense grass-like green skirt wraps the top of the base": baked moss on the trunk classed as leaf) -> no leaf in
         # the lowest 35 %. (judge: foliage one even mid green; reference lit tops yellow-olive #7c9440, sides #4f6e2e, undersides #27401f)
         # -> much stronger top light, yellower, darker overall so sides and undersides drop
-        split=dict(name="leaf", test="green", texture="textures/leaf.png", min_z_frac=0.35,
-                   mat=dict(tile_m=0.9, mask="curv", ridge=0.0, crease=0.35, top_light=0.85, ao=0.45, tex_contrast=0.7, tex_sat=0.65,
-                            tint=(1.0, 1.0, 0.78), gain=0.34, face_var=0.3)),
+        # r03: the r02 rule (no leaf below 35 %) cleared the skirt but also turned the low pads' undersides into pale bark (judge r02) ->
+        # only near the trunk axis (near_axis_m). Leaf material back to r01's (r02's top_light 0.85 / gain 0.34 read as one saturated green)
+        split=dict(name="leaf", test="green", texture="textures/leaf.png", min_z_frac=0.35, near_axis_m=2.2,
+                   mat=dict(tile_m=0.9, mask="curv", ridge=0.0, crease=0.3, top_light=0.3, ao=0.3, tex_contrast=0.7, tex_sat=0.62,
+                            tint=(0.95, 0.97, 1.0), gain=0.46, face_var=0.3)),
     ),
     "rockery": dict(
-        # r02 (judge r01: "tops are single flat n-gon lids"): the 10 deg dissolve merged each top into one face -> 3 deg
-        tris=30000, planar_deg=3.0, shade="flat",
+        # r02 tried planar_deg 3 (judge r01: "tops are single flat n-gon lids"): no change, the lids are Trellis geometry. r02 scored 4.3
+        # against r01's 5.3, so all knobs are back at r01 (best).
+        tris=30000, planar_deg=10.0, shade="flat",
         # (first try with voxel_m=0.03 shredded it into thin fences and 1253 loose triangles: this mesh is not a closed volume,
         # and a voxel skin of an open shell is junk) -> no voxel pass
         imp=dict(min_face_frac=0.01, min_diag_frac=0.08),
         texture="textures/stone_cut.png",
         # r02 (judge r01: stone too light and cool, no painted detail; reference mid warm grey near (0.45, 0.44, 0.41), +/-8-10 % per facet,
         # lighter ridges, darker crevices) -> 20 % darker, warmer, more ridge / crease / per-facet contrast
-        mat=dict(tile_m=0.9, mask="curv", ridge=0.24, crease=0.6, ridge_col=(0.86, 0.85, 0.82, 1), top_light=0.25, ao=0.45,
-                 tex_contrast=0.85, tex_sat=0.3, tint=(1.0, 0.97, 0.9), gain=0.42, face_var=0.18, bottom_dark=0.10),
+        # (r02 tried ridge 0.24, crease 0.6, ao 0.45, gain 0.42, warmer: the near-white ridge colour lit the edges white, judged worse)
+        mat=dict(tile_m=0.9, mask="curv", ridge=0.15, crease=0.5, ridge_col=(0.86, 0.85, 0.82, 1), top_light=0.3, ao=0.35,
+                 tex_contrast=0.85, tex_sat=0.25, tint=(1.0, 0.98, 0.93), gain=0.52, face_var=0.12, bottom_dark=0.10),
         bump=None,
         # the reference's boulders wear a moss cap: olive green on every top, crisp-ish edge
         # (pre-judge look: srgb(112, 124, 52) lit up lime under the studio key -> darker olive)
@@ -139,7 +146,8 @@ KNOBS = {
         # shoulders, 20-30 % of each top bare) -> less saturated and yellower, finer noise for a ragged edge, lower up_min to reach the
         # shoulders, a higher threshold for bare patches
         # (pre-judge look: srgb(104, 110, 52) rendered lime on the lit tops) -> darker, a little greyer
-        moss=dict(col=srgb(80, 86, 44), thresh=0.44, soft=0.07, scale=2.6, w_up=0.5, up_min=0.3, up_soft=0.35, strength=0.8),
+        # (r02 tried col srgb(80, 86, 44), thresh 0.44, soft 0.07, scale 2.6, up_min 0.3, strength 0.8: still read lime, judged worse)
+        moss=dict(col=srgb(64, 74, 34), thresh=0.36, soft=0.12, scale=1.6, w_up=0.55, up_min=0.5, up_soft=0.3, strength=0.9),
         rune=None,
         drop_overlaps=True,   # 4 coplanar pairs lay on top of each other
     ),
@@ -497,12 +505,16 @@ def main():
         m2 = tcommon._spec(loop_mat.material(f"M_recon_{pid}_{sp['name']}", rel(sp["texture"]), rough=1.0, **sp["mat"]))
         ob.data.materials.append(m2)
         sel = split_faces(ob, baked[0], baked[1], sp["test"])
-        if sp.get("min_z_frac"):  # no leaves below this fraction of the height (the trunk's moss baked green read as a grass skirt)
+        if sp.get("min_z_frac"):  # no leaves low down near the trunk (the trunk's moss baked green read as a grass skirt)
             import numpy as np
 
             cz = np.empty(len(ob.data.polygons) * 3, dtype=np.float32)
             ob.data.polygons.foreach_get("center", cz)
-            sel = sel & (cz.reshape(-1, 3)[:, 2] >= sp["min_z_frac"] * ob.dimensions.z)
+            cz = cz.reshape(-1, 3)
+            low = cz[:, 2] < sp["min_z_frac"] * ob.dimensions.z
+            if sp.get("near_axis_m"):  # only within this distance of the vertical axis (low pads further out keep their leaves)
+                low &= np.hypot(cz[:, 0], cz[:, 1]) < sp["near_axis_m"]
+            sel = sel & ~low
         ob.data.polygons.foreach_set("material_index", sel.astype("int32"))
         ob.data.update()
         out["split"] = {"name": sp["name"], "faces": int(sel.sum()), "of": int(len(sel))}

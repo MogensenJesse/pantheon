@@ -34,18 +34,28 @@ P = dict(
     rockery_h=3.4,          # the input suggests about 3.4 m of rock; the piece kept its close-up's 4.5 m
     crown_base=4.3,         # the crown's trunk stub starts here; scaled so the tree is tree_h tall (a03: 3.3 let the pads hang over the roots
                             # and hide the trunk; the input's lowest pads sit at about 5.7 m)
-    tree_h=10.5,
+    tree_h=10.3,            # a09: the canopy touched the frame top (judge a08: lower about 0.3 m)
     tree_y=1.3,             # a05: the tree stands this far BEHIND the tile centre. Centred (a01-a04), its root skirt (4.6 m radius) reached
                             # to within 1.1 m of the rock ring's front corner and covered the basin: the pool had no place
     stone_sink=0.15,        # runestones stand this far into what they stand on
-    stone_front_m=0.6,      # and this far in front of the surface behind their middle
+    stone_front_m=dict(runestone_l=0.6, runestone_c=0.1, runestone_r=0.6),   # this far in front of the surface behind their middle
+                            # a09: the centre one 0.5 m further back, into the roots (judge a08: stands out in front, not in a niche)
     stone_scale=dict(runestone_l=1.0, runestone_c=0.92, runestone_r=0.92),   # visible heights 211 / 184 / 185 px
     # a07: the pool as the input draws it, from the waterfall forward: 3.1 m wide (223 px at 72 px/m), 2.2 m deep, on the ground
     pool=dict(size_m=(3.1, 2.2), gap_m=0.35, floor_z=0.05, z_above_floor=0.15,
               front_cap_m=0.3, front_keep=0.18, front_soft_m=0.9, front_margin_m=0.5),
     bay=dict(side_m=0.6, back_m=0.25, front_m=1.6, height_m=2.6),   # None = leave the roots whole
-    crown_xy=1.2,           # a07: canopy 10.7 m wide in the input (768 px at 72 px/m); scaled to the tree's height it was 8.9 m
-    ivy=dict(count=1400, leaf_m=0.24, seed=3),
+    crown_xy=1.22,          # a07: canopy 10.7 m wide in the input (768 px at 72 px/m); scaled to the tree's height (6 m crown) it is 8.6 m
+    # a09 (judge a08: a horizontal flange with a flat top rings the trunk; roots flare only about 4 m visible, the input about 9 m): the trunk-
+    # and-roots piece wider and lower, so its cut top (now 5.2 m) sits inside the crown's flare, which starts at crown_base
+    # (a09 tried (1.12, 1.12, 0.8): the roots then covered the rock ring and the pool, and the collar stayed: it is the crown's own flare top)
+    roots_scale=(1.0, 1.0, 1.0),
+    # a09 (judge a08: the base reads as a flat-topped rock plateau; the input's back half is roots, its rocks stay under about 1-1.2 m):
+    # rocks above `cap` keep `keep` of their height above it; behind back_y the lower back cap applies
+    # (a09 tried cap 1.15 everywhere and 0.55 behind: the ring became a flat mossy plate and the side stones lost their footing)
+    # a10: the front ring stays as it is; only the tiers behind the tree come down
+    rock_cap=dict(cap=99.0, keep=1.0, back_y=0.8, back_cap=1.3, back_keep=0.35, soft=1.5),
+    ivy=dict(count=2200, leaf_m=0.16, seed=3),   # a09 (judge a08: leaf cards like confetti, 40 % too big, too lime) -> smaller, darker
 )
 
 
@@ -96,7 +106,19 @@ out = {"tag": tag}
 rock_h = src["rockery"].dimensions.z
 rockery = place("A_rockery", "rockery", scale=(1, 1, P["rockery_h"] / rock_h))
 rockery.data = rockery.data.copy()  # the front gets lowered below: on a copy, the judged piece stays as it is
-roots = place("A_trunk_roots", "trunk_roots", loc=(0, P["tree_y"], 0))
+_rc = P["rock_cap"]
+_mw, _inv = rockery.matrix_world.copy(), rockery.matrix_world.inverted()
+for v in rockery.data.vertices:
+    wv = _mw @ v.co
+    t = min(max((wv.y - _rc["back_y"]) / _rc["soft"], 0.0), 1.0)  # 0 in front, 1 behind back_y + soft
+    t = t * t * (3 - 2 * t)
+    cap_ = _rc["cap"] * (1 - t) + _rc["back_cap"] * t
+    keep_ = _rc["keep"] * (1 - t) + _rc["back_keep"] * t
+    if wv.z > cap_:
+        wv.z = cap_ + (wv.z - cap_) * keep_
+        v.co = _inv @ wv
+rockery.data.update()
+roots = place("A_trunk_roots", "trunk_roots", loc=(0, P["tree_y"], 0), scale=P["roots_scale"])
 ks = (P["tree_h"] - P["crown_base"]) / src["crown"].dimensions.z
 crown = place("A_crown", "crown", loc=(0, P["tree_y"], P["crown_base"]), scale=(ks * P["crown_xy"], ks * P["crown_xy"], ks))
 bpy.context.view_layer.update()
@@ -133,11 +155,15 @@ for inst in stones:
     mid, bot = ((x0 + x1) / 2, (y0 + y1) / 2), ((x0 + x1) / 2, y1)
     dm, db = Vector(cam.ray([mid])[0]), Vector(cam.ray([bot])[0])
     hit = ground.ray_cast(Cw, dm)
-    if hit[0] is None:
-        g = cam.ground_xy([bot])[0]
-        pos, how = Vector((g[0], g[1], 0.0)), "ground plane"
+    if hit[0] is None:  # nothing behind its middle: stand it where its bottom pixel's ray first meets rocks or roots (a01's rule)
+        hb = ground.ray_cast(Cw, db)
+        if hb[0] is not None:
+            pos, how = hb[0].copy(), "on the first surface along its bottom ray"
+        else:
+            g = cam.ground_xy([bot])[0]
+            pos, how = Vector((g[0], g[1], 0.0)), "ground plane"
     else:
-        depth = (hit[0] - Cw).dot(fwd) - P["stone_front_m"]
+        depth = (hit[0] - Cw).dot(fwd) - P["stone_front_m"][inst["id"]]
         pos, how = Cw + db * (depth / db.dot(fwd)), "in front of rocks/roots"
         h = top_z(pos.x, pos.y)
         floor = 0.0 if h is None else h
@@ -253,7 +279,19 @@ edge = [(x, y, pz) for x, y in edge_xy]
 ctr = np.array([pc[0], pc[1], pz])
 me = bpy.data.meshes.new("water")
 me.from_pydata([tuple(ctr)] + edge, [], [(0, 1 + i, 1 + (i + 1) % len(edge)) for i in range(len(edge))])
-me.materials.append(flat_mat("M_recon_water", srgb(52, 150, 150), rough=0.15, emit=srgb(70, 190, 185), strength=0.35))
+# a09 (judge a08: flat opaque bright cyan; the input's water is teal with darker depth and a lighter rim): a centre-to-rim gradient
+ca = me.color_attributes.new("depth", "FLOAT_COLOR", "POINT")
+ca.data[0].color = (*srgb(22, 92, 96), 1)
+for i in range(1, len(me.vertices)):
+    ca.data[i].color = (*srgb(92, 178, 172), 1)
+wm = bpy.data.materials.get("M_recon_water") or bpy.data.materials.new("M_recon_water")
+wb = next(n for n in wm.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
+an = wm.node_tree.nodes.new("ShaderNodeAttribute")
+an.attribute_type, an.attribute_name = "GEOMETRY", "depth"
+wm.node_tree.links.new(an.outputs["Color"], wb.inputs["Base Color"])
+wm.node_tree.links.new(an.outputs["Color"], wb.inputs["Emission Color"])
+wb.inputs["Emission Strength"].default_value, wb.inputs["Roughness"].default_value = 0.12, 0.1
+me.materials.append(wm)
 pool = bpy.data.objects.new("A_water", me)
 G.objects.link(pool)
 out["pool"] = {"centre_m": [round(float(v), 2) for v in ctr], "size_m": [pw, pd], "seen_fraction": round(float(vis), 2)}
@@ -268,13 +306,22 @@ verts, faces = [], []
 for i in range(n + 1):
     t = i / n
     p = top.lerp(bot, t) + Vector((0, -0.35 * math.sin(t * math.pi) * (1 - t), 0))  # leans out, then drops
-    ww = w * (0.8 + 0.5 * t)
+    ww = w * (0.35 + 0.9 * t)   # a09: tapered (judge a08: a straight plank)
     verts += [(p.x - ww / 2, p.y, p.z), (p.x + ww / 2, p.y, p.z)]
     if i:
         faces.append((2 * i - 2, 2 * i - 1, 2 * i + 1, 2 * i))
 mf = bpy.data.meshes.new("waterfall")
 mf.from_pydata(verts, [], faces)
-mf.materials.append(flat_mat("M_recon_waterfall", srgb(120, 200, 205), rough=0.2, emit=srgb(150, 220, 225), strength=0.25))
+fm = flat_mat("M_recon_waterfall", srgb(190, 228, 230), rough=0.2, emit=srgb(170, 225, 228), strength=0.2)
+fb = next(n for n in fm.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
+fb.inputs["Alpha"].default_value = 0.7  # a09: some see-through (judge a08: opaque)
+mf.materials.append(fm)
+# foam where it lands (judge a08)
+foam = bpy.data.meshes.new("foam")
+fv = [(bot.x + math.cos(a) * 0.45, bot.y + math.sin(a) * 0.3, pz + 0.02) for a in np.linspace(0, 2 * math.pi, 16, endpoint=False)]
+foam.from_pydata([(bot.x, bot.y, pz + 0.02)] + fv, [], [(0, 1 + i, 1 + (i + 1) % 16) for i in range(16)])
+foam.materials.append(flat_mat("M_recon_foam", srgb(225, 240, 240), rough=0.6))
+G.objects.link(bpy.data.objects.new("A_foam", foam))
 fall = bpy.data.objects.new("A_waterfall", mf)
 G.objects.link(fall)
 
@@ -325,7 +372,7 @@ for k in pick:
     placed += 1
 mi = bpy.data.meshes.new("ivy")
 mi.from_pydata(verts, [], faces)
-mi.materials.append(flat_mat("M_recon_ivy", srgb(74, 110, 44), rough=0.9))
+mi.materials.append(flat_mat("M_recon_ivy", srgb(50, 82, 34), rough=0.9))
 ivy = bpy.data.objects.new("A_ivy", mi)
 G.objects.link(ivy)
 out["ivy"] = {"clusters": placed, "leaves": len(faces)}

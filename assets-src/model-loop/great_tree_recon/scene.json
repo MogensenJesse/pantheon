@@ -391,7 +391,8 @@
      "silhouette_iou",
      "colour"
     ]
-   }
+   },
+   "last_round": "r04 (5.1, reverted)"
   },
   {
    "id": "crown",
@@ -473,7 +474,8 @@
      "colour"
     ]
    },
-   "last_score": 5.5
+   "last_score": 5.5,
+   "last_round": "r02 (5.0, reverted); r03 = r01 + skirt fix near the trunk, not judged on its own"
   },
   {
    "id": "leaf_pad",
@@ -562,7 +564,8 @@
     ]
    },
    "dims_note": "the ring spans the tile's diagonal (11.4 m); Trellis kept the close-up's proportions, which makes it about 4.7 m tall. The input suggests about 3.4 m: squash it in the assembly if it pokes through the roots.",
-   "last_score": 5.3
+   "last_score": 5.3,
+   "last_round": "r02 (4.3, reverted)"
   },
   {
    "id": "water",
