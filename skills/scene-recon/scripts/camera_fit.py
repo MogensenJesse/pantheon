@@ -112,10 +112,12 @@ class Camera:
     def blender(self):
         """Camera parameters for bpy: location, rotation_euler (XYZ, radians), lens, sensor."""
         M = self.R.T @ np.diag([1.0, -1.0, -1.0])  # camera-to-world with Blender axes (x right, y up, -z forward)
+        # XYZ Euler: M = Rz(c) Ry(b) Rx(a), so M[2, 0] = -sin(b). (Until 2026-11-15 this returned -b: wrong for any camera with roll;
+        # the Blender cross-check only had roll-free cameras, and the great_tree assembly renders a01-a08 came out ~45 px to the right.)
         b = -math.asin(max(-1.0, min(1.0, M[2, 0])))
         a = math.atan2(M[2, 1], M[2, 2])
         c = math.atan2(M[1, 0], M[0, 0])
-        return {"location": [float(v) for v in self.C], "rotation_euler": [a, -b, c], "lens_mm": self.lens_mm,
+        return {"location": [float(v) for v in self.C], "rotation_euler": [a, b, c], "lens_mm": self.lens_mm,
                 "sensor_width_mm": SENSOR_MM, "sensor_fit": "AUTO", "resolution": [self.W, self.H]}
 
     def summary(self):
@@ -232,7 +234,7 @@ def fit(corners_px, size_px, tile_m=1.0, tile_yaw=0.0, weights=None):
 
 
 # ---------------------------------------------------------------------------------------------- self-check
-def _synthetic(az, el, lens_mm, dist, aim, size):
+def _synthetic(az, el, lens_mm, dist, aim, size, roll=0.0):
     a, e = math.radians(az), math.radians(el)
     C = np.array([math.sin(a) * math.cos(e), -math.cos(a) * math.cos(e), math.sin(e)]) * dist + [aim[0], aim[1], 0]
     z = np.array([aim[0], aim[1], 0.0]) - C
@@ -240,6 +242,9 @@ def _synthetic(az, el, lens_mm, dist, aim, size):
     x = np.cross(z, [0, 0, 1.0])
     x /= np.linalg.norm(x)
     y = np.cross(z, x)
+    if roll:  # turn the image about the viewing axis
+        r = math.radians(roll)
+        x, y = x * math.cos(r) + y * math.sin(r), -x * math.sin(r) + y * math.cos(r)
     R = np.stack([x, y, z])
     return Camera(R, -R @ C, lens_mm * max(size) / SENSOR_MM, size)
 

@@ -17,10 +17,11 @@ import camera_fit as cf
 worst = 0.0
 bpy.ops.wm.read_factory_settings(use_empty=True)
 sc = bpy.context.scene
-for az, el, lens, dist, aim, size in [(0, 30, 50, 4.0, (0, 0), (1536, 1024)), (35, 25, 85, 6.0, (0.2, 0.1), (1024, 1024)),
-                                      (-50, 40, 35, 3.0, (-0.1, 0.3), (1536, 1024)), (120, 20, 28, 5.0, (0, 0), (1024, 1536)),
-                                      (15, 55, 70, 8.0, (0.5, -0.3), (1920, 1080))]:
-    cam = cf._synthetic(az, el, lens, dist, aim, size)
+# roll matters: with roll 0 a wrong sign on the Euler Y angle goes unnoticed (it did, until the great_tree assembly came out 45 px off)
+for az, el, lens, dist, aim, size, roll in [(0, 30, 50, 4.0, (0, 0), (1536, 1024), 0), (35, 25, 85, 6.0, (0.2, 0.1), (1024, 1024), 3),
+                                            (-50, 40, 35, 3.0, (-0.1, 0.3), (1536, 1024), -7), (120, 20, 28, 5.0, (0, 0), (1024, 1536), 0),
+                                            (15, 55, 70, 8.0, (0.5, -0.3), (1920, 1080), 12), (-1, 25, 71, 42.0, (0, 0), (1536, 1024), 1)]:
+    cam = cf._synthetic(az, el, lens, dist, aim, size, roll)
     b = cam.blender()
     sc.render.resolution_x, sc.render.resolution_y, sc.render.resolution_percentage = size[0], size[1], 100
     cd = bpy.data.cameras.new("c")
@@ -37,7 +38,7 @@ for az, el, lens, dist, aim, size in [(0, 30, 50, 4.0, (0, 0), (1536, 1024)), (3
         got.append([v.x * size[0], (1 - v.y) * size[1]])
     err = float(np.abs(np.array(got) - ref).max())
     worst = max(worst, err)
-    assert err < 0.05, f"blender camera disagrees by {err:.3f} px (az {az} el {el} lens {lens} size {size})"
+    assert err < 0.05, f"blender camera disagrees by {err:.3f} px (az {az} el {el} lens {lens} size {size} roll {roll})"
     g = cam.ground_xy(ref[:5])
     assert np.abs(g - pts[:5, :2]).max() < 1e-6
     bpy.data.objects.remove(ob)
