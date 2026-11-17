@@ -576,8 +576,8 @@
     852,
     875
    ],
-   "status": "built",
-   "note": "pool (flat teal polygon traced from the ID map's water pixels) and a waterfall ribbon from the centre runestone. Assembly a06 puts it in the rockery's basin, in a bay cut out of the roots; the water level had to be raised to 1.7 m to show over the rockery's front rocks, and only 38 % of it is seen. A rough fit: the rockery's front is too tall and its basin too small for the input's low, open pool.",
+   "status": "removed",
+   "note": "Removed by the user on 2026-11-17 (assembly a11): no pool, waterfall or foam, and no bay cut in the roots or lowered rocks for it. The code stays in build/assemble.py behind P['water'].",
    "build": "build/assemble.py"
   },
   {
@@ -669,19 +669,18 @@
  "assembly": {
   "build": "build/assemble.py",
   "blend": "great_tree_recon_scene.blend",
-  "latest": "a10",
-  "render": "renders/scene/a10_cam.png (ignored; copy in review_assembly_a10.png)",
-  "status": "judged: whole scene a08 5.6 (wrong camera), a10 5.5 (correct camera, keep). Review gate 5 passed; pass mark 9 not reached.",
+  "latest": "a11",
+  "render": "renders/scene/a11_cam.png (ignored; copy in review_assembly_a11.png; the trunk join before and after in review_join_a10_a11.png)",
+  "status": "a11 not judged. Judged: a08 5.6 (wrong camera), a10 5.5. a11 = a10 without the water, with the trunk join fixed.",
   "placement": {
    "rockery": "tile centre, squashed to 3.4 m",
    "tree (trunk_roots + crown)": "1.3 m behind the tile centre; crown from z = 4.3 m, scaled so the tree is 10.5 m",
    "bay": "an egg-shaped volume cut out of a copy of the trunk mesh around the pool, so the roots stop at it (the judged piece is unchanged)",
    "pool": "the lowest spot of the rockery alone near the input's pool; water level raised until the camera sees it",
-   "runestones": "depth from the ray through each stone's middle pixel, 0.6 m in front of the surface behind it; base on the bottom pixel's ray, dropped if it hangs"
+   "runestones": "depth from the ray through each stone's middle pixel, 0.6 m in front of the surface behind it; base on the bottom pixel's ray, dropped if it hangs",
+   "join": "the crown's flare and lower shaft (below its limb fork at about 5.6 m) pulled to 4 cm inside the trunk's median surface at each height, on a copy of the crown mesh; it stood 0.15-0.4 m proud of the trunk and made a collar"
   },
   "known_issues": [
-   "pool: raised to 1.7 m and only 38 % seen (the rockery's front rocks hide a low pool); it reads as a thin sliver, not the input's open basin",
-   "bay: 3.9 m radius, larger than meant (the pool's outline is stretched in depth when its pixels are cast onto the ground at this view angle); the front roots are mostly gone",
    "crown: narrower than the input's canopy after scaling to the tree's height (9 m against 10.7 m)",
    "no ground tile (by plan); not judged: the whole-scene compare loop is a later step"
   ],

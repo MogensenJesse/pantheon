@@ -45,6 +45,14 @@ P = dict(
     pool=dict(size_m=(3.1, 2.2), gap_m=0.35, floor_z=0.05, z_above_floor=0.15,
               front_cap_m=0.3, front_keep=0.18, front_soft_m=0.9, front_margin_m=0.5),
     bay=dict(side_m=0.6, back_m=0.25, front_m=1.6, height_m=2.6),   # None = leave the roots whole
+    # a11 (user: "remove the water"): no pool, waterfall or foam, and none of what made room for them (the bay cut in the roots, the rocks
+    # lowered in front of the pool and pressed under it). The knobs above stay for when water comes back.
+    water=False,
+    # a11 (user: "a weird bump where trunk and roots connect"; judges a08/a10: a collar rings the trunk): the crown's own flare and lower shaft
+    # stood 0.15-0.4 m proud of the trunk-and-roots trunk below the crown's limb fork (about 5.7 m). On a copy of the crown mesh, every vertex
+    # below `top` and within near_m of the axis is pulled in to `inset_m` inside the trunk's median surface (pct) at its height; over `blend`
+    # above `top` the pull fades out, so the limbs are untouched.
+    join=dict(z_from=4.0, top=5.6, blend=0.35, near_m=2.0, inset_m=0.04, pct=50),
     crown_xy=1.22,          # a07: canopy 10.7 m wide in the input (768 px at 72 px/m); scaled to the tree's height (6 m crown) it is 8.6 m
     # a09 (judge a08: a horizontal flange with a flat top rings the trunk; roots flare only about 4 m visible, the input about 9 m): the trunk-
     # and-roots piece wider and lower, so its cut top (now 5.2 m) sits inside the crown's flare, which starts at crown_base
@@ -122,6 +130,36 @@ roots = place("A_trunk_roots", "trunk_roots", loc=(0, P["tree_y"], 0), scale=P["
 ks = (P["tree_h"] - P["crown_base"]) / src["crown"].dimensions.z
 crown = place("A_crown", "crown", loc=(0, P["tree_y"], P["crown_base"]), scale=(ks * P["crown_xy"], ks * P["crown_xy"], ks))
 bpy.context.view_layer.update()
+if P["join"]:  # tuck the crown's flare inside the trunk (see the knob)
+    J = P["join"]
+    crown.data = crown.data.copy()
+    rmw = np.array(roots.matrix_world)
+    rco = np.empty(len(roots.data.vertices) * 3)
+    roots.data.vertices.foreach_get("co", rco)
+    rw = rco.reshape(-1, 3) @ rmw[:3, :3].T + rmw[:3, 3]
+    ax = (roots.location.x, roots.location.y)
+    rd = np.hypot(rw[:, 0] - ax[0], rw[:, 1] - ax[1])
+    zs = np.arange(J["z_from"], J["top"] + J["blend"] + 0.31, 0.1)
+    prof = np.array([np.percentile(rd[b_], J["pct"]) if (b_ := (np.abs(rw[:, 2] - z) < 0.08) & (rd < 2.5)).sum() > 10 else np.nan for z in zs])
+    ok_ = ~np.isnan(prof)
+    prof = np.interp(zs, zs[ok_], prof[ok_])
+    cmw, cinv = crown.matrix_world.copy(), crown.matrix_world.inverted()
+    tucked = 0
+    for v in crown.data.vertices:
+        w = cmw @ v.co
+        if w.z > J["top"] + J["blend"]:
+            continue
+        d = math.hypot(w.x - ax[0], w.y - ax[1])
+        rt = float(np.interp(w.z, zs, prof)) - J["inset_m"]
+        if d > J["near_m"] or d <= rt or d < 1e-6:
+            continue
+        t = 1.0 if w.z <= J["top"] else 1.0 - (w.z - J["top"]) / J["blend"]
+        k = (d + (rt - d) * t) / d
+        w.x, w.y = ax[0] + (w.x - ax[0]) * k, ax[1] + (w.y - ax[1]) * k
+        v.co = cinv @ w
+        tucked += 1
+    crown.data.update()
+    out["join"] = {"crown_vertices_tucked": tucked, "trunk_r50_m": {f"{z:.1f}": round(float(r), 2) for z, r in zip(zs[::4], prof[::4])}}
 Cw = Vector(cam.C)
 fwd = Vector(cam.ray([(C["size_px"][0] / 2, C["size_px"][1] / 2)])[0])
 
@@ -173,86 +211,87 @@ for inst in stones:
     place("A_" + inst["id"], "runestone", loc=(pos.x, pos.y, pos.z - P["stone_sink"]), scale=(s, s, s))
     out["stones"][inst["id"]] = {"pos_m": [round(v, 2) for v in pos], "how": how}
 
-# the pool. a01-a06 searched for it from the pool's pixels; at this view angle a pixel's ground point slides metres in depth, and the
-# pool ended up under the centre stone (a06). a07: as in the input, the waterfall drops from just below the centre stone into the
-# pool's back edge: the pool is an ellipse w x d on the ground right in front of that stone.
-PP = P["pool"]
-sc_ = bpy.data.objects["A_runestone_c"].location
-pw, pd = PP["size_m"]
-pc = np.array([sc_.x, sc_.y - PP["gap_m"] - pd / 2])
-rnd_p = random.Random(7)
-edge_xy = []
-for a in np.linspace(0, 2 * math.pi, 32, endpoint=False):
-    k = 1.0 + rnd_p.uniform(-0.08, 0.08)
-    edge_xy.append((float(pc[0] + math.cos(a) * pw / 2 * k), float(pc[1] + math.sin(a) * pd / 2 * k)))
-floor_z = PP["floor_z"]
+if P["water"]:  # the pool's place, the rocks lowered in front of it, the bay cut in the roots
+    # the pool. a01-a06 searched for it from the pool's pixels; at this view angle a pixel's ground point slides metres in depth, and the
+    # pool ended up under the centre stone (a06). a07: as in the input, the waterfall drops from just below the centre stone into the
+    # pool's back edge: the pool is an ellipse w x d on the ground right in front of that stone.
+    PP = P["pool"]
+    sc_ = bpy.data.objects["A_runestone_c"].location
+    pw, pd = PP["size_m"]
+    pc = np.array([sc_.x, sc_.y - PP["gap_m"] - pd / 2])
+    rnd_p = random.Random(7)
+    edge_xy = []
+    for a in np.linspace(0, 2 * math.pi, 32, endpoint=False):
+        k = 1.0 + rnd_p.uniform(-0.08, 0.08)
+        edge_xy.append((float(pc[0] + math.cos(a) * pw / 2 * k), float(pc[1] + math.sin(a) * pd / 2 * k)))
+    floor_z = PP["floor_z"]
 
-# the rocks in front of and under the pool: the input's front is open (low paving, one front boulder). Lower every rockery vertex in
-# that corridor above `cap` (relief kept at `keep`), with a soft edge. On the copy made above; vertices are in local space (scale z).
-inv = rockery.matrix_world.inverted()
-mw = rockery.matrix_world
-cap, keep, soft = floor_z + PP["front_cap_m"], PP["front_keep"], PP["front_soft_m"]
-lowered = 0
-for v in rockery.data.vertices:
-    wv = mw @ v.co
-    dx = abs(wv.x - pc[0]) - (pw / 2 + PP["front_margin_m"])
-    dy = (wv.y - (pc[1] + pd / 2 + PP["front_margin_m"]))  # > 0: behind the pool (untouched)
-    out_dist = max(dx, dy, 0.0)
-    if out_dist >= soft or wv.z <= cap:
-        continue
-    wt = 1.0 - out_dist / soft
-    wt = wt * wt * (3 - 2 * wt)
-    z_new = cap + (wv.z - cap) * keep
-    wv.z = wv.z * (1 - wt) + z_new * wt
-    v.co = inv @ wv
-    lowered += 1
-# a08: inside the pool's own outline the rocks go under the water (a07: lowered to 0.35 m they still covered it, 0 % seen)
-pressed = 0
-for v in rockery.data.vertices:
-    wv = mw @ v.co
-    e = math.hypot((wv.x - pc[0]) / (pw / 2), (wv.y - pc[1]) / (pd / 2))
-    if e >= 1.12 or wv.z <= floor_z:
-        continue
-    wt = 1.0 if e <= 0.95 else (1.12 - e) / 0.17
-    wv.z = wv.z * (1 - wt) + (floor_z - 0.03 + (wv.z - floor_z) * 0.03) * wt
-    v.co = inv @ wv
-    pressed += 1
-rockery.data.update()
-out["rocks_pressed_under_water"] = pressed
-out["rocks_lowered"] = lowered
+    # the rocks in front of and under the pool: the input's front is open (low paving, one front boulder). Lower every rockery vertex in
+    # that corridor above `cap` (relief kept at `keep`), with a soft edge. On the copy made above; vertices are in local space (scale z).
+    inv = rockery.matrix_world.inverted()
+    mw = rockery.matrix_world
+    cap, keep, soft = floor_z + PP["front_cap_m"], PP["front_keep"], PP["front_soft_m"]
+    lowered = 0
+    for v in rockery.data.vertices:
+        wv = mw @ v.co
+        dx = abs(wv.x - pc[0]) - (pw / 2 + PP["front_margin_m"])
+        dy = (wv.y - (pc[1] + pd / 2 + PP["front_margin_m"]))  # > 0: behind the pool (untouched)
+        out_dist = max(dx, dy, 0.0)
+        if out_dist >= soft or wv.z <= cap:
+            continue
+        wt = 1.0 - out_dist / soft
+        wt = wt * wt * (3 - 2 * wt)
+        z_new = cap + (wv.z - cap) * keep
+        wv.z = wv.z * (1 - wt) + z_new * wt
+        v.co = inv @ wv
+        lowered += 1
+    # a08: inside the pool's own outline the rocks go under the water (a07: lowered to 0.35 m they still covered it, 0 % seen)
+    pressed = 0
+    for v in rockery.data.vertices:
+        wv = mw @ v.co
+        e = math.hypot((wv.x - pc[0]) / (pw / 2), (wv.y - pc[1]) / (pd / 2))
+        if e >= 1.12 or wv.z <= floor_z:
+            continue
+        wt = 1.0 if e <= 0.95 else (1.12 - e) / 0.17
+        wv.z = wv.z * (1 - wt) + (floor_z - 0.03 + (wv.z - floor_z) * 0.03) * wt
+        v.co = inv @ wv
+        pressed += 1
+    rockery.data.update()
+    out["rocks_pressed_under_water"] = pressed
+    out["rocks_lowered"] = lowered
 
-# the bay: this root skirt (4.6 m) closes the front; cut an ellipsoid out of a COPY of the trunk mesh around the pool, reaching
-# forward from just behind the pool's back edge (the centre stone stands behind it, on roots that stay). Sized in metres (a06 sized it
-# from the pool's cast outline: 3.9 m, most front roots gone).
-if P["bay"]:
-    B = P["bay"]
-    roots.data = roots.data.copy()
-    import bmesh as _bm
+    # the bay: this root skirt (4.6 m) closes the front; cut an ellipsoid out of a COPY of the trunk mesh around the pool, reaching
+    # forward from just behind the pool's back edge (the centre stone stands behind it, on roots that stay). Sized in metres (a06 sized it
+    # from the pool's cast outline: 3.9 m, most front roots gone).
+    if P["bay"]:
+        B = P["bay"]
+        roots.data = roots.data.copy()
+        import bmesh as _bm
 
-    bm_ = bpy.data.meshes.new("bay_cutter")
-    b = _bm.new()
-    _bm.ops.create_icosphere(b, subdivisions=3, radius=1.0)
-    rx, ry, rz = pw / 2 + B["side_m"], pd / 2 + B["back_m"] / 2 + B["front_m"] / 2, B["height_m"]
-    for v in b.verts:
-        v.co = Vector((v.co.x * rx, v.co.y * ry, v.co.z * rz))
-    b.to_mesh(bm_)
-    b.free()
-    cutter = bpy.data.objects.new("bay_cutter", bm_)
-    back_y = pc[1] + pd / 2 + B["back_m"]
-    cutter.location = (float(pc[0]), float(back_y - ry), floor_z)
-    G.objects.link(cutter)
-    mod = roots.modifiers.new("bay", "BOOLEAN")
-    mod.operation, mod.solver, mod.object = "DIFFERENCE", "EXACT", cutter
-    for o in bpy.context.view_layer.objects:
-        o.select_set(False)
-    roots.select_set(True)
-    bpy.context.view_layer.objects.active = roots
-    t0 = len(roots.data.polygons)
-    bpy.ops.object.modifier_apply(modifier=mod.name)
-    bpy.data.objects.remove(cutter)
-    for p_ in roots.data.polygons:
-        p_.use_smooth = False
-    out["bay"] = {"faces_before": t0, "faces_after": len(roots.data.polygons), "radii_m": [round(rx, 2), round(ry, 2), rz]}
+        bm_ = bpy.data.meshes.new("bay_cutter")
+        b = _bm.new()
+        _bm.ops.create_icosphere(b, subdivisions=3, radius=1.0)
+        rx, ry, rz = pw / 2 + B["side_m"], pd / 2 + B["back_m"] / 2 + B["front_m"] / 2, B["height_m"]
+        for v in b.verts:
+            v.co = Vector((v.co.x * rx, v.co.y * ry, v.co.z * rz))
+        b.to_mesh(bm_)
+        b.free()
+        cutter = bpy.data.objects.new("bay_cutter", bm_)
+        back_y = pc[1] + pd / 2 + B["back_m"]
+        cutter.location = (float(pc[0]), float(back_y - ry), floor_z)
+        G.objects.link(cutter)
+        mod = roots.modifiers.new("bay", "BOOLEAN")
+        mod.operation, mod.solver, mod.object = "DIFFERENCE", "EXACT", cutter
+        for o in bpy.context.view_layer.objects:
+            o.select_set(False)
+        roots.select_set(True)
+        bpy.context.view_layer.objects.active = roots
+        t0 = len(roots.data.polygons)
+        bpy.ops.object.modifier_apply(modifier=mod.name)
+        bpy.data.objects.remove(cutter)
+        for p_ in roots.data.polygons:
+            p_.use_smooth = False
+        out["bay"] = {"faces_before": t0, "faces_after": len(roots.data.polygons), "radii_m": [round(rx, 2), round(ry, 2), rz]}
 
 bpy.context.view_layer.update()
 ground, gverts, gpolys = world_bvh([rockery, roots])
@@ -273,57 +312,58 @@ for inst in stones:
         o.location.z = h - P["stone_sink"]
         out["stones"][inst["id"]]["how"] += "; dropped after the cuts"
 
-pz = floor_z + PP["z_above_floor"]
-vis = sum(seen(Vector((x, y, pz))) for x, y in edge_xy + [tuple(pc)]) / (len(edge_xy) + 1)
-edge = [(x, y, pz) for x, y in edge_xy]
-ctr = np.array([pc[0], pc[1], pz])
-me = bpy.data.meshes.new("water")
-me.from_pydata([tuple(ctr)] + edge, [], [(0, 1 + i, 1 + (i + 1) % len(edge)) for i in range(len(edge))])
-# a09 (judge a08: flat opaque bright cyan; the input's water is teal with darker depth and a lighter rim): a centre-to-rim gradient
-ca = me.color_attributes.new("depth", "FLOAT_COLOR", "POINT")
-ca.data[0].color = (*srgb(22, 92, 96), 1)
-for i in range(1, len(me.vertices)):
-    ca.data[i].color = (*srgb(92, 178, 172), 1)
-wm = bpy.data.materials.get("M_recon_water") or bpy.data.materials.new("M_recon_water")
-wb = next(n for n in wm.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
-an = wm.node_tree.nodes.new("ShaderNodeAttribute")
-an.attribute_type, an.attribute_name = "GEOMETRY", "depth"
-wm.node_tree.links.new(an.outputs["Color"], wb.inputs["Base Color"])
-wm.node_tree.links.new(an.outputs["Color"], wb.inputs["Emission Color"])
-wb.inputs["Emission Strength"].default_value, wb.inputs["Roughness"].default_value = 0.12, 0.1
-me.materials.append(wm)
-pool = bpy.data.objects.new("A_water", me)
-G.objects.link(pool)
-out["pool"] = {"centre_m": [round(float(v), 2) for v in ctr], "size_m": [pw, pd], "seen_fraction": round(float(vis), 2)}
+if P["water"]:  # pool, waterfall and foam
+    pz = floor_z + PP["z_above_floor"]
+    vis = sum(seen(Vector((x, y, pz))) for x, y in edge_xy + [tuple(pc)]) / (len(edge_xy) + 1)
+    edge = [(x, y, pz) for x, y in edge_xy]
+    ctr = np.array([pc[0], pc[1], pz])
+    me = bpy.data.meshes.new("water")
+    me.from_pydata([tuple(ctr)] + edge, [], [(0, 1 + i, 1 + (i + 1) % len(edge)) for i in range(len(edge))])
+    # a09 (judge a08: flat opaque bright cyan; the input's water is teal with darker depth and a lighter rim): a centre-to-rim gradient
+    ca = me.color_attributes.new("depth", "FLOAT_COLOR", "POINT")
+    ca.data[0].color = (*srgb(22, 92, 96), 1)
+    for i in range(1, len(me.vertices)):
+        ca.data[i].color = (*srgb(92, 178, 172), 1)
+    wm = bpy.data.materials.get("M_recon_water") or bpy.data.materials.new("M_recon_water")
+    wb = next(n for n in wm.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
+    an = wm.node_tree.nodes.new("ShaderNodeAttribute")
+    an.attribute_type, an.attribute_name = "GEOMETRY", "depth"
+    wm.node_tree.links.new(an.outputs["Color"], wb.inputs["Base Color"])
+    wm.node_tree.links.new(an.outputs["Color"], wb.inputs["Emission Color"])
+    wb.inputs["Emission Strength"].default_value, wb.inputs["Roughness"].default_value = 0.12, 0.1
+    me.materials.append(wm)
+    pool = bpy.data.objects.new("A_water", me)
+    G.objects.link(pool)
+    out["pool"] = {"centre_m": [round(float(v), 2) for v in ctr], "size_m": [pw, pd], "seen_fraction": round(float(vis), 2)}
 
-# waterfall: a ribbon from under the centre runestone down to the pool's back edge
-cst = bpy.data.objects["A_runestone_c"].location
-top = Vector((cst.x, cst.y - 0.35, cst.z + 0.25))
-back = max(edge, key=lambda e: e[1])
-bot = Vector((ctr[0], back[1] - 0.25, pz))
-n, w = 8, 0.32   # a08: the input's fall is a thin strand (a07: 0.5 m read as a lit panel)
-verts, faces = [], []
-for i in range(n + 1):
-    t = i / n
-    p = top.lerp(bot, t) + Vector((0, -0.35 * math.sin(t * math.pi) * (1 - t), 0))  # leans out, then drops
-    ww = w * (0.35 + 0.9 * t)   # a09: tapered (judge a08: a straight plank)
-    verts += [(p.x - ww / 2, p.y, p.z), (p.x + ww / 2, p.y, p.z)]
-    if i:
-        faces.append((2 * i - 2, 2 * i - 1, 2 * i + 1, 2 * i))
-mf = bpy.data.meshes.new("waterfall")
-mf.from_pydata(verts, [], faces)
-fm = flat_mat("M_recon_waterfall", srgb(190, 228, 230), rough=0.2, emit=srgb(170, 225, 228), strength=0.2)
-fb = next(n for n in fm.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
-fb.inputs["Alpha"].default_value = 0.7  # a09: some see-through (judge a08: opaque)
-mf.materials.append(fm)
-# foam where it lands (judge a08)
-foam = bpy.data.meshes.new("foam")
-fv = [(bot.x + math.cos(a) * 0.45, bot.y + math.sin(a) * 0.3, pz + 0.02) for a in np.linspace(0, 2 * math.pi, 16, endpoint=False)]
-foam.from_pydata([(bot.x, bot.y, pz + 0.02)] + fv, [], [(0, 1 + i, 1 + (i + 1) % 16) for i in range(16)])
-foam.materials.append(flat_mat("M_recon_foam", srgb(225, 240, 240), rough=0.6))
-G.objects.link(bpy.data.objects.new("A_foam", foam))
-fall = bpy.data.objects.new("A_waterfall", mf)
-G.objects.link(fall)
+    # waterfall: a ribbon from under the centre runestone down to the pool's back edge
+    cst = bpy.data.objects["A_runestone_c"].location
+    top = Vector((cst.x, cst.y - 0.35, cst.z + 0.25))
+    back = max(edge, key=lambda e: e[1])
+    bot = Vector((ctr[0], back[1] - 0.25, pz))
+    n, w = 8, 0.32   # a08: the input's fall is a thin strand (a07: 0.5 m read as a lit panel)
+    verts, faces = [], []
+    for i in range(n + 1):
+        t = i / n
+        p = top.lerp(bot, t) + Vector((0, -0.35 * math.sin(t * math.pi) * (1 - t), 0))  # leans out, then drops
+        ww = w * (0.35 + 0.9 * t)   # a09: tapered (judge a08: a straight plank)
+        verts += [(p.x - ww / 2, p.y, p.z), (p.x + ww / 2, p.y, p.z)]
+        if i:
+            faces.append((2 * i - 2, 2 * i - 1, 2 * i + 1, 2 * i))
+    mf = bpy.data.meshes.new("waterfall")
+    mf.from_pydata(verts, [], faces)
+    fm = flat_mat("M_recon_waterfall", srgb(190, 228, 230), rough=0.2, emit=srgb(170, 225, 228), strength=0.2)
+    fb = next(n for n in fm.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
+    fb.inputs["Alpha"].default_value = 0.7  # a09: some see-through (judge a08: opaque)
+    mf.materials.append(fm)
+    # foam where it lands (judge a08)
+    foam = bpy.data.meshes.new("foam")
+    fv = [(bot.x + math.cos(a) * 0.45, bot.y + math.sin(a) * 0.3, pz + 0.02) for a in np.linspace(0, 2 * math.pi, 16, endpoint=False)]
+    foam.from_pydata([(bot.x, bot.y, pz + 0.02)] + fv, [], [(0, 1 + i, 1 + (i + 1) % 16) for i in range(16)])
+    foam.materials.append(flat_mat("M_recon_foam", srgb(225, 240, 240), rough=0.6))
+    G.objects.link(bpy.data.objects.new("A_foam", foam))
+    fall = bpy.data.objects.new("A_waterfall", mf)
+    G.objects.link(fall)
 
 # ivy: leaf clusters on up-facing rock / root faces that the input paints as ivy (their pixel in the ID map)
 rnd = random.Random(P["ivy"]["seed"])
