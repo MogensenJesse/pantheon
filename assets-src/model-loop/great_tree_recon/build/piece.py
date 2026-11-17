@@ -80,15 +80,22 @@ KNOBS = {
         # roots are thick in this mesh: no inflate. Islands under 2 % of the triangles go unless they span a quarter of the piece
         imp=dict(min_face_frac=0.02, min_diag_frac=0.25),
         settle=dict(drop_below=0.002, overlap_m=0.03), drop_overlaps=True,
-        texture="textures/bark.png",
+        # r06 (user: "revisit the bark texture"): textures/bark_v2a.png (GPT, from a crop of the input's trunk): long plates running top to
+        # bottom with thin dark seams (tiled 5.5 m: plates about 0.3 m). The old bark.png had HORIZONTAL streaks (the first run modelled its limbs lengthwise along X), so the
+        # box projection wrapped them round the vertical trunk: the judges' "pinstripe lathe marks". Plates are ~1/16 of the image -> tile
+        # 3.6 m for plates about 0.22 m wide; the texture's own contrast kept (tex_contrast 0.9, it was flattened to 0.35)
+        texture="textures/bark_v2a.png",
         # r02 judge: bark close but slightly light, yellow and uniform -> about #7A6F58 with a cooler grey-olive cast, 10-15 % value change from
         # plate to plate (face_var on the planar facets)
         # r04 (judge r03: faint fine parallel lines across the limbs; bark slightly warm and brown, reference about RGB 120,112,90) -> flatter
         # texture, a little greyer
         # r04 tried tex_contrast 0.2, tex_sat 0.55, tint (0.92, 0.94, 0.93), gain 0.82, face_var 0.14: stripes judged fixed, but the round
         # scored 5.1 against r03's 5.6 (on an unchanged mesh: judge noise). Back to r03 (best), per model-loop's rule.
-        mat=dict(tile_m=1.1, mask="curv", ridge=0.10, crease=0.35, top_light=0.15, ao=0.15, tex_contrast=0.35, tex_sat=0.65,
-                 tint=(0.93, 0.94, 0.92), gain=0.80, face_var=0.13),
+        # (first look at 3.6 m: plates about 0.1 m, the input's 0.25-0.3 m; measured on the trunk through the input camera: mid #4b473d vs
+        # #40403b, side #37352c vs #30322d (ours warm, the input's grey-green), lit #5b564b vs #766d5a) -> wider plates, full texture
+        # contrast, cooler, a little more edge light
+        mat=dict(tile_m=5.5, mask="curv", ridge=0.13, crease=0.35, top_light=0.15, ao=0.15, tex_contrast=1.0, tex_sat=0.85,
+                 tint=(0.94, 0.98, 0.98), gain=0.76, face_var=0.08),
         # r02 judge: the bump read as "a fine pinstripe wrapping round the limbs like lathe marks" -> off; the facets carry the relief
         bump=None,
         # r02 judge: moss soft-edged now but saturated yellow-green in large patches -> desaturated olive (#6B6F45), 10-15 % cover, 30-50 % blend
@@ -107,11 +114,12 @@ KNOBS = {
         # trunk judge asked for in r02
         planar_deg=6.0, shade="flat",
         imp=dict(min_face_frac=0.004, min_diag_frac=0.06),
-        texture="textures/bark.png",
+        # r05: the trunk's new bark (bark_v2a.png, see trunk_roots r06); limbs are thinner: tile 3 m
+        texture="textures/bark_v2a.png",
         # r02 tried tex_contrast 0.18, tex_sat 0.45, ridge 0.03, gain 1.15: lit bark went near white, the round scored 5.0 against r01's 5.5 ->
         # back to r01's bark (r03)
-        mat=dict(tile_m=1.1, mask="curv", ridge=0.10, crease=0.3, top_light=0.15, ao=0.12, tex_contrast=0.5, tex_sat=0.7,
-                 tint=(0.92, 0.94, 0.96), gain=1.3, face_var=0.10),
+        mat=dict(tile_m=4.5, mask="curv", ridge=0.13, crease=0.3, top_light=0.15, ao=0.12, tex_contrast=1.0, tex_sat=0.85,
+                 tint=(0.94, 0.98, 0.98), gain=1.05, face_var=0.08),
         bump=None,
         # r04: the moss paints textures/moss_olive.png (see trunk_roots); gain for srgb 92/98/50
         moss=dict(col=srgb(92, 98, 50), thresh=0.66, soft=0.14, scale=0.9, w_up=0.25, up_min=0.2, up_soft=0.5, strength=0.5,

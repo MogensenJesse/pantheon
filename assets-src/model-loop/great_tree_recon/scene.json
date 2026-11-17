@@ -88,9 +88,10 @@
    "note": "GPT Image from input.png, seamless (2026-11-17); painted by piece.py soft_moss through each piece's moss mask (trunk r05, crown r04, rockery r03). textures/moss.png (the temple's bright moss) is no longer used."
   },
   "bark": {
-   "texture": "textures/bark.png",
-   "tile_m": 1.2,
-   "roughness": 0.88
+   "texture": "textures/bark_v2a.png",
+   "tile_m": 5.5,
+   "roughness": 1.0,
+   "note": "2026-11-17: GPT Image from a crop of the input's trunk; long plates running top to bottom. Replaces textures/bark.png, whose streaks ran horizontally (the first run modelled its limbs lengthwise) and wrapped round the vertical trunk as stripes. Measured on the trunk through the input camera: side #35352b / mid #49473e / lit #5b574d against the input's #30322d / #40403b / #766d5a."
   },
   "leaf": {
    "texture": "textures/leaf.png",
@@ -396,7 +397,8 @@
     ]
    },
    "last_round": "r04 (5.1, reverted)",
-   "moss_texture_round": "r05 (best-round knobs, moss now textured; not judged)"
+   "moss_texture_round": "r05 (best-round knobs, moss now textured; not judged)",
+   "bark_round": "r06 (best-round knobs, new bark texture; not judged)"
   },
   {
    "id": "crown",
@@ -480,7 +482,8 @@
    },
    "last_score": 5.5,
    "last_round": "r02 (5.0, reverted); r03 = r01 + skirt fix near the trunk, not judged on its own",
-   "moss_texture_round": "r04 (best-round knobs, moss now textured; not judged)"
+   "moss_texture_round": "r04 (best-round knobs, moss now textured; not judged)",
+   "bark_round": "r05 (best-round knobs, new bark texture; not judged)"
   },
   {
    "id": "leaf_pad",
@@ -675,9 +678,9 @@
  "assembly": {
   "build": "build/assemble.py",
   "blend": "great_tree_recon_scene.blend",
-  "latest": "a12",
-  "render": "renders/scene/a12_cam.png (ignored; copy in review_assembly_a12.png)",
-  "status": "a12 not judged. Judged: a08 5.6 (wrong camera), a10 5.5. a11 = a10 without the water, trunk join fixed; a12 = a11 with textured moss and ivy.",
+  "latest": "a13",
+  "render": "renders/scene/a13_cam.png (ignored; copy in review_assembly_a13.png; trunk close-up in review_bark_a12_a13.png)",
+  "status": "a13 not judged. Judged: a08 5.6 (wrong camera), a10 5.5. a11 no water + trunk join; a12 textured moss and ivy; a13 new bark.",
   "placement": {
    "rockery": "tile centre, squashed to 3.4 m",
    "tree (trunk_roots + crown)": "1.3 m behind the tile centre; crown from z = 4.3 m, scaled so the tree is 10.5 m",

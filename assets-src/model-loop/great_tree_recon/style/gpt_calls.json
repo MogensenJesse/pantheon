@@ -128,5 +128,47 @@
   "quality": "medium",
   "derived": "textures/ivy_leaf.png (white keyed to alpha, cropped square, 512 px)",
   "prompt": "From this image, paint ONE single ivy leaf like the small ivy leaves climbing the tree roots and rocks: a pointed three- to five-lobed leaf with a short stem, seen flat from straight above, centred, filling most of the frame with a small margin, stem pointing straight down. Same hand-painted low-poly style and the same greens as the image: dark green with lighter yellow-green on the upper lobes and a lighter midrib. Pure flat white background, no shadow, no other leaves, no text."
+ },
+ "textures/bark_v2a.png": {
+  "image": "a crop of input.png around the trunk (x 640-900, y 140-470)",
+  "size": "1024x1024",
+  "model": "gpt-image-2",
+  "quality": "medium",
+  "tile": true,
+  "result": {
+   "mean": [
+    107,
+    100,
+    85
+   ],
+   "stdev": [
+    16,
+    14,
+    11
+   ]
+  },
+  "used": "trunk_roots r06, crown r05 (tiled 5.5 m / 4.5 m)",
+  "prompt": "Paint the bark of this tree as a seamless tileable texture filling the whole frame: flat albedo colour only, seen straight on, no lighting, no shadows, no perspective, no objects, no moss, no leaves, no carving. Long bark plates running strictly top to bottom, each plate 3 to 5 times longer than it is wide, chiselled into a few flat facets in the same hand-painted low-poly game style as the image, separated by thin dark seams and occasional short cross-breaks. Cool grey-olive taupe, not warm, not pink: plate base RGB 104/98/80, lighter facets 136/128/104, seams RGB 56/56/48. Clearly visible plates and seams, medium contrast."
+ },
+ "textures/bark_v2b.png": {
+  "image": "the same crop",
+  "size": "1024x1024",
+  "model": "gpt-image-2",
+  "quality": "medium",
+  "tile": true,
+  "result": {
+   "mean": [
+    96,
+    87,
+    72
+   ],
+   "stdev": [
+    15,
+    12,
+    9
+   ]
+  },
+  "used": "no (the alternative candidate: stripier, read as conifer ridges)",
+  "prompt": "Paint the bark of this tree as a seamless tileable texture filling the whole frame: flat albedo colour only, seen straight on, no lighting, no shadows, no perspective, no objects, no moss, no leaves, no carving. Broad painterly bark plates running strictly top to bottom, irregular widths, softly faceted with flat planes, darker grooves between them and a few lighter worn ridges, hand-painted stylised game texture as in the image. Grey-brown olive taupe, slightly cool: base RGB 98/92/76, lighter ridges 132/124/100, grooves RGB 60/58/50. Low noise, readable at a distance."
  }
 }
