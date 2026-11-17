@@ -3,6 +3,7 @@ import type { DirectionalLight, PerspectiveCamera, Scene, Texture, Vector3 } fro
 import type { WebGPURenderer } from 'three/webgpu';
 import type { AaMethod, UpscalingSettings } from '../config/visualTuning';
 import type { BloomParams } from './postfx/bloomParams';
+import type { PainterlyParams } from './postfx/controls/painterlyControls';
 import { createPostFxPipeline, disposePostFxPipeline } from './postfx/createPostFxPipeline';
 import type { DofParams } from './postfx/dofParams';
 import type { GodraysParams } from './postfx/godraysParams';
@@ -10,6 +11,7 @@ import type { GpuDebugTargets } from './postfx/postfxDevDebug';
 
 export type { AaMethod, UpscalingSettings } from '../config/visualTuning';
 export type { BloomParams } from './postfx/bloomParams';
+export type { PainterlyParams } from './postfx/controls/painterlyControls';
 export type { DofParams } from './postfx/dofParams';
 export type { GodraysParams } from './postfx/godraysParams';
 export type { GpuDebugTargets };
@@ -55,6 +57,9 @@ export interface PostFXContext {
   resetDofParams: () => void;
   getUpscalingSettings: () => UpscalingSettings;
   setUpscalingSettings: (params: Partial<UpscalingSettings>) => void;
+  getPainterlyParams: () => PainterlyParams;
+  setPainterlyParams: (params: Partial<PainterlyParams>) => void;
+  resetPainterlyParams: () => void;
   getAaMethod: () => AaMethod;
   setAaMethod: (method: AaMethod) => void;
   logGpuInfo: () => void;

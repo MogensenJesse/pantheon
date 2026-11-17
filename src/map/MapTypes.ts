@@ -89,6 +89,8 @@ export type MapEntity =
       rotY?: number;
       /** Size of the whole landmark (> 0): its models, their spread and their lift. Omit → 1. */
       scale?: number;
+      /** Extra height (m, + up, - down) of its models over the stand-in table's own lift. Omit → 0. */
+      surfaceLift?: number;
       kind: LandmarkKind;
     };
 

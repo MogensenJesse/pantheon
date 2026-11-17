@@ -146,7 +146,8 @@ function birchEntries(): NaturePropAssetEntry[] {
   return [
     prop('birch_web', 'birch1', 'autumn_birch_web', 'FOREST', 3),
     prop('birch_pendula', 'birch2', 'autumn_birch_betula_pendula', 'FOREST', 3),
-    // The tree landmark: birch 1 with a glowing bind rune on its trunk (`assets-src/landmarks`). Weight 0: never scattered.
+    // The former tree landmark stand-in: birch 1 with a glowing bind rune on its trunk (`assets-src/landmarks`); the tree
+    // is `great_tree` now (structures below), this one is unused but kept. Weight 0: never scattered.
     prop('birch_rune', 'landmarks', 'birch_rune', 'FOREST', 0),
   ];
 }
@@ -239,6 +240,8 @@ const STRUCTURE_HEIGHT_M = {
   ruin: 6,
   /** The sunken ruin landmark at its true size (about 16 x 16 m, 7.9 m to the dragon heads). */
   sunkenRuin: 7.87,
+  /** The great tree landmark at its true size (about 11 x 12 m, 10.4 m to the crown's top). */
+  greatTree: 10.38,
 } as const;
 
 function structureProp(
@@ -270,6 +273,8 @@ export const ASSET_MANIFEST = {
       'SHORE',
       'landmarks',
     ),
+    // The great tree landmark (`assets-src/landmarks/great_tree_build.py`, from the scene-recon assembly).
+    structureProp('great_tree', 'great_tree', STRUCTURE_HEIGHT_M.greatTree, 'FOREST', 'landmarks'),
   ],
 } as const;
 

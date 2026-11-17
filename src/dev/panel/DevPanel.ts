@@ -17,6 +17,7 @@ import { initDevPanelHaze } from './devPanelHaze';
 import { initDevPanelLife } from './devPanelLife';
 import { initDevPanelMapEditor } from './devPanelMapEditor';
 import { initDevPanelOrganicOrb } from './devPanelOrganicOrb';
+import { initDevPanelPainterly } from './devPanelPainterly';
 import { initPerformancePanel } from './devPanelPerformance';
 import { type DevPanelPropLodContext, initDevPanelPropLod } from './devPanelPropLod';
 import { type DevPanelShadowContext, initDevPanelShadows } from './devPanelShadows';
@@ -81,6 +82,7 @@ export function initDevPanel(
   disposers.push(initDevPanelGodrays(panel, postFX, skyCtx?.sun));
   disposers.push(initDevPanelHaze(panel));
   disposers.push(initDevPanelDof(panel, postFX));
+  disposers.push(initDevPanelPainterly(panel, postFX));
 
   disposers.push(initDevPanelMapEditor(panel));
   if (terrainCtx) {

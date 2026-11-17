@@ -1,5 +1,7 @@
 // scripts/checks/map/map-entities-check.ts — map entity validation and the editor palette's landmark entries
 import assert from 'node:assert/strict';
+import { EditorEntityStore } from '../../../src/editor/core/EditorEntityStore.ts';
+import { readEntityHeight, setEntityHeight } from '../../../src/editor/place/entityHeight.ts';
 import { LANDMARK_STAND_INS } from '../../../src/landmarks/landmarkStandIns.ts';
 import {
   EDITOR_PALETTE,
@@ -36,6 +38,34 @@ await check('a landmark size is optional, but when given it is a positive number
     assert.ok(!isValidMapEntity({ type: 'landmark', x: 1, z: 2, scale, kind: 'tree' }), `${scale}`);
   }
 });
+
+await check('a landmark height is optional, but when given it is a finite number', () => {
+  for (const surfaceLift of [-2.3, 0, 4]) {
+    assert.ok(isValidMapEntity({ type: 'landmark', x: 1, z: 2, surfaceLift, kind: 'tree' }));
+  }
+  for (const surfaceLift of [Number.NaN, Number.POSITIVE_INFINITY, '1']) {
+    assert.ok(!isValidMapEntity({ type: 'landmark', x: 1, z: 2, surfaceLift, kind: 'tree' }));
+  }
+});
+
+await check(
+  'the editor height panel sets, shares and resets a height on props and landmarks only',
+  () => {
+    const store = new EditorEntityStore();
+    const prop = store.add({ type: 'prop', key: 'stone_big_1', x: 0, z: 0, rotY: 0, scale: 1 });
+    const tree = store.add({ type: 'landmark', kind: 'tree', x: 5, z: 5 });
+    const orb = store.add({ type: 'orb', x: 9, z: 9 });
+    const all = [prop, tree, orb];
+    assert.deepEqual(readEntityHeight(store, all), { count: 2, liftM: 0 });
+    assert.deepEqual(setEntityHeight(store, all, 2.5), [prop, tree], 'the orb has no height');
+    assert.deepEqual(readEntityHeight(store, all), { count: 2, liftM: 2.5 });
+    setEntityHeight(store, [tree], -1);
+    assert.equal(readEntityHeight(store, all).liftM, null, 'different heights read as mixed');
+    setEntityHeight(store, all, null);
+    assert.deepEqual(readEntityHeight(store, all), { count: 2, liftM: 0 });
+    assert.ok(!JSON.stringify(store.serialize()).includes('surfaceLift'), 'reset saves no height');
+  },
+);
 
 await check('a map holds each landmark kind at most once', () => {
   const all = LANDMARK_KINDS.map((kind, i) => ({ type: 'landmark', x: i, z: i, kind }));

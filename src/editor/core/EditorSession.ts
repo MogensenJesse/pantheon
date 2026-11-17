@@ -38,6 +38,7 @@ import {
   setTerrainBiomeDebugVisible,
 } from '../../world/MapTerrainBuilder';
 import { createEditorPlaceMode } from '../place/EditorPlaceMode';
+import { createEntityHeightEditor } from '../place/entityHeight';
 import { bindActivePlaceOptionsModel, createPlaceOptionsModel } from '../place/placeOptions';
 import { createEditorGridHistory } from '../session/editorGridHistory';
 import { createEditorMapReload, type EditorMapMetaState } from '../session/editorMapReload';
@@ -255,6 +256,7 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
       entityCount: entityStore.size,
     });
     chrome?.refreshFillEstimate();
+    chrome?.heightProps.refresh();
   };
 
   let sunPhase = 0.5;
@@ -393,6 +395,16 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
   const unsubHistory = history.subscribe(syncChrome);
   const unbindHistoryKeys = history.bindKeyboard();
 
+  const heightEditor = createEntityHeightEditor({
+    store: entityStore,
+    history,
+    redraw: (uids) => {
+      for (const uid of uids) placeMode.preview.applyEntityTransform(uid);
+      placeMode.gizmo.update();
+    },
+    onCommitted: syncChrome,
+  });
+
   placeMode = createEditorPlaceMode(
     scene,
     assets,
@@ -403,8 +415,10 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
     editorCam.isSpaceHeld,
     pointerRouter,
     (uids) => {
+      heightEditor.setSelection(uids);
       placeMode.gizmo.setSelectedUids(uids);
       store.patch({ selectionCount: uids.length });
+      chrome?.heightProps.refresh();
     },
     history,
   );
@@ -548,6 +562,7 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
         syncChrome();
       },
     },
+    heightHandlers: heightEditor,
     placeHandlers: {
       getBrushRadius: () => brushRadius,
       onBrushRadius: setBrushRadius,

@@ -25,7 +25,7 @@ type StandIn = {
 };
 
 /**
- * A ring of floating runic stones, a great birch, a ruined temple, a half-sunken Norse temple (its own model, sunk a
+ * A ring of floating runic stones, the great tree (its own model), a ruined temple, a half-sunken Norse temple (its own model, sunk a
  * little so its podium sits in the ground or the water) and a tall rock. The runestones hover `LOOK.hover.liftM` over the ground (the lift is in their instance matrix, so their
  * shadows fall at the hover height) and the prop shader bobs them (the key says so: `config/propHover.ts`).
  */
@@ -49,7 +49,11 @@ export const LANDMARK_STAND_INS: Record<LandmarkKind, readonly StandIn[]> = {
       surfaceLift: LOOK.hover.liftM,
     },
   ],
-  tree: [{ key: 'birch_rune', scale: 3 }],
+  // `assets-src/landmarks/great_tree_build.py` (true size in metres, about 11 x 12 m, 10.4 m tall): twice that, so the old
+  // tree stands over the village. Its rockery has a flat base, so it is sunk until the base is under the lowest ground of
+  // its footprint (measured on island-mountain, 2026-11-17: the ground falls 2.4 m below the centre downhill; the lift
+  // grows with the map's landmark scale, 1.22 there).
+  tree: [{ key: 'great_tree', scale: 2, surfaceLift: -2.3 }],
   temple_ruin: [{ key: 'temple_ruin', scale: 1 }],
   // `assets-src/landmarks/sunken_ruin_build.py` (true size in metres, about 17 x 16 m): half of its 0.8 m podium sunk.
   sunken_ruin: [{ key: 'sunken_ruin', scale: 1, surfaceLift: -0.4 }],
@@ -98,8 +102,9 @@ export const LANDMARK_RESTORE_PROPS: Record<
   Record<RestorePhase, readonly StandIn[]>
 > = {
   tree: {
-    inProgress: ring('stone_small_2', 0.8, 5, 6),
-    restored: [...ring('stone_runic_2', 0.9, 7, 6), ...ring('stone_small_3', 0.9, 5.5, 14)],
+    // Outside the rockery's rim (about 12 m from the tree's centre at twice its size).
+    inProgress: ring('stone_small_2', 0.8, 13, 8),
+    restored: [...ring('stone_runic_2', 0.9, 15, 6), ...ring('stone_small_3', 0.9, 13.5, 14)],
   },
   runestones: {
     inProgress: ring('stone_small_2', 0.8, 4, 6),
@@ -146,9 +151,16 @@ export const outpostProps = (
   finished: boolean,
 ): PropEntity[] => toProps({ x, z }, finished ? OUTPOST_PROPS[kind] : CAMP_PROPS);
 
-/** The stand-in props of one landmark, as map prop entities. */
+/**
+ * The stand-in props of one landmark, as map prop entities. The landmark's own `surfaceLift` (set by hand in the
+ * editor, in metres, not scaled) raises all of them; the restoration props stay on the ground.
+ */
 export function standInProps(landmark: LandmarkEntity): PropEntity[] {
-  return toProps(landmark, LANDMARK_STAND_INS[landmark.kind]);
+  const props = toProps(landmark, LANDMARK_STAND_INS[landmark.kind]);
+  const lift = landmark.surfaceLift ?? 0;
+  return lift === 0
+    ? props
+    : props.map((p) => ({ ...p, surfaceLift: (p.surfaceLift ?? 0) + lift }));
 }
 
 /** The props the village adds at a landmark in a phase of its restoration. */

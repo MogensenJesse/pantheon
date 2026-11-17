@@ -2,7 +2,11 @@
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { VILLAGE } from '../../../src/config/village.ts';
-import { findCoarseRoute, routeFromGate } from '../../../src/world/village/sim/coarseRoute.ts';
+import {
+  findCoarseRoute,
+  GOAL_SNAP_M,
+  routeFromGate,
+} from '../../../src/world/village/sim/coarseRoute.ts';
 import { check, finish } from '../lib/check.ts';
 import { loadMap } from '../lib/villageHeadless.ts';
 
@@ -42,7 +46,7 @@ await check(
       assert.equal(pts[pts.length - 2], Math.fround(route!.endX));
       assert.equal(pts[pts.length - 1], Math.fround(route!.endZ));
       assert.ok(
-        Math.hypot(route!.endX - t.x, route!.endZ - t.z) <= 24 * Math.SQRT2 + 1,
+        Math.hypot(route!.endX - t.x, route!.endZ - t.z) <= GOAL_SNAP_M * Math.SQRT2 + 1,
         'ends near the place',
       );
       assert.ok(route!.walkMinutes <= LIMIT, `${route!.walkMinutes} min`);
@@ -85,6 +89,19 @@ await check('a shorter limit refuses a far place, and a place in the sea has no 
   );
   // Far out at sea: no land within reach of the place.
   assert.equal(findCoarseRoute(sampler, seed.x, seed.z, seed.x + 5000, seed.z, 600), null);
+});
+
+await check('a place standing in the water is reached at the nearest shore', () => {
+  const ruin = JSON.parse(
+    readFileSync(new URL('../../../public/maps/island-mountain.json', import.meta.url), 'utf8'),
+  ).entities.find(
+    (e: { type: string; kind?: string }) => e.type === 'landmark' && e.kind === 'sunken_ruin',
+  );
+  assert.ok(sampler.isWet(ruin.x, ruin.z), 'the ruin stands in the water');
+  const route = findCoarseRoute(sampler, seed.x, seed.z, ruin.x, ruin.z);
+  assert.ok(route, 'the shore can be reached');
+  assert.ok(!sampler.isWet(route.endX, route.endZ), 'the route ends on dry ground');
+  assert.ok(Math.hypot(route.endX - ruin.x, route.endZ - ruin.z) <= GOAL_SNAP_M * Math.SQRT2 + 1);
 });
 
 await check('the route from the gate starts on the circle and keeps the points beyond it', () => {

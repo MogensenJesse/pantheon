@@ -11,7 +11,7 @@ export const RESTORATION_PARTS = {
     SITE_WORK_S: [600, 1200],
     /** The crew that camps at the site: at least this many builders must be free to start, at most this many go. */
     CREW: { MIN: 2, MAX: 4 },
-    /** A place is only offered when the walk from the temple takes at most this long (minutes). */
-    ROUTE_WALK_LIMIT_MIN: 20,
+    /** A place is only offered when the walk from the temple takes at most this long (minutes). 45 so every place of island-mountain is in reach (the farthest, the temple ruin, is about 42). */
+    ROUTE_WALK_LIMIT_MIN: 45,
   },
 } as const;

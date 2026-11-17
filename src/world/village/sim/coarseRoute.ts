@@ -16,6 +16,8 @@ const CELL_M = 8;
 const MARGIN_M = 300;
 /** The goal (and the start) may be this far from the nearest walkable ground (m). */
 const SNAP_M = 24;
+/** A place of power may stand in the water (the sunken ruin): the route ends at the shore this far (m) from it. */
+export const GOAL_SNAP_M = 48;
 /** Slope is judged at the worst of five points over the cell, as the cell is larger than a step. */
 const PROBES: readonly (readonly [number, number])[] = [
   [0, 0],
@@ -81,13 +83,13 @@ export function findCoarseRoute(
     cost[c] = worst > STEEP_SLOPE ? 0 : 1 + SLOPE_COST * worst * worst;
   }
 
-  /** The walkable cell nearest (x, z) within SNAP_M, -1 when none. */
-  const snap = (x: number, z: number): number => {
-    const reach = Math.ceil(SNAP_M / CELL_M);
+  /** The walkable cell nearest (x, z) within `maxM`, -1 when none. */
+  const snap = (x: number, z: number, maxM = SNAP_M): number => {
+    const reach = Math.ceil(maxM / CELL_M);
     const home = cellAt(x, z);
     if (home < 0) return -1;
     let best = -1;
-    let bestD = SNAP_M * SNAP_M + 1;
+    let bestD = maxM * maxM + 1;
     for (let dj = -reach; dj <= reach; dj++) {
       for (let di = -reach; di <= reach; di++) {
         const i = (home % w) + di;
@@ -106,7 +108,7 @@ export function findCoarseRoute(
   };
 
   const start = snap(fromX, fromZ);
-  const goal = snap(toX, toZ);
+  const goal = snap(toX, toZ, GOAL_SNAP_M);
   if (start < 0 || goal < 0) return null;
 
   const limitEffort = limitMin * 60 * VILLAGE.VILLAGERS.WALK_SPEED_MPS;

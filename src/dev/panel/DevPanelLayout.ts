@@ -25,6 +25,7 @@ const DEV_SHELL_HTML = `
       <div id="dev-section-godrays"></div>
       <div id="dev-section-haze"></div>
       <div id="dev-section-dof"></div>
+      <div id="dev-section-painterly"></div>
       <div id="dev-section-sky"></div>
       <div id="dev-section-clouds"></div>
     </div>

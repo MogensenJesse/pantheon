@@ -2,7 +2,8 @@
 
 .editor-app button,
 .editor-app select,
-.editor-app input[type="search"] {
+.editor-app input[type="search"],
+.editor-app input[type="number"] {
   font: inherit;
   color: inherit;
   background: var(--editor-surface-2);
@@ -127,6 +128,17 @@
   text-align: right;
   font-variant-numeric: tabular-nums;
   color: var(--editor-text-color);
+}
+
+/* Two columns (label, field): the shared three-column range grid has no output. */
+.editor-height-row {
+  grid-template-columns: 78px 1fr;
+}
+
+.editor-height-row input[type="number"] {
+  width: 100%;
+  min-width: 0;
+  padding: 3px 6px;
 }
 
 .editor-sidebar-range {

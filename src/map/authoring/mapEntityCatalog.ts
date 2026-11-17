@@ -217,6 +217,7 @@ export function isValidMapEntity(entity: unknown): entity is MapEntity {
         finite(e.z) &&
         (e.rotY === undefined || finite(e.rotY)) &&
         (e.scale === undefined || (finite(e.scale) && e.scale > 0)) &&
+        (e.surfaceLift === undefined || finite(e.surfaceLift)) &&
         isLandmarkKind(e.kind)
       );
     default:

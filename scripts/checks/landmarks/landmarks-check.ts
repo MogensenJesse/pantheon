@@ -339,6 +339,32 @@ await check('a landmark scale sizes its whole group: props, spread and lift', ()
   }
 });
 
+await check(
+  'a landmark height raises its models by metres, not by its size, and leaves the restoration props',
+  () => {
+    for (const kind of LANDMARK_KINDS) {
+      const base = { type: 'landmark', kind, x: 100, z: 50, scale: 2 } as const;
+      const up = standInProps({ ...base, surfaceLift: 1.5 });
+      standInProps(base).forEach((p, i) => {
+        assert.equal(
+          up[i].surfaceLift,
+          (p.surfaceLift ?? 0) + 1.5,
+          `${kind}: 1.5 m higher at any size`,
+        );
+      });
+      assert.deepEqual(
+        standInProps({ ...base, surfaceLift: 0 }),
+        standInProps(base),
+        'omitted is 0',
+      );
+      assert.deepEqual(
+        restoreProps({ ...base, surfaceLift: 1.5 }, 'restored'),
+        restoreProps(base, 'restored'),
+      );
+    }
+  },
+);
+
 await check('each landmark woken tells the next chapter, whatever kind it is', () => {
   const ids = LANDMARK_KINDS.map((_, i) => landmarkChapterId(i + 1));
   assert.deepEqual(ids, [...LANDMARK_CHAPTER_IDS]);

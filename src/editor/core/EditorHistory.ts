@@ -100,6 +100,7 @@ export function mapEntitiesEqual(a: MapEntity, b: MapEntity): boolean {
       a.z === b.z &&
       (a.rotY ?? 0) === (b.rotY ?? 0) &&
       (a.scale ?? 1) === (b.scale ?? 1) &&
+      (a.surfaceLift ?? 0) === (b.surfaceLift ?? 0) &&
       a.kind === b.kind
     );
   }

@@ -326,7 +326,12 @@ function applyLandmarkTransform(
     const dz = spot.dz * size;
     const x = entity.x + dx * cos + dz * sin;
     const z = entity.z - dx * sin + dz * cos;
-    const y = terrain.getWorldY(x, z) - baseY + spot.lift * size - VISUAL.props.surfaceSinkM;
+    const y =
+      terrain.getWorldY(x, z) -
+      baseY +
+      spot.lift * size +
+      (entity.surfaceLift ?? 0) -
+      VISUAL.props.surfaceSinkM;
     model.position.set(dx, y, dz);
     model.scale.setScalar(spot.scale * size);
   }

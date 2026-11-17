@@ -1,4 +1,4 @@
-// src/config/visual/postfx.ts — procedural grade + LUT (per TOD stop)
+// src/config/visual/postfx.ts — procedural grade + LUT (per TOD stop) + painterly pass
 
 const LUT_DEFAULT = {
   enabled: false,
@@ -40,6 +40,19 @@ const GRADE_STOP = {
 } as const;
 
 export const postfx = {
+  /** Screen-space painterly pass (anisotropic Kuwahara + canvas grain): after the grade, before DoF. */
+  painterly: {
+    enabled: true,
+    strength: 1,
+    /** Filter radius, full-res pixels. */
+    radius: 4.5,
+    anisotropy: 1,
+    hardness: 40,
+    sharpness: 12,
+    grain: 0.05,
+    /** Kuwahara RT scale (0.5 = quarter the pixels); upsampled bilinearly. */
+    resolutionScale: 1,
+  },
   grade: {
     /** Master enable for procedural grade (LUT enable is per-stop). */
     enabled: true,

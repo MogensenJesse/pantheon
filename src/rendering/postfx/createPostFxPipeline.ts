@@ -10,6 +10,7 @@ import { createBloomControls } from './controls/bloomControls';
 import { createDofControls, disposeActiveDof } from './controls/dofControls';
 import { createGodraysControls, disposeActiveGodrays } from './controls/godraysControls';
 import { createGradeControls } from './controls/gradeControls';
+import { createPainterlyControls, type PainterlyParams } from './controls/painterlyControls';
 import type { DofParams } from './dofParams';
 import {
   createEffectGraphBypassGate,
@@ -36,6 +37,7 @@ const forceOpaquePresent = (color: TslNode) => vec4((color as { rgb: TslNode }).
 let _activeRenderPipeline: RenderPipeline | null = null;
 let _activeFsrNode: FSR1Node | null = null;
 let _activeSmaaChains: SmaaChain[] = [];
+let _activePainterly: ReturnType<typeof createPainterlyControls> | null = null;
 
 export function createPostFxPipeline(
   renderer: WebGPURenderer,
@@ -65,6 +67,8 @@ export function createPostFxPipeline(
   const bloomControls = createBloomControls(sceneBeauty);
   const godraysControls = createGodraysControls(sceneDepth, camera);
   const gradeControls = createGradeControls();
+  const painterly = createPainterlyControls();
+  _activePainterly = painterly;
 
   const uExposure = uniform(Number(VISUAL.sky.lighting.noon.globalExposure));
 
@@ -124,7 +128,7 @@ export function createPostFxPipeline(
     // SMAA before DoF so beauty / CoC taps are anti-aliased.
     if (!useSmaa) aaFsr.disposeSmaaBake();
     const gradedForSharp = useSmaa ? aaFsr.smaaPre.ensure(graded) : graded;
-    sharpColor = buildSharpColor(gradedForSharp);
+    sharpColor = painterly.apply(buildSharpColor(gradedForSharp));
     sharpColor.name = 'gradeLut';
     if (dofControls) {
       dofControls.rebindSharp(sharpColor);
@@ -156,7 +160,7 @@ export function createPostFxPipeline(
   const initialUseSmaa = aaEnabled && aaMethod === 'smaa';
   const initialUseFxaa = aaEnabled && aaMethod === 'fxaa';
   const gradedForSharp = initialUseSmaa ? aaFsr.smaaPre.ensure(graded) : graded;
-  sharpColor = buildSharpColor(gradedForSharp);
+  sharpColor = painterly.apply(buildSharpColor(gradedForSharp));
   sharpColor.name = 'gradeLut';
   dofControls = createDofControls(sharpColor, sceneViewZ);
   dofControls.setDofBokehScale(lastDofBokehScale);
@@ -304,6 +308,13 @@ export function createPostFxPipeline(
       applySceneResolutionScale();
       rebuildPostGraph();
     },
+    getPainterlyParams: () => painterly.getParams(),
+    setPainterlyParams: (params: Partial<PainterlyParams>) => {
+      if (painterly.updateParams(params)) rebuildPostGraph();
+    },
+    resetPainterlyParams: () => {
+      if (painterly.resetParams()) rebuildPostGraph();
+    },
     getAaMethod: () => aaMethod,
     setAaMethod: (method: AaMethod) => {
       if (aaMethod === method) return;
@@ -348,6 +359,8 @@ export function disposePostFxPipeline(): void {
   _activeFsrNode = null;
   for (const chain of _activeSmaaChains) chain.dispose();
   _activeSmaaChains = [];
+  _activePainterly?.dispose();
+  _activePainterly = null;
   disposeActiveGodrays();
   disposeActiveDof();
 }

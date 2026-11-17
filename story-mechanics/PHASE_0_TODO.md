@@ -88,7 +88,7 @@ The animals are not skinned and have no animation clips (the DEV optimizer rejec
 - [ ] Put the last landmark near the village
 - [ ] Paint Path cells along the guide route so the line follows them
 - [ ] Decide whether dala, island-test and volcanic get landmarks (without them the old energy-only rule applies)
-- Placement rules for restoring the places (phase 2): the map needs a `villageSeed`; every landmark must be reachable on foot from it within a 20-minute walk (`ROUTE_WALK_LIMIT_MIN`, about 1.6 km), not behind water or a steep ridge. An unreachable one is refused in play as "no way there", and the editor does not warn. After placing, tell me and I run the reachability check (`npm run check:village-route` covers shipped maps).
+- Placement rules for restoring the places (phase 2): the map needs a `villageSeed`; every landmark must be reachable on foot from it within a 45-minute walk (`ROUTE_WALK_LIMIT_MIN`, about 3.6 km of effort, steep ground counting extra), not behind water or a steep ridge; a place that stands in the water needs dry ground within 48 m of it (`GOAL_SNAP_M`, the crew camps on that shore). An unreachable one is refused in play as "no way there", and the editor does not warn. After placing, tell me and I run the reachability check (`npm run check:village-route` covers shipped maps).
 
 ## Restoring the places (phase 2)
 - [ ] Look at the whole flow on a real GPU, since headless could not render: the restoring ring, the crew camp, the restored ring, and a crew member far from the village (draw distance, shadow). Only the tree has been run through it in a browser.

@@ -22,6 +22,7 @@ import {
   type EditorPropertiesTabsHandlers,
 } from '../ui/EditorPropertiesTabs';
 import { createEditorToolRail, type EditorToolRailHandlers } from '../ui/EditorToolRail';
+import { createEntityHeightPanel, type EntityHeightPanelHandlers } from '../ui/EntityHeightPanel';
 import type { EditorDialogService } from '../ui/editorDialog';
 import type { EditorToastService } from '../ui/editorToast';
 import {
@@ -58,12 +59,14 @@ export interface EditorSessionChromeDeps {
   sculptHandlers: SculptPropertiesPanelHandlers;
   paintHandlers: PaintPropertiesPanelHandlers;
   placeHandlers: PlacePropertiesPanelHandlers;
+  heightHandlers: EntityHeightPanelHandlers;
 }
 
 export interface EditorSessionChrome {
   mapDocument: EditorMapDocumentContext;
   sculptProps: ReturnType<typeof createSculptPropertiesPanel>;
   placeProps: ReturnType<typeof createPlacePropertiesPanel>;
+  heightProps: ReturnType<typeof createEntityHeightPanel>;
   syncTerrainShape: () => void;
   syncMapHeight: () => void;
   syncBiomePaintRules: (rules: BiomePaintRules) => void;
@@ -87,6 +90,7 @@ export function createEditorSessionChrome(deps: EditorSessionChromeDeps): Editor
     sculptHandlers,
     paintHandlers,
     placeHandlers,
+    heightHandlers,
   } = deps;
 
   let mapDocument!: EditorMapDocumentContext;
@@ -127,10 +131,12 @@ export function createEditorSessionChrome(deps: EditorSessionChromeDeps): Editor
     mix,
     placeHandlers,
   );
+  const heightProps = createEntityHeightPanel(shell.slots.propertiesBody, store, heightHandlers);
   return {
     mapDocument,
     sculptProps,
     placeProps,
+    heightProps,
     syncTerrainShape: () => sculptProps.syncTerrainShape(),
     syncMapHeight: () => sculptProps.syncMapHeight(),
     syncBiomePaintRules: (rules) => paintProps.syncBiomePaintRules(rules),
@@ -143,6 +149,7 @@ export function createEditorSessionChrome(deps: EditorSessionChromeDeps): Editor
       sculptProps.dispose();
       paintProps.dispose();
       placeProps.dispose();
+      heightProps.dispose();
       documentBar.dispose();
       infoPopup.dispose();
       propertiesTabs.dispose();
