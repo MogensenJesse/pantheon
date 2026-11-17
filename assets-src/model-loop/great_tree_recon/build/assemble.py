@@ -479,5 +479,7 @@ bpy.ops.render.render(write_still=True)
 out["render"] = sc.render.filepath
 out["tris"] = int(sum(len(o.data.loop_triangles) or (o.data.calc_loop_triangles() or len(o.data.loop_triangles)) for o in G.objects))
 bpy.ops.wm.save_as_mainfile(filepath=os.path.join(R, "great_tree_recon_scene.blend"))
+bpy.ops.file.make_paths_relative()  # ivy/rune images were loaded by absolute path: store them relative so the blend opens elsewhere
+bpy.ops.wm.save_mainfile()
 json.dump(out, open(os.path.join(R, "renders", "scene", f"{tag}_result.json"), "w"), indent=1)
 print("@@RESULT@@" + json.dumps(out)[:2000])

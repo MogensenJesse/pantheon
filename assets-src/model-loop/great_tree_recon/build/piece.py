@@ -560,6 +560,7 @@ def main():
         raise RuntimeError("loop_render.run kept failing")
     out["mask"] = mask_pass(pid, os.path.join(rdir, f"{tag}_mask.png"))
     out["ref"] = piece["ref"]
+    bpy.ops.file.make_paths_relative()  # images loaded by absolute path would break the blend on another machine
     bpy.ops.wm.save_mainfile()
     os.makedirs(os.path.join(OUT, "rounds"), exist_ok=True)
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, "rounds", f"{pid}_{tag}.blend"), copy=True)

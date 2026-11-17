@@ -111,6 +111,8 @@ Trellis output is raw: about 1 m tall, dense, one baked material, UVs fragmented
 - The studio rig's `LD_Backdrop` ends in black when the ref camera looks past its edge. That is how the plugin's rig looks, not a render fault.
 - `run_bpy.sh` sets `PYTHONDONTWRITEBYTECODE=1` because `../model-loop/scripts/__pycache__` is tracked.
 - Blender 5: after `bpy.data.objects.remove(...)` call `view_layer.update()` before iterating `view_layer.objects` (stale `None` entries).
+- Call `bpy.ops.file.make_paths_relative()` before saving a blend that will be committed. An image loaded with `bpy.data.images.load(<absolute path>)`
+  is saved as that absolute path, so the blend shows magenta textures on any other machine (great_tree_recon's blends held `/home/user/...` until 2026-11-17).
 
 ## Orientation and other things a raw Trellis mesh needs (first run, great_tree_recon, 2026-11-13)
 - **Yaw.** Trellis puts the piece at any yaw (runestone 130 deg, trunk 235 deg off). `orient_fit.run(glb, ref_png, ref_view)` renders the raw mesh
