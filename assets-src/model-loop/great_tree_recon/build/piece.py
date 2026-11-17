@@ -96,7 +96,10 @@ KNOBS = {
         # the cap a pale yellow-green disc) -> more and stronger, and none on the cut top
         # (pre-judge look: srgb(96, 104, 48) at 0.65 read as lime stripes) -> darker, softer
         # (r04 tried col srgb(78, 84, 46), thresh 0.6, scale 1.1, strength 0.55, z_max 6.15: cover judged fixed, stripes along the crests)
-        moss=dict(col=srgb(80, 84, 52), thresh=0.70, soft=0.14, scale=0.9, w_up=0.25, up_min=0.25, up_soft=0.5, strength=0.45),
+        # r05 (user: "does everything have a texture?"): the moss paints textures/moss_olive.png (GPT, from the input) instead of a flat colour;
+        # tex_gain 0.6 keeps it at about the judged flat colour's brightness (texture mean 102/109/54 vs srgb 80/84/52)
+        moss=dict(col=srgb(80, 84, 52), thresh=0.70, soft=0.14, scale=0.9, w_up=0.25, up_min=0.25, up_soft=0.5, strength=0.45,
+                  tex="textures/moss_olive.png", tex_tile_m=0.8, tex_gain=0.6),
         rune=None,
     ),
     "crown": dict(
@@ -110,7 +113,9 @@ KNOBS = {
         mat=dict(tile_m=1.1, mask="curv", ridge=0.10, crease=0.3, top_light=0.15, ao=0.12, tex_contrast=0.5, tex_sat=0.7,
                  tint=(0.92, 0.94, 0.96), gain=1.3, face_var=0.10),
         bump=None,
-        moss=dict(col=srgb(92, 98, 50), thresh=0.66, soft=0.14, scale=0.9, w_up=0.25, up_min=0.2, up_soft=0.5, strength=0.5),
+        # r04: the moss paints textures/moss_olive.png (see trunk_roots); gain for srgb 92/98/50
+        moss=dict(col=srgb(92, 98, 50), thresh=0.66, soft=0.14, scale=0.9, w_up=0.25, up_min=0.2, up_soft=0.5, strength=0.5,
+                  tex="textures/moss_olive.png", tex_tile_m=0.8, tex_gain=0.8),
         rune=None,
         # Trellis left 28 clumps hanging free (one a whole leaf pad): drop the crumbs, slide the rest into contact; 7 coplanar pairs overlapped
         settle=dict(drop_below=0.0015, overlap_m=0.03), drop_overlaps=True,
@@ -147,7 +152,9 @@ KNOBS = {
         # shoulders, a higher threshold for bare patches
         # (pre-judge look: srgb(104, 110, 52) rendered lime on the lit tops) -> darker, a little greyer
         # (r02 tried col srgb(80, 86, 44), thresh 0.44, soft 0.07, scale 2.6, up_min 0.3, strength 0.8: still read lime, judged worse)
-        moss=dict(col=srgb(64, 74, 34), thresh=0.36, soft=0.12, scale=1.6, w_up=0.55, up_min=0.5, up_soft=0.3, strength=0.9),
+        # r03: the moss paints textures/moss_olive.png (see trunk_roots); gain for srgb 64/74/34 (judged lime when brighter)
+        moss=dict(col=srgb(64, 74, 34), thresh=0.36, soft=0.12, scale=1.6, w_up=0.55, up_min=0.5, up_soft=0.3, strength=0.9,
+                  tex="textures/moss_olive.png", tex_tile_m=0.6, tex_gain=0.45),
         rune=None,
         drop_overlaps=True,   # 4 coplanar pairs lay on top of each other
     ),
@@ -326,9 +333,12 @@ def bump(mat, strength=0.5, distance=0.04):
     nt.links.new(b.outputs["Normal"], bsdf.inputs["Normal"])
 
 
-def soft_moss(mat, col, thresh=0.6, soft=0.14, scale=0.9, w_up=0.25, up_min=0.2, up_soft=0.5, strength=0.7, z_max=None):
+def soft_moss(mat, col, thresh=0.6, soft=0.14, scale=0.9, w_up=0.25, up_min=0.2, up_soft=0.5, strength=0.7, z_max=None,
+              tex=None, tex_tile_m=0.7, tex_gain=1.0):
     """Moss as a soft-edged tint: object-space noise patches, pushed toward up-facing faces and absent below up_min
-    (normal z). great_tree's paint_moss cuts crisp-edged dabs for a limb; on a 10 m piece those read as camouflage."""
+    (normal z). great_tree's paint_moss cuts crisp-edged dabs for a limb; on a 10 m piece those read as camouflage.
+    tex: a tileable moss image (run-relative path), box-projected in object space every tex_tile_m metres and scaled by
+    tex_gain, painted instead of the flat `col`."""
     nt, bsdf = _nodes(mat)
     src = bsdf.inputs["Base Color"].links[0].from_socket
     tc = nt.nodes.new("ShaderNodeTexCoord")
@@ -351,8 +361,19 @@ def soft_moss(mat, col, thresh=0.6, soft=0.14, scale=0.9, w_up=0.25, up_min=0.2,
     fac = _math(nt, "MULTIPLY", fac, strength)
     tone = nt.nodes.new("ShaderNodeVectorMath")
     tone.operation = "SCALE"
-    tone.inputs[0].default_value = col
-    nt.links.new(_math(nt, "ADD", _math(nt, "MULTIPLY", fine.outputs["Fac"], 0.5), 0.75), tone.inputs["Scale"])
+    if tex:
+        mp = nt.nodes.new("ShaderNodeMapping")
+        mp.inputs["Scale"].default_value = (1 / tex_tile_m,) * 3
+        nt.links.new(tc.outputs["Object"], mp.inputs["Vector"])
+        im = nt.nodes.new("ShaderNodeTexImage")
+        im.image = bpy.data.images.load(rel(tex), check_existing=True)
+        im.projection, im.projection_blend = "BOX", 0.25
+        nt.links.new(mp.outputs["Vector"], im.inputs["Vector"])
+        nt.links.new(im.outputs["Color"], tone.inputs[0])
+        nt.links.new(_math(nt, "MULTIPLY", _math(nt, "ADD", _math(nt, "MULTIPLY", fine.outputs["Fac"], 0.3), 0.85), tex_gain), tone.inputs["Scale"])
+    else:
+        tone.inputs[0].default_value = col
+        nt.links.new(_math(nt, "ADD", _math(nt, "MULTIPLY", fine.outputs["Fac"], 0.5), 0.75), tone.inputs["Scale"])
     nt.links.new(loop_mat._mix(nt, "MIX", fac, src, tone.outputs["Vector"]), bsdf.inputs["Base Color"])
 
 

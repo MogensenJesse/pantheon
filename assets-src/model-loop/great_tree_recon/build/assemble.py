@@ -63,7 +63,8 @@ P = dict(
     # (a09 tried cap 1.15 everywhere and 0.55 behind: the ring became a flat mossy plate and the side stones lost their footing)
     # a10: the front ring stays as it is; only the tiers behind the tree come down
     rock_cap=dict(cap=99.0, keep=1.0, back_y=0.8, back_cap=1.3, back_keep=0.35, soft=1.5),
-    ivy=dict(count=2200, leaf_m=0.16, seed=3),   # a09 (judge a08: leaf cards like confetti, 40 % too big, too lime) -> smaller, darker
+    # a12: each leaf a card showing textures/ivy_leaf.png (a GPT leaf, keyed to alpha); leaf_m is the card's size
+    ivy=dict(count=2200, leaf_m=0.2, seed=3),   # a09 (judge a08: leaf cards like confetti, 40 % too big, too lime) -> smaller, darker
 )
 
 
@@ -404,15 +405,45 @@ for k in pick:
         s = L * rnd.uniform(0.7, 1.2)
         tilt = rnd.uniform(0.15, 0.5)
         d = Vector((math.cos(ang), math.sin(ang), tilt))
-        side = Vector((-math.sin(ang), math.cos(ang), 0)) * s * 0.42
-        pts = [Vector((0, 0, 0.02)), d * s * 0.5 + side, d * s, d * s * 0.5 - side]
+        side = Vector((-math.sin(ang), math.cos(ang), 0)) * s * 0.5
+        o0 = Vector((0, 0, 0.02)) - d.normalized() * s * 0.08  # the stem's foot just under the cluster's centre
+        pts = [o0 - side, o0 + side, o0 + side + d * s, o0 - side + d * s]  # card: stem edge first, tip edge last
         base = len(verts)
         verts += [tuple(Vector(p) + rot @ q) for q in pts]
         faces.append((base, base + 1, base + 2, base + 3))
     placed += 1
 mi = bpy.data.meshes.new("ivy")
 mi.from_pydata(verts, [], faces)
-mi.materials.append(flat_mat("M_recon_ivy", srgb(50, 82, 34), rough=0.9))
+uvl = mi.uv_layers.new(name="UVMap")
+uvl.data.foreach_set("uv", [c for _ in faces for c in (0, 0, 1, 0, 1, 1, 0, 1)])
+vary = mi.attributes.new("vary", "FLOAT", "FACE")  # per-leaf value, as the input's leaves are not all one green
+vary.data.foreach_set("value", [rnd.uniform(0.8, 1.15) for _ in faces])
+# a12 (user: textures everywhere): the leaf sprite, cut out by its alpha; per-leaf value. (a11: one flat green, srgb 50/82/34)
+iv = bpy.data.materials.new("M_recon_ivy")
+nt_ = iv.node_tree
+ib = next(n for n in nt_.nodes if n.type == "BSDF_PRINCIPLED")
+itx = nt_.nodes.new("ShaderNodeTexImage")
+itx.image = bpy.data.images.load(os.path.join(R, "textures", "ivy_leaf.png"), check_existing=True)
+itx.extension = "CLIP"
+iuv = nt_.nodes.new("ShaderNodeUVMap")
+iuv.uv_map = "UVMap"
+nt_.links.new(iuv.outputs["UV"], itx.inputs["Vector"])
+iat = nt_.nodes.new("ShaderNodeAttribute")
+iat.attribute_type, iat.attribute_name = "GEOMETRY", "vary"
+isc = nt_.nodes.new("ShaderNodeVectorMath")
+isc.operation = "SCALE"
+nt_.links.new(itx.outputs["Color"], isc.inputs[0])
+nt_.links.new(iat.outputs["Fac"], isc.inputs["Scale"])
+nt_.links.new(isc.outputs["Vector"], ib.inputs["Base Color"])
+icut = nt_.nodes.new("ShaderNodeMath")
+icut.operation = "GREATER_THAN"
+icut.inputs[1].default_value = 0.5
+nt_.links.new(itx.outputs["Alpha"], icut.inputs[0])
+nt_.links.new(icut.outputs[0], ib.inputs["Alpha"])
+ib.inputs["Roughness"].default_value = 0.85
+if "Specular IOR Level" in ib.inputs:
+    ib.inputs["Specular IOR Level"].default_value = 0.2
+mi.materials.append(iv)
 ivy = bpy.data.objects.new("A_ivy", mi)
 G.objects.link(ivy)
 out["ivy"] = {"clusters": placed, "leaves": len(faces)}

@@ -83,11 +83,9 @@
    "from": "temple_ruin"
   },
   "moss": {
-   "texture": "textures/moss.png",
-   "tile_m": 0.8,
-   "roughness": 0.9,
-   "from": "temple_ruin",
-   "note": "painted on by great_tree/build/tree_common.paint_moss (noise patches, more on up-facing faces)"
+   "texture": "textures/moss_olive.png",
+   "tile_m": 0.6,
+   "note": "GPT Image from input.png, seamless (2026-11-17); painted by piece.py soft_moss through each piece's moss mask (trunk r05, crown r04, rockery r03). textures/moss.png (the temple's bright moss) is no longer used."
   },
   "bark": {
    "texture": "textures/bark.png",
@@ -108,6 +106,11 @@
     1.0
    ],
    "note": "front-projected mask as emission"
+  },
+  "ivy_leaf": {
+   "texture": "textures/ivy_leaf.png",
+   "source": "textures/ivy_leaf_src.png (GPT Image from input.png, white keyed to alpha)",
+   "note": "one leaf per card, cut out by alpha (assemble.py, a12)"
   }
  },
  "segmentation": {
@@ -392,7 +395,8 @@
      "colour"
     ]
    },
-   "last_round": "r04 (5.1, reverted)"
+   "last_round": "r04 (5.1, reverted)",
+   "moss_texture_round": "r05 (best-round knobs, moss now textured; not judged)"
   },
   {
    "id": "crown",
@@ -475,7 +479,8 @@
     ]
    },
    "last_score": 5.5,
-   "last_round": "r02 (5.0, reverted); r03 = r01 + skirt fix near the trunk, not judged on its own"
+   "last_round": "r02 (5.0, reverted); r03 = r01 + skirt fix near the trunk, not judged on its own",
+   "moss_texture_round": "r04 (best-round knobs, moss now textured; not judged)"
   },
   {
    "id": "leaf_pad",
@@ -565,7 +570,8 @@
    },
    "dims_note": "the ring spans the tile's diagonal (11.4 m); Trellis kept the close-up's proportions, which makes it about 4.7 m tall. The input suggests about 3.4 m: squash it in the assembly if it pokes through the roots.",
    "last_score": 5.3,
-   "last_round": "r02 (4.3, reverted)"
+   "last_round": "r02 (4.3, reverted)",
+   "moss_texture_round": "r03 (best-round knobs, moss now textured; not judged)"
   },
   {
    "id": "water",
@@ -591,7 +597,7 @@
    ],
    "status": "built",
    "build": "build/assemble.py",
-   "note": "617 three-leaf clusters on up-facing rock and root faces whose pixel in the object-ID map is ivy and that the camera sees; one mesh, flat green."
+   "note": "leaf cards (0.2 m) showing textures/ivy_leaf.png, on up-facing rock and root faces where the ID map has ivy and the camera sees them; per-leaf value"
   }
  ],
  "weave_runs": [
@@ -669,9 +675,9 @@
  "assembly": {
   "build": "build/assemble.py",
   "blend": "great_tree_recon_scene.blend",
-  "latest": "a11",
-  "render": "renders/scene/a11_cam.png (ignored; copy in review_assembly_a11.png; the trunk join before and after in review_join_a10_a11.png)",
-  "status": "a11 not judged. Judged: a08 5.6 (wrong camera), a10 5.5. a11 = a10 without the water, with the trunk join fixed.",
+  "latest": "a12",
+  "render": "renders/scene/a12_cam.png (ignored; copy in review_assembly_a12.png)",
+  "status": "a12 not judged. Judged: a08 5.6 (wrong camera), a10 5.5. a11 = a10 without the water, trunk join fixed; a12 = a11 with textured moss and ivy.",
   "placement": {
    "rockery": "tile centre, squashed to 3.4 m",
    "tree (trunk_roots + crown)": "1.3 m behind the tile centre; crown from z = 4.3 m, scaled so the tree is 10.5 m",
@@ -684,6 +690,7 @@
    "crown: narrower than the input's canopy after scaling to the tree's height (9 m against 10.7 m)",
    "no ground tile (by plan); not judged: the whole-scene compare loop is a later step"
   ],
-  "last_score": 5.5
+  "last_score": 5.5,
+  "textures": "every material reads an image (checked 2026-11-17): stone_cut, bark, leaf, rune_mask_v2, moss_olive, ivy_leaf"
  }
 }

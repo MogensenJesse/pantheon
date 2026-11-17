@@ -100,5 +100,33 @@
   "quality": "medium",
   "why": "the first close-up gave Trellis a round skirt of thin roots, a one-tube trunk, a hollow top and no knot band; the pool had no place (assembly a03)",
   "prompt": "From this image, show only the tree's braided trunk together with its root skirt, as one single object, redrawn clearly for a sculptor. TRUNK: three or four fat strands twisted round each other like a rope, each strand clearly separate with deep grooves between them; a raised carved band of square knotwork runs up the front strand, facing the viewer; the trunk is cut off flat and solid just above where the limbs would start (no crown, no branches, no leaves, no hollow). ROOTS: about twelve thick primary roots, each as thick as a trunk strand where it leaves the trunk and tapering toward the ground, flowing down and outward in broad S-curves and crossing over each other; packed shoulder to shoulder with no see-through gaps in the upper part; each root splits near the ground into two to four short pointed rootlets that lie flat on the ground like claws. IMPORTANT: at the front centre the roots part and arch to leave one clear open gap, a hollow like a doorway about a quarter of the skirt's width, where a pool will go; no roots cross that gap at ground level. Remove everything else: no standing stones, no boulders, no rocks, no water, no ivy, no ground tile. Isolated, centred, the whole object in frame, seen from the front and slightly above, plain light-grey background, soft even light. Keep exactly the same low-poly faceted style, colours and wear as in the image."
+ },
+ "textures/moss_olive.png": {
+  "image": "input.png",
+  "size": "1024x1024",
+  "model": "gpt-image-2",
+  "quality": "medium",
+  "tile": true,
+  "result": {
+   "mean": [
+    102,
+    109,
+    54
+   ],
+   "stdev": [
+    11,
+    9,
+    4
+   ]
+  },
+  "prompt": "From this image, paint only the moss that grows on the tree roots and the rocks, as a seamless tileable texture filling the whole frame: flat albedo colour only, seen straight on, no lighting, no shadows, no perspective, no objects, no leaves, no stones. Soft painterly blotches of olive and yellow-olive green in the same hand-painted style as the image: base RGB 104/112/52, darker 70/80/38, lighter 140/146/72. Clearly visible soft blotches, low contrast, no fine noise."
+ },
+ "textures/ivy_leaf_src.png": {
+  "image": "input.png",
+  "size": "1024x1024",
+  "model": "gpt-image-2",
+  "quality": "medium",
+  "derived": "textures/ivy_leaf.png (white keyed to alpha, cropped square, 512 px)",
+  "prompt": "From this image, paint ONE single ivy leaf like the small ivy leaves climbing the tree roots and rocks: a pointed three- to five-lobed leaf with a short stem, seen flat from straight above, centred, filling most of the frame with a small margin, stem pointing straight down. Same hand-painted low-poly style and the same greens as the image: dark green with lighter yellow-green on the upper lobes and a lighter midrib. Pure flat white background, no shadow, no other leaves, no text."
  }
 }
