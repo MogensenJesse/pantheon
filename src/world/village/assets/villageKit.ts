@@ -37,6 +37,8 @@ const KIT: readonly { key: string; file: string; type?: VillageBuildingType; sin
     { key: 'village_well_s2', file: 'well_s2', type: 'well' },
     { key: 'village_fence', file: 'fence', single: true },
     { key: 'village_stockpile', file: 'stockpile', single: true },
+    // Sketchfab "Stylized tree stump" (CC-BY, credit in public/models/village-kit/license.txt), 0.4 m high.
+    { key: 'village_stump', file: 'stump', single: true },
   ];
 
 export interface VillageKit {

@@ -1,0 +1,16 @@
+Third-party model in this folder: stump.glb
+
+Model Information:
+* title:	Stylized tree stump
+* source:	https://sketchfab.com/3d-models/stylized-tree-stump-04d51f5c2fb643aab3b93b451d1b77c9
+* author:	Aartee (https://sketchfab.com/Aartee)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+Changes: normal, occlusion and metal-rough maps and the tangents dropped, scaled to 0.4 m high, feet on the ground,
+texture resized and compressed to KTX2 (assets-src/landmarks/sketchfab_prep.mjs).
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Stylized tree stump" (https://sketchfab.com/3d-models/stylized-tree-stump-04d51f5c2fb643aab3b93b451d1b77c9) by Aartee (https://sketchfab.com/Aartee) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
