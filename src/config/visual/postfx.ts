@@ -43,9 +43,9 @@ export const postfx = {
   /** Screen-space painterly pass (anisotropic Kuwahara + canvas grain): after the grade, before DoF. */
   painterly: {
     enabled: true,
-    strength: 1,
+    strength: 0.8,
     /** Filter radius, full-res pixels. */
-    radius: 4.5,
+    radius: 4,
     anisotropy: 1,
     hardness: 40,
     sharpness: 12,
