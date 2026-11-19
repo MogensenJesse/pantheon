@@ -38,7 +38,8 @@ export function createVegetationIndirectResources(
 ): VegetationIndirectResources {
   const visibleIndices = instancedArray(instanceCount, 'uint');
   const drawIndirectAttr = new IndirectStorageBufferAttribute(new Uint32Array(5), 5);
-  const drawStorage = storage(drawIndirectAttr, vegetationDrawIndirectStruct, 1);
+  // r187: a struct storage is always an array, so address the single draw record explicitly.
+  const drawStorage = storage(drawIndirectAttr, vegetationDrawIndirectStruct, 1).element(0);
   return {
     visibleIndices,
     drawIndirectAttr,

@@ -18,12 +18,12 @@ import {
   vec4,
 } from 'three/tsl';
 import {
+  Node,
   NodeMaterial,
   NodeUpdateType,
   QuadMesh,
   RendererUtils,
   RenderTarget,
-  TempNode,
 } from 'three/webgpu';
 import { godrays as GODRAYS_LOOK, GODRAYS_MAX_SAMPLES } from '../../../config/visual/godrays';
 import { CAMERA_FAR } from '../../sceneConstants';
@@ -62,7 +62,8 @@ function configureShaftTarget(rt: InstanceType<typeof RenderTarget>, name: strin
  * any closer geometry (including distant trees) occludes. Composite additively.
  * No per-pixel dither (that was the stipple); a 5-tap Gaussian smooths the shaft RT.
  */
-export class GodraysRadialNode extends TempNode {
+// r187 deprecated TempNode: Node already caches a multiply-used result in a temp variable.
+export class GodraysRadialNode extends Node {
   static get type() {
     return 'GodraysRadialNode';
   }
