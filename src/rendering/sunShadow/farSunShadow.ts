@@ -1,9 +1,9 @@
 // src/rendering/sunShadow/farSunShadow.ts — far (±200 m) player-follow sun shadow map, its node + warmup
 import type { DirectionalLight, PerspectiveCamera, Scene } from 'three';
-import { shadow } from 'three/tsl';
 import type { WebGPURenderer } from 'three/webgpu';
 import { sunDevState } from '../sunDevState';
 import { currentSunElevationDeg } from '../sunSpherical';
+import { DepthOnlyShadowNode } from './depthOnlyShadowNode';
 import { SUN_SHADOW_FAR_FOLLOW_HALF_M } from './shadowFollowConstants';
 import {
   createShadowFollowDirtyState,
@@ -28,13 +28,13 @@ function ensureFarFrustum(sun: DirectionalLight): void {
   frustumAppliedCamera = cam;
 }
 
-let farNode: ReturnType<typeof shadow> | null = null;
+let farNode: DepthOnlyShadowNode | null = null;
 let farNodeSun: DirectionalLight | null = null;
 
-/** Shared `shadow(sun)` node for the far map: ground beyond the near ring, and clouds. */
-export function createFarSunShadowNode(sun: DirectionalLight): ReturnType<typeof shadow> {
+/** Shared shadow node for the far map: ground beyond the near ring, and clouds. */
+export function createFarSunShadowNode(sun: DirectionalLight): DepthOnlyShadowNode {
   if (!farNode || farNodeSun !== sun) {
-    farNode = shadow(sun);
+    farNode = new DepthOnlyShadowNode(sun);
     farNodeSun = sun;
   }
   return farNode;

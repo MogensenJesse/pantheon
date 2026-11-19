@@ -2,15 +2,9 @@
 // @ts-nocheck — Three ShadowNode internals are loosely typed
 
 import { float, ivec2, max, min, screenCoordinate, textureLoad, uniform, vec4 } from 'three/tsl';
-import {
-  FloatType,
-  LinearFilter,
-  NodeMaterial,
-  QuadMesh,
-  RedFormat,
-  ShadowNode,
-} from 'three/webgpu';
+import { FloatType, LinearFilter, NodeMaterial, QuadMesh, RedFormat } from 'three/webgpu';
 import { VISUAL } from '../../config/visualTuning';
+import { DepthOnlyShadowNode } from './depthOnlyShadowNode';
 
 const _quadMesh = /*@__PURE__*/ new QuadMesh(new NodeMaterial());
 _quadMesh.name = 'PcssBlockerReduce';
@@ -24,7 +18,7 @@ const BLOCKER_REDUCE_SAMPLES = 4;
  * fullscreen `textureLoad` min/max-reduces raw depth into a smaller bilinear R32F target. That
  * keeps the penumbra estimate stable under sub-texel UV drift and is ~64× cheaper than a full copy.
  */
-export class PcssShadowNode extends ShadowNode {
+export class PcssShadowNode extends DepthOnlyShadowNode {
   static get type() {
     return 'PcssShadowNode';
   }

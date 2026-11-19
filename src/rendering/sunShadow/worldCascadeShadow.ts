@@ -1,6 +1,6 @@
 // src/rendering/sunShadow/worldCascadeShadow.ts — coarse whole-map sun cascade beyond the far map
 import { DirectionalLight, type PerspectiveCamera, type Scene, Vector3 } from 'three';
-import { shadow, uniform } from 'three/tsl';
+import { uniform } from 'three/tsl';
 import type { WebGPURenderer } from 'three/webgpu';
 import { VISUAL } from '../../config/visualTuning';
 import { WORLD } from '../../config/world';
@@ -11,6 +11,7 @@ import {
   sunDirectionFromSpherical,
 } from '../sunSpherical';
 import { registerCoarseShadowCamera } from './casterMaterial';
+import { DepthOnlyShadowNode } from './depthOnlyShadowNode';
 import {
   SHADOW_CAMERA_EXPLICIT_LAYER,
   SUN_SHADOW_FAR_FOLLOW_HALF_M,
@@ -27,7 +28,7 @@ import {
   setWorldVisibilityTerms,
 } from './worldShadowVisibility';
 
-type ShadowNode = ReturnType<typeof shadow>;
+type ShadowNode = DepthOnlyShadowNode;
 
 const LIGHT_DISTANCE_M = 4000;
 /** The near/far maps clip casters beyond their light distance; the G channel starts this much earlier so the two overlap. */
@@ -165,7 +166,7 @@ export function createWorldCascadeShadowLight(scene: Scene): DirectionalLight | 
   scene.add(light);
   scene.add(light.target);
 
-  const node = shadow(light);
+  const node = new DepthOnlyShadowNode(light);
   // three's lighting reuses this node instead of building a second one, which would overwrite
   // `shadow.map` with a target nothing bakes.
   (light.shadow as { shadowNode?: unknown }).shadowNode = node;

@@ -1,6 +1,5 @@
 // src/rendering/sunShadow/cloudCastShadow.ts — dedicated soft cloud-cast DirectionalLight + shadow node
 import { DirectionalLight, type PerspectiveCamera, type Scene } from 'three';
-import { shadow } from 'three/tsl';
 import type { WebGPURenderer } from 'three/webgpu';
 import { VISUAL } from '../../config/visualTuning';
 import { getLiveCloudSettings } from '../clouds/cloudDevState';
@@ -8,6 +7,7 @@ import { currentSunElevationDeg } from '../sunSpherical';
 import { syncCloudCastHandoffFromLight } from './cloudCastHandoffUniforms';
 import { CLOUD_SHADOW_LAYER } from './cloudCastShadowLayer';
 import { CloudCastSoftShadowFilter } from './cloudCastSoftShadowFilter';
+import { DepthOnlyShadowNode } from './depthOnlyShadowNode';
 import { CLOUD_CAST_CAMERA_FAR_M, CLOUD_CAST_LIGHT_DISTANCE_M } from './shadowFollowConstants';
 import {
   createShadowFollowDirtyState,
@@ -21,7 +21,7 @@ type CloudCastShadowWithFilter = DirectionalLight['shadow'] & {
 };
 
 let cloudCastLight: DirectionalLight | null = null;
-let cloudCastShadowNode: ReturnType<typeof shadow> | null = null;
+let cloudCastShadowNode: DepthOnlyShadowNode | null = null;
 let frustumAppliedCamera: object | null = null;
 const followState = createShadowFollowDirtyState();
 let bakeCount = 0;
@@ -86,11 +86,11 @@ export function getCloudCastShadowLight(): DirectionalLight | null {
   return cloudCastLight;
 }
 
-/** Singleton shadow(cloudCastLight) for ground receivers. */
-export function createCloudCastShadowNode(): ReturnType<typeof shadow> | null {
+/** Singleton shadow node for cloudCastLight, for ground receivers. */
+export function createCloudCastShadowNode(): DepthOnlyShadowNode | null {
   if (!cloudCastLight) return null;
   if (!cloudCastShadowNode) {
-    cloudCastShadowNode = shadow(cloudCastLight);
+    cloudCastShadowNode = new DepthOnlyShadowNode(cloudCastLight);
   }
   return cloudCastShadowNode;
 }
