@@ -1,5 +1,6 @@
 // src/rendering/layers/waterReflectionLayers.ts — layer mask for slim water reflector pass
 import type { Camera, Object3D, PerspectiveCamera } from 'three';
+import type { NodeFrame } from 'three/webgpu';
 
 /**
  * Layer used only by the water planar reflector virtual camera.
@@ -47,10 +48,18 @@ export function disableWaterReflectionLayer(object: Object3D): void {
 
 type ReflectorBase = {
   getVirtualCamera: (camera: Camera) => Camera;
+  updateBefore: (frame: NodeFrame) => boolean | undefined;
 };
 
 /**
  * Restrict the reflector's virtual camera to WATER_REFLECTION_LAYER so grass/props are not re-drawn.
+ *
+ * Also keeps the reflector's nested render from poisoning the main pass's pipeline keys. That render sees no
+ * lights (they are on layer 0 only), and three caches the scene's environment key per `info.calls`; a nested
+ * render leaves `info.calls` unchanged for the rest of the main pass, so every object drawn after the water
+ * got the no-lights key. Under the surface the reflector skips its render, so those objects flipped back to
+ * the real key and every transparent object (sun, clouds, particles, beacons) rebuilt its pipeline, with
+ * shader modules recompiled, on each crossing. Bumping the counter makes the next draw recompute the key.
  */
 export function patchReflectorVirtualCameraLayers(reflector: ReflectorBase): void {
   const original = reflector.getVirtualCamera.bind(reflector);
@@ -58,5 +67,13 @@ export function patchReflectorVirtualCameraLayers(reflector: ReflectorBase): voi
     const virtual = original(camera);
     virtual.layers.mask = WATER_REFLECTION_LAYER_MASK;
     return virtual;
+  };
+  const updateBefore = reflector.updateBefore.bind(reflector);
+  reflector.updateBefore = (frame: NodeFrame) => {
+    const result = updateBefore(frame);
+    // `calls` is typed read-only; it is only a counter.
+    const info = frame.renderer?.info as { calls: number } | undefined;
+    if (info) info.calls++;
+    return result;
   };
 }
