@@ -25,8 +25,8 @@ type StandIn = {
 };
 
 /**
- * A ring of floating runic stones, the great tree (its own model), a ruined temple, a half-sunken Norse temple (its own model, sunk a
- * little so its podium sits in the ground or the water) and a tall rock. The runestones hover `LOOK.hover.liftM` over the ground (the lift is in their instance matrix, so their
+ * A ring of floating runic stones, the ancient tree (its own model), a ruined temple, a half-sunken temple (its own model, sunk so its plinth
+ * sits in the ground or the water) and a rock arch (the monolith). The runestones hover `LOOK.hover.liftM` over the ground (the lift is in their instance matrix, so their
  * shadows fall at the hover height) and the prop shader bobs them (the key says so: `config/propHover.ts`).
  */
 export const LANDMARK_STAND_INS: Record<LandmarkKind, readonly StandIn[]> = {
@@ -49,15 +49,18 @@ export const LANDMARK_STAND_INS: Record<LandmarkKind, readonly StandIn[]> = {
       surfaceLift: LOOK.hover.liftM,
     },
   ],
-  // `assets-src/landmarks/great_tree_build.py` (true size in metres, about 11 x 12 m, 10.4 m tall): twice that, so the old
-  // tree stands over the village. Its rockery has a flat base, so it is sunk until the base is under the lowest ground of
-  // its footprint (measured on island-mountain, 2026-11-17: the ground falls 2.4 m below the centre downhill; the lift
-  // grows with the map's landmark scale, 1.22 there).
-  tree: [{ key: 'great_tree', scale: 2, surfaceLift: -2.3 }],
+  // The Sketchfab ancient tree (true size in metres, about 13 x 17 m, 11.5 m tall): half as big again, so it stands over
+  // the village. Its root tips hang about 0.7 m under the trunk's foot, so it is sunk by that (times the scale) to put the
+  // trunk on the ground; the lift grows with the map's landmark scale. First guess: not yet tuned against a map's ground.
+  tree: [{ key: 'ancient_tree', scale: 1.5, surfaceLift: -1 }],
   temple_ruin: [{ key: 'temple_ruin', scale: 1 }],
-  // `assets-src/landmarks/sunken_ruin_build.py` (true size in metres, about 17 x 16 m): half of its 0.8 m podium sunk.
-  sunken_ruin: [{ key: 'sunken_ruin', scale: 1, surfaceLift: -0.4 }],
-  monolith: [{ key: 'stone_big_1', scale: 3.6 }],
+  // `assets-src/landmarks/sunken_temple_build.py --variant ruin` (true size in metres, about 19 x 26 m, long axis along z, the
+  // plinth about 2.5 m behind the middle): its 2.5 m plinth and the causeway's arches are meant to stand 2 m in the ground or
+  // the water (the build's GROUND), so it is sunk by that. First guess, not yet fitted to the island-mountain shore.
+  sunken_ruin: [{ key: 'sunken_ruin', scale: 1, surfaceLift: -2 }],
+  // BlenderKit "Gateway" (true size about 14 x 6.5 m, 12.4 m high, its legs reach 1.25 m under the origin): two thirds, so it
+  // is about as tall as the stone it replaces, with the legs sunk into the ground. First guess, not yet tuned on a map.
+  monolith: [{ key: 'gateway', scale: 0.67, surfaceLift: -0.85 }],
 };
 
 /** `scale` sizes the whole group: the props, their offsets from the origin and their lift. Omit → 1. */
@@ -102,7 +105,7 @@ export const LANDMARK_RESTORE_PROPS: Record<
   Record<RestorePhase, readonly StandIn[]>
 > = {
   tree: {
-    // Outside the rockery's rim (about 12 m from the tree's centre at twice its size).
+    // Outside the roots and crown (about 9 m from the tree's centre across, 13 m along its long side, at 1.5 times its size).
     inProgress: ring('stone_small_2', 0.8, 13, 8),
     restored: [...ring('stone_runic_2', 0.9, 15, 6), ...ring('stone_small_3', 0.9, 13.5, 14)],
   },
@@ -115,13 +118,14 @@ export const LANDMARK_RESTORE_PROPS: Record<
     restored: ring('stone_mid_2', 1, 8, 6),
   },
   sunken_ruin: {
-    // Outside the temple's podium and boulders (about 9 m from its centre).
-    inProgress: ring('stone_small_2', 0.8, 10, 8),
-    restored: ring('stone_mid_3', 1, 11.5, 8),
+    // Outside the causeway's tip and the rocks (about 13 m from the model's middle along z, 10 m to the side).
+    inProgress: ring('stone_small_2', 0.8, 14, 8),
+    restored: ring('stone_mid_3', 1, 15.5, 8),
   },
   monolith: {
-    inProgress: ring('stone_small_2', 0.8, 5, 6),
-    restored: [...ring('stone_runic_6', 0.9, 6, 6), ...ring('stone_small_4', 0.7, 3.5, 8)],
+    // Outside the arch's legs (about 4.7 m from its centre along the arch, 2.2 m across, at two thirds of its size).
+    inProgress: ring('stone_small_2', 0.8, 6, 6),
+    restored: [...ring('stone_runic_6', 0.9, 7.5, 6), ...ring('stone_small_4', 0.7, 5.5, 8)],
   },
 };
 

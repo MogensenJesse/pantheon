@@ -1,5 +1,9 @@
 # assets-src/landmarks/sunken_ruin_build.py — the Sunken ruin landmark model, baked from the model-loop temple
 #
+# SUPERSEDED 2026-11-18: the shipped `sunken_ruin` is now built from the temple ruins asset pack by sunken_temple_build.py.
+# This script (and sunken_ruin_lods.py) still describe the previous model-loop temple, whose GLBs are in git history
+# (commit a23bd16 and before); running it would overwrite the new GLBs at the same path.
+#
 # Source: assets-src/model-loop/temple_ruin/temple_work.blend, collection G_temple_ruin (round t11: the five groups as
 # collection instances on a stone podium, boulders, rubble heaps, steles, ivy). Its 33 materials are procedural (box-
 # projected painted textures in each object's own space, moss masks from mesh attributes, per-object value shifts,

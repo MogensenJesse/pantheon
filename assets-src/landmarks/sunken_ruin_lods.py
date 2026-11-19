@@ -1,5 +1,7 @@
 # assets-src/landmarks/sunken_ruin_lods.py — LOD1 and LOD2 of the Sunken ruin, decimated in Blender
 #
+# SUPERSEDED 2026-11-18 (see sunken_ruin_build.py): it belongs to the previous model-loop temple.
+#
 # The play baker's own LODs (gltf-transform simplify) can't reduce this model: its stones are flat-shaded and every facet is
 # its own UV island, so no vertex is shared and the simplifier has nothing to collapse (lod1/lod2 came out as big as lod0).
 # Blender's collapse decimator keeps the UV seams and the baked atlas still fits, so the LODs are made here and baked with

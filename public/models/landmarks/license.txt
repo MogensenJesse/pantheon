@@ -1,0 +1,26 @@
+Third-party models in this folder (each with its _lod1 / _lod2 siblings): ancient_tree.glb, gateway.glb
+
+=== gateway.glb ===
+* title:	Gateway
+* source:	https://www.blendkit.com (asset_base_id a2691da7-82ea-4f50-b5b2-20424b3806a9)
+* author:	Aiden zhou
+* license:	BlenderKit "royalty_free" (the asset's own license field; no credit required, kept here anyway)
+Changes: normal and roughness maps dropped, scaled and centred, texture compressed to KTX2, LODs generated
+(assets-src/landmarks/sketchfab_prep.mjs).
+
+=== ancient_tree.glb ===
+
+Model Information:
+* title:	Ancient Tree
+* source:	https://sketchfab.com/3d-models/ancient-tree-960fb92d7192458daeaf4282cc6193e2
+* author:	DJMaesen (https://sketchfab.com/bumstrum)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+Changes: normal, occlusion and metal-rough maps and the tangents dropped, meshes joined per material, scaled to metres,
+textures resized and compressed to KTX2, LODs generated (assets-src/landmarks/sketchfab_prep.mjs).
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Ancient Tree" (https://sketchfab.com/3d-models/ancient-tree-960fb92d7192458daeaf4282cc6193e2) by DJMaesen (https://sketchfab.com/bumstrum) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

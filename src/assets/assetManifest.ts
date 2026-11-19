@@ -147,7 +147,7 @@ function birchEntries(): NaturePropAssetEntry[] {
     prop('birch_web', 'birch1', 'autumn_birch_web', 'FOREST', 3),
     prop('birch_pendula', 'birch2', 'autumn_birch_betula_pendula', 'FOREST', 3),
     // The former tree landmark stand-in: birch 1 with a glowing bind rune on its trunk (`assets-src/landmarks`); the tree
-    // is `great_tree` now (structures below), this one is unused but kept. Weight 0: never scattered.
+    // is `ancient_tree` now (structures below), this one is unused but kept. Weight 0: never scattered.
     prop('birch_rune', 'landmarks', 'birch_rune', 'FOREST', 0),
   ];
 }
@@ -238,10 +238,12 @@ const STRUCTURE_HEIGHT_M = {
   church: 12,
   /** The temple ruin landmark (a low ruin, about 10 m wide at this height). */
   ruin: 6,
-  /** The sunken ruin landmark at its true size (about 16 x 16 m, 7.9 m to the dragon heads). */
-  sunkenRuin: 7.87,
-  /** The great tree landmark at its true size (about 11 x 12 m, 10.4 m to the crown's top). */
-  greatTree: 10.38,
+  /** The sunken temple landmark at its true size (a ruin with ivy, about 19 x 26 m with its causeway and rocks, 8.8 m high). */
+  sunkenRuin: 8.81,
+  /** The ancient tree landmark at the model's own size (about 13 x 17 m, 11.5 m to the crown's top). */
+  ancientTree: 11.5,
+  /** The monolith landmark, a rock arch at the model's own size (about 14 x 6.5 m, 12.4 m high, 1.25 m of legs under its origin). */
+  gateway: 12.44,
 } as const;
 
 function structureProp(
@@ -265,7 +267,7 @@ export const ASSET_MANIFEST = {
     structureProp('stave_church', 'stave-church', STRUCTURE_HEIGHT_M.church),
     // The temple ruin landmark (`assets-src/landmarks/temple_ruin_build.py`).
     structureProp('temple_ruin', 'temple_ruin', STRUCTURE_HEIGHT_M.ruin, 'HILLS', 'landmarks'),
-    // The sunken ruin landmark (`assets-src/landmarks/sunken_ruin_build.py`, LODs `sunken_ruin_lods.py`).
+    // The sunken temple landmark (`assets-src/landmarks/sunken_temple_build.py`, from the temple ruins asset pack).
     structureProp(
       'sunken_ruin',
       'sunken_ruin',
@@ -273,8 +275,16 @@ export const ASSET_MANIFEST = {
       'SHORE',
       'landmarks',
     ),
-    // The great tree landmark (`assets-src/landmarks/great_tree_build.py`, from the scene-recon assembly).
-    structureProp('great_tree', 'great_tree', STRUCTURE_HEIGHT_M.greatTree, 'FOREST', 'landmarks'),
+    // The monolith landmark (BlenderKit "Gateway" by Aiden zhou, royalty free: `assets-src/landmarks/sketchfab_prep.mjs`).
+    structureProp('gateway', 'gateway', STRUCTURE_HEIGHT_M.gateway, 'HILLS', 'landmarks'),
+    // The ancient tree landmark (Sketchfab, CC-BY: `assets-src/landmarks/sketchfab_prep.mjs`, credit in license.txt).
+    structureProp(
+      'ancient_tree',
+      'ancient_tree',
+      STRUCTURE_HEIGHT_M.ancientTree,
+      'FOREST',
+      'landmarks',
+    ),
   ],
 } as const;
 

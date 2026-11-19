@@ -9,7 +9,7 @@ Stand-in props are used until these exist. For each: `runestones`, `tree`, `temp
 - [x] `runestones` (the existing runestones model is fine; the stones float, bob and turn slowly, each out of step: `VISUAL.landmark.hover`)
 - [ ] `tree`
 - [ ] `temple_ruin`
-- [x] `sunken_ruin`: the model-loop temple (`public/models/landmarks/sunken_ruin.glb`, source `assets-src/landmarks/sunken_ruin_build.py`); the water line is the terrain's, the temple is placed in water by hand. No glow parts yet.
+- [x] `sunken_ruin`: a ruined temple built from the Temple ruins asset pack (`public/models/landmarks/sunken_ruin.glb`, source `assets-src/landmarks/sunken_temple_build.py --variant ruin`); the water line is the terrain's, the temple is placed in water by hand. No glow parts yet.
 - [ ] `monolith`
 
 What I need per model: a glTF `.glb` with the origin at the base and +Y up; a target height in metres (`targetHeightM` in `src/assets/assetManifest.ts`) and rough footprint; a LOD chain (`Name.glb`, `Name_lod1.glb`, `Name_lod2.glb`); textures baked to KTX2 by `npm run bake:play-props`; which parts should glow (a separate emissive material or node, or a mask) so I can drive them from the awakening; a pick/dwell radius if the footprint is unusual. Put them in `public/models/landmarks/` (a new family) and tell me the file names.
