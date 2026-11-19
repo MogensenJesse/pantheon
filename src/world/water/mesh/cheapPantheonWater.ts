@@ -11,6 +11,7 @@ import {
   applySunShadowVisibility,
   buildWaterMeshGraph,
   initWaterMeshUniforms,
+  underSurfaceColor,
   type WaterMeshSharedOptions,
   type WaterMeshUniformHost,
 } from './buildWaterMeshGraph';
@@ -68,34 +69,37 @@ export class CheapPantheonWaterMesh extends Mesh implements WaterMeshUniformHost
     } = graph;
 
     if (shore) {
-      material.colorNode = Fn(() => {
-        applyWaterDryLandDiscardTsl(worldXZ, shore, shoreDistM);
-        const shoreWaterColor = waterDepthScatterTintTsl(
-          this.waterColor,
-          worldXZ,
-          shore,
-          shoreDepth,
-        );
-        const scatter = max(0.0, dot(surfaceNormal, eyeDirection)).mul(shoreWaterColor);
-        const baseColor = shoreWaterColor
-          .mul(0.65)
-          .add(this.sunColor.mul(diffuseLight).mul(0.25))
-          .add(scatter.mul(0.35))
-          .add(specularLight.mul(fresnel))
-          .add(vec3(0.02, 0.04, 0.06).mul(fresnel));
-        const refracted = applyWaterRefractionTsl(
-          applySunShadowVisibility(baseColor, sunShadow, uShadowFloor, uSunIntensity),
-          waterRefractionScreenOffsetTsl(surfaceNormal.xz, distance, this.distortionScale, shore),
-          refractMask,
-          shoreWaterColor,
-          shoreDepth,
-          shore,
-          viewportScene,
-        );
-        return foamMask
-          ? applyWaterSurfaceFoamColorTsl(refracted, foamMask, waterWaveUniforms)
-          : refracted;
-      })() as any;
+      material.colorNode = underSurfaceColor(
+        graph,
+        Fn(() => {
+          applyWaterDryLandDiscardTsl(worldXZ, shore, shoreDistM);
+          const shoreWaterColor = waterDepthScatterTintTsl(
+            this.waterColor,
+            worldXZ,
+            shore,
+            shoreDepth,
+          );
+          const scatter = max(0.0, dot(surfaceNormal, eyeDirection)).mul(shoreWaterColor);
+          const baseColor = shoreWaterColor
+            .mul(0.65)
+            .add(this.sunColor.mul(diffuseLight).mul(0.25))
+            .add(scatter.mul(0.35))
+            .add(specularLight.mul(fresnel))
+            .add(vec3(0.02, 0.04, 0.06).mul(fresnel));
+          const refracted = applyWaterRefractionTsl(
+            applySunShadowVisibility(baseColor, sunShadow, uShadowFloor, uSunIntensity),
+            waterRefractionScreenOffsetTsl(surfaceNormal.xz, distance, this.distortionScale, shore),
+            refractMask,
+            shoreWaterColor,
+            shoreDepth,
+            shore,
+            viewportScene,
+          );
+          return foamMask
+            ? applyWaterSurfaceFoamColorTsl(refracted, foamMask, waterWaveUniforms)
+            : refracted;
+        })(),
+      ) as any;
     } else {
       const scatter = max(0.0, dot(surfaceNormal, eyeDirection)).mul(this.waterColor);
       const baseColor = this.waterColor
@@ -104,11 +108,9 @@ export class CheapPantheonWaterMesh extends Mesh implements WaterMeshUniformHost
         .add(scatter.mul(0.35))
         .add(specularLight.mul(fresnel))
         .add(vec3(0.02, 0.04, 0.06).mul(fresnel));
-      material.colorNode = applySunShadowVisibility(
-        baseColor,
-        sunShadow,
-        uShadowFloor,
-        uSunIntensity,
+      material.colorNode = underSurfaceColor(
+        graph,
+        applySunShadowVisibility(baseColor, sunShadow, uShadowFloor, uSunIntensity),
       ) as any;
     }
   }

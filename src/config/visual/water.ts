@@ -58,10 +58,10 @@ export const water = {
   },
   shoreDepth: {
     enabled: true,
-    absorption: 0.6,
+    absorption: 0.35,
     coastFadeM: 4.5,
     shallowDepthM: 13,
-    refractionDepthM: 4,
+    refractionDepthM: 8,
     /** Translucent multiply of shallowColor over refracted seabed (1 = full tint, sand still shows). */
     shallowOverRefract: 0.7,
     shadowOpacityBoost: 0.6,

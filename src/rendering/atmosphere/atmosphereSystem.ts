@@ -1,7 +1,7 @@
 // src/rendering/atmosphere/atmosphereSystem.ts — scene.fogNode uniforms + day/night cycle sync
 import type { Scene, Texture } from 'three';
 import { Color, MathUtils } from 'three';
-import { color, fog, texture, uniform } from 'three/tsl';
+import { color, float, fog, max, mix, texture, uniform } from 'three/tsl';
 import type { TodStopId } from '../../config/visual/tod';
 import { TOD_STOPS } from '../../config/visual/tod';
 import { VISUAL } from '../../config/visualTuning';
@@ -9,6 +9,7 @@ import { WORLD } from '../../config/world';
 import { devSettings } from '../../core/settings';
 import { createPlaceholderInlandTexture } from '../../map/oceanInlandMask';
 import { sampleTodScalar } from '../tod/todBlend';
+import { underwaterFogTsl } from '../underwater/underwaterTsl';
 import {
   type HazeTintParams,
   hazeStrengthForElevation,
@@ -195,7 +196,12 @@ export function initValleyFog(scene: Scene): ValleyFogUniforms {
   fogNightAreaNode = nightArea;
   fogSkyVolumeNode = skyVolume;
   fogAreaNode = fogArea;
-  scene.fogNode = fog(color(uFogColor), fogArea);
+  // The water volume joins the air's fog as a third term, 1-(1-air)*(1-water), tinted by the water's own colour in proportion
+  // (0 for any ray that never touches the water, so dry views are unchanged). Built in, never swapped (see above).
+  const water = underwaterFogTsl();
+  const totalFog = float(1).sub(float(1).sub(fogArea).mul(float(1).sub(water.factor)));
+  const fogTint = mix(color(uFogColor), water.color, water.factor.div(max(totalFog, float(1e-4))));
+  scene.fogNode = fog(fogTint, totalFog);
 
   fogUniforms = {
     ...graph,

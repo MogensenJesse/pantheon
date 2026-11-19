@@ -1,11 +1,13 @@
 // src/rendering/postfx/createPostFxPipeline.ts — WebGPU RenderPipeline assembly
 import type { DirectionalLight, PerspectiveCamera, Scene } from 'three';
 import type FSR1Node from 'three/addons/tsl/display/FSR1Node.js';
-import { float, mix, pass, smoothstep, uniform, vec4 } from 'three/tsl';
+import { Fn, float, If, mix, pass, screenUV, smoothstep, uniform, vec4 } from 'three/tsl';
 import { RenderPipeline, type WebGPURenderer } from 'three/webgpu';
 import { type AaMethod, type UpscalingSettings, VISUAL } from '../../config/visualTuning';
 import { devSettings } from '../../core/settings';
 import type { PostFXContext } from '../PostFX';
+import { underwaterVoidFillTsl } from '../underwater/underwaterTsl';
+import { underwaterUniforms } from '../underwater/underwaterUniforms';
 import { createBloomControls } from './controls/bloomControls';
 import { createDofControls, disposeActiveDof } from './controls/dofControls';
 import { createGodraysControls, disposeActiveGodrays } from './controls/godraysControls';
@@ -64,7 +66,17 @@ export function createPostFxPipeline(
   const sceneViewZ = scenePass.getViewZNode();
   const sceneBeauty: TslNode = sceneColor;
 
-  const bloomControls = createBloomControls(sceneBeauty);
+  // Bloom reads the scene with the underwater void filled in (see `underwaterVoidFillTsl`): from the raw scene it would
+  // keep glowing from the sky band that the composite has replaced with water.
+  const bloomInput = Fn(() => {
+    const color = sceneColor.sample(screenUV).toVar();
+    If(underwaterUniforms.uSubmerge.greaterThan(0.001), () => {
+      const fill = underwaterVoidFillTsl(screenUV, sceneDepth);
+      color.assign(vec4(mix(color.rgb, fill.color, fill.weight), color.a));
+    });
+    return color;
+  })();
+  const bloomControls = createBloomControls(bloomInput);
   const godraysControls = createGodraysControls(sceneDepth, camera);
   const gradeControls = createGradeControls();
   const painterly = createPainterlyControls();

@@ -16,6 +16,7 @@ import { playerGlowFalloffTerrain } from '../../../rendering/playerGlowTsl';
 import { computeTerrainSunVisFloor } from '../../../rendering/sunShadow';
 import { guideReceiveGlowTsl } from '../../../rendering/tsl/guideReceiveGlowTsl';
 import { applyWetLookTsl } from '../../../rendering/tsl/wetLookTsl';
+import { underwaterCausticLightTsl } from '../../../rendering/underwater/underwaterTsl';
 import { waterWaveUniforms } from '../../water/material/waterWaveUniforms';
 import {
   applyWaterTerrainWetnessTsl,
@@ -320,7 +321,16 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     const guideGlow = guideReceiveGlowTsl(uGuideGlowMap, mapUv, uGuideLightIntensity);
     const glowLit = albedoFinal.mul(aoTerm).mul(playerGlow.add(guideGlow));
 
-    const normalLit = diffuse.add(glowLit);
+    // Sea floor: moving caustics on sunlit ground under the surface (0 above it; the fog tint comes from scene.fogNode).
+    const causticLight = underwaterCausticLightTsl(
+      worldPos,
+      worldNormal,
+      uSunDirection,
+      sunVisWithPropAo,
+    );
+    const normalLit = diffuse
+      .add(glowLit)
+      .add(albedoFinal.mul(uSunColor).mul(uSunIntensity).mul(causticLight));
     const shadowDebug = mix(
       normalLit,
       vec3(sunVisWithPropAo as any, sunVisWithPropAo as any, sunVisWithPropAo as any),

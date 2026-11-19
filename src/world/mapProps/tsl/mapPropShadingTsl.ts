@@ -5,6 +5,7 @@ import { playerGlowFalloff } from '../../../rendering/playerGlowTsl';
 import { computePropSunShadowMul } from '../../../rendering/sunShadow';
 import { applyFoliageWrapHemisphere } from '../../../rendering/tsl/foliageWrapHemisphereTsl';
 import { guideReceiveGlowTsl } from '../../../rendering/tsl/guideReceiveGlowTsl';
+import { underwaterCausticLightTsl } from '../../../rendering/underwater/underwaterTsl';
 import { propShadowUniforms } from '../config/mapPropShadowUniforms';
 import { applyPropGroundContactTsl } from './propGroundContactTsl';
 
@@ -80,6 +81,13 @@ export function applyPropShading(
   // Key/fill color: sun-lit side follows the sun tint, shadowed side the ambient tint.
   const keyFill = mix(uAmbientTint, uSunTint, shadowMul.clamp(0, 1));
   const baseLit = groundedAlbedo.mul(nightMul).mul(shadowMul).mul(keyFill);
+  // Props on the sea floor: the same moving caustics as the terrain under them (0 above the surface).
+  const causticLight = underwaterCausticLightTsl(
+    positionWorld,
+    normal,
+    uSunDirection,
+    shadowMul.clamp(0, 1),
+  );
 
   const toPlayer = vec3(
     positionWorld.x.sub(uPlayerPosition.x),
@@ -92,5 +100,5 @@ export function applyPropShading(
   const guideGlow = guideReceiveGlowTsl(uGuideGlowMap, guideUv, uGuideLightIntensity);
   const glowLit = groundedAlbedo.mul(glow.add(guideGlow));
 
-  return baseLit.add(glowLit);
+  return baseLit.add(glowLit).add(groundedAlbedo.mul(uSunTint).mul(causticLight));
 }

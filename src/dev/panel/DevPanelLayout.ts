@@ -44,6 +44,7 @@ const DEV_SHELL_HTML = `
       <div id="dev-section-village"></div>
       <div id="dev-section-shadows"></div>
       <div id="dev-section-water"></div>
+      <div id="dev-section-underwater"></div>
     </div>
   </details>
   <div id="dev-section-upscaling"></div>

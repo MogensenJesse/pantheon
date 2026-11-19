@@ -23,6 +23,7 @@ import { shrineZone } from './shrineZone.ts';
 import { sky } from './sky.ts';
 import { terrain } from './terrain.ts';
 import { tod } from './tod.ts';
+import { underwater } from './underwater.ts';
 import { village } from './village.ts';
 import { water } from './water.ts';
 
@@ -55,6 +56,7 @@ export const VISUAL = {
   postfx,
   render,
   water,
+  underwater,
   terrain,
   props,
   foliage,

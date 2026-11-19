@@ -59,6 +59,7 @@ const CHECKS = [
   { name: 'prop-sway', file: 'map/prop-sway-check.ts' },
   { name: 'save', file: 'save/save-check.ts' },
   { name: 'ui', file: 'ui/kit-check.ts' },
+  { name: 'underwater', file: 'underwater/underwater-check.ts' },
 ];
 
 const args = process.argv.slice(2);

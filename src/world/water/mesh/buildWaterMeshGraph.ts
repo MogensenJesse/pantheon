@@ -1,6 +1,6 @@
 // src/world/water/mesh/buildWaterMeshGraph.ts — shared uniforms + surface/material shell for water tiers
 import type { DirectionalLight, Texture } from 'three';
-import { Color, Vector3 } from 'three';
+import { Color, DoubleSide, Vector3 } from 'three';
 import {
   add,
   cameraPosition,
@@ -8,6 +8,7 @@ import {
   dot,
   Fn,
   float,
+  frontFacing,
   length,
   max,
   normalize,
@@ -15,6 +16,7 @@ import {
   positionWorld,
   pow,
   reflect,
+  select,
   sub,
   texture,
   time,
@@ -27,6 +29,8 @@ import {
   createReceiverSunShadowNode,
 } from '../../../rendering/sunShadow';
 import { waterSunReceiverUniforms } from '../../../rendering/sunShadow/receiverUniforms';
+import { underwaterCeilingColorTsl } from '../../../rendering/underwater/underwaterTsl';
+import { underwaterUniforms } from '../../../rendering/underwater/underwaterUniforms';
 import { createMacroHeightTsl } from '../../terrain/tsl/terrainMacroHeightTsl';
 import type { PantheonWaterNodeMaterial } from '../material/PantheonWaterNodeMaterial';
 import {
@@ -119,6 +123,8 @@ export interface WaterMeshGraph extends WaterMeshUniformHost {
   distance: TslNode;
   distortion: TslNode;
   fresnel: TslNode | null;
+  /** The surface seen from below (back face): bright window, water-coloured ceiling. Tiers pick it with `underSurfaceColor`. */
+  ceilingColor: TslNode;
 }
 
 function createWaterNormalNoiseFn(waterNormals: TslNode, sampleCount: 2 | 4) {
@@ -189,7 +195,8 @@ export function buildWaterMeshGraph(
   );
   const shore = options.shoreDepth ? createWaterShoreUniforms(options.shoreDepth) : null;
   host.shoreUniforms = shore;
-  const viewportScene = shore ? viewportSharedTexture() : null;
+  // Also read by the surface seen from below, so it exists with or without shore depth.
+  const viewportScene = viewportSharedTexture();
 
   const getNoise = createWaterNormalNoiseFn(host.waterNormals, tuning.normalSampleCount);
   const noise = getNoise(positionWorld.xz.mul(host.size));
@@ -236,9 +243,11 @@ export function buildWaterMeshGraph(
     shore && shoreDepth
       ? waterRefractionMaskTsl(worldXZ, shore, shoreDepth, shoreDistM ?? undefined)
       : null;
-  if (shore && refractMask) {
-    material.fogBypassNode = waterShoreFogBypassTsl(refractMask, shore);
-  }
+  // Seen from below the surface is a back face: opaque, a refracted view of the world above, no valley fog (the volume's own fog is in its colour).
+  // Off with the volume (the map editor never syncs it), the back face then stays invisible as it was when culled.
+  material.side = DoubleSide;
+  const shoreBypass = shore && refractMask ? waterShoreFogBypassTsl(refractMask, shore) : float(0);
+  material.fogBypassNode = select(frontFacing, shoreBypass, float(1));
   const depthOpacity =
     shore && shoreDepth
       ? waterRefractionOpacityCompensateTsl(
@@ -254,9 +263,14 @@ export function buildWaterMeshGraph(
           shore,
         )
       : edgeAlpha;
-  material.opacityNode = foamMask
+  const frontOpacity = foamMask
     ? applyWaterSurfaceFoamOpacityTsl(depthOpacity, foamMask)
     : depthOpacity;
+  material.opacityNode = select(
+    frontFacing,
+    frontOpacity,
+    edgeAlpha.mul(underwaterUniforms.uEnabled),
+  );
   material.receivedShadowPositionNode = tuning.shadowReceiveDistortion
     ? positionWorld.add(distortion)
     : positionWorld;
@@ -281,7 +295,13 @@ export function buildWaterMeshGraph(
     distance,
     distortion,
     fresnel,
+    ceilingColor: underwaterCeilingColorTsl(eyeDirection.negate(), surfaceNormal, viewportScene),
   };
+}
+
+/** The surface colour for a fragment: `frontColor` seen from above, the ceiling from below. */
+export function underSurfaceColor(graph: WaterMeshGraph, frontColor: TslNode): TslNode {
+  return select(frontFacing, frontColor, graph.ceilingColor);
 }
 
 export { applySunShadowVisibility };

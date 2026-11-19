@@ -31,6 +31,7 @@ import {
   updateWorldCascadeShadow,
 } from '../rendering/sunShadow';
 import { currentSunElevationDeg } from '../rendering/sunSpherical';
+import { mapEdgeFloorY, syncUnderwater } from '../rendering/underwater/underwaterSync';
 import type { WeatherView } from '../rendering/weather/weatherView';
 import { syncWorldLighting } from '../rendering/worldLighting';
 import type { GrassSystem } from '../world/grass/core/GrassSystem';
@@ -134,6 +135,8 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     ambienceView,
     life,
   } = ctx;
+
+  const edgeFloorY = mapEdgeFloorY(terrain.getWorldY);
 
   let elapsed = ctx.initialClocks?.elapsed ?? 0;
   /** Render-rate cloud wind clock: the 50 Hz fixed `elapsed` steps cloud and shadow motion unevenly. */
@@ -277,6 +280,14 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
       );
       syncPantheonWater(waterMesh, sun, skySystem.getDaylight());
     }
+    syncUnderwater(
+      currentSunElevationDeg(),
+      skySystem.getDaylight(),
+      camera,
+      playWaterY,
+      frameDelta,
+      edgeFloorY,
+    );
     postFX.setDofFocus(camera, focusAnchor, frameDelta);
     // The overview is for reading the village and a cutscene for looking: no depth-of-field blur there.
     postFX.setDofBokehScale(

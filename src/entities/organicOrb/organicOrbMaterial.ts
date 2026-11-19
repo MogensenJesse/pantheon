@@ -1,9 +1,11 @@
 // src/entities/organicOrb/organicOrbMaterial.ts — MeshBasicNodeMaterial factory + live uniforms
 import { FrontSide, NormalBlending, Vector3 } from 'three';
-import { uniform } from 'three/tsl';
+import { mix, uniform } from 'three/tsl';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import type { OrganicOrbSettings } from '../../config/visual/organicOrb';
 import { VISUAL } from '../../config/visualTuning';
+import { underwaterFogTsl } from '../../rendering/underwater/underwaterTsl';
+import { underwaterUniforms } from '../../rendering/underwater/underwaterUniforms';
 import { buildOrganicOrbGraph } from './organicOrbTsl';
 
 export interface OrganicOrbMaterial {
@@ -73,7 +75,9 @@ export function createOrganicOrbMaterial(): OrganicOrbMaterial {
   material.fog = false;
   material.forceSinglePass = true;
   material.positionNode = positionNode;
-  material.colorNode = colorNode;
+  // Unlit, so scene fog never reaches it: take a share of the water's colour in proportion to the water in front of it.
+  const water = underwaterFogTsl();
+  material.colorNode = mix(colorNode, water.color, water.factor.mul(underwaterUniforms.uOrbTint));
   material.opacityNode = opacityNode;
 
   const sync = (settings: OrganicOrbSettings, rimHdr?: number) => {

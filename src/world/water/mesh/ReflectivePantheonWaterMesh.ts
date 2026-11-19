@@ -13,6 +13,7 @@ import {
   applySunShadowVisibility,
   buildWaterMeshGraph,
   initWaterMeshUniforms,
+  underSurfaceColor,
   type WaterMeshSharedOptions,
   type WaterMeshUniformHost,
 } from './buildWaterMeshGraph';
@@ -91,61 +92,67 @@ export class ReflectivePantheonWaterMesh extends Mesh implements WaterMeshUnifor
     const minReflectionMix = float(VISUAL.water.minReflectionMix);
 
     if (shore) {
-      material.colorNode = Fn(() => {
-        applyWaterDryLandDiscardTsl(worldXZ, shore, shoreDistM);
+      material.colorNode = underSurfaceColor(
+        graph,
+        Fn(() => {
+          applyWaterDryLandDiscardTsl(worldXZ, shore, shoreDistM);
 
-        const theta = max(dot(eyeDirection, surfaceNormal), 0.0);
-        const rf0 = float(0.02);
-        const reflectance = mul(pow(float(1.0).sub(theta), 5.0), float(1.0).sub(rf0)).add(rf0);
-        const scatterWaterColor = waterDepthScatterTintTsl(
-          this.waterColor,
-          worldXZ,
-          shore,
-          shoreDepth,
-        );
-        const scatter = max(0.0, dot(surfaceNormal, eyeDirection)).mul(scatterWaterColor);
-        const reflectionMix = max(reflectance, minReflectionMix);
-        const procedural = this.sunColor.mul(diffuseLight).mul(0.3).add(scatter);
-        const reflected = mirrorSampler.rgb.add(specularLight);
-        const albedo = mix(
-          applySunShadowVisibility(procedural, sunShadow, uShadowFloor, uSunIntensity),
-          reflected,
-          reflectionMix,
-        );
-        const refractOffset = waterRefractionScreenOffsetTsl(
-          surfaceNormal.xz,
-          distance,
-          this.distortionScale,
-          shore,
-        );
-        const refracted = applyWaterRefractionTsl(
-          albedo,
-          refractOffset,
-          refractMask,
-          scatterWaterColor,
-          shoreDepth,
-          shore,
-          viewportScene,
-        );
-        return foamMask
-          ? applyWaterSurfaceFoamColorTsl(refracted, foamMask, waterWaveUniforms)
-          : refracted;
-      })() as any;
+          const theta = max(dot(eyeDirection, surfaceNormal), 0.0);
+          const rf0 = float(0.02);
+          const reflectance = mul(pow(float(1.0).sub(theta), 5.0), float(1.0).sub(rf0)).add(rf0);
+          const scatterWaterColor = waterDepthScatterTintTsl(
+            this.waterColor,
+            worldXZ,
+            shore,
+            shoreDepth,
+          );
+          const scatter = max(0.0, dot(surfaceNormal, eyeDirection)).mul(scatterWaterColor);
+          const reflectionMix = max(reflectance, minReflectionMix);
+          const procedural = this.sunColor.mul(diffuseLight).mul(0.3).add(scatter);
+          const reflected = mirrorSampler.rgb.add(specularLight);
+          const albedo = mix(
+            applySunShadowVisibility(procedural, sunShadow, uShadowFloor, uSunIntensity),
+            reflected,
+            reflectionMix,
+          );
+          const refractOffset = waterRefractionScreenOffsetTsl(
+            surfaceNormal.xz,
+            distance,
+            this.distortionScale,
+            shore,
+          );
+          const refracted = applyWaterRefractionTsl(
+            albedo,
+            refractOffset,
+            refractMask,
+            scatterWaterColor,
+            shoreDepth,
+            shore,
+            viewportScene,
+          );
+          return foamMask
+            ? applyWaterSurfaceFoamColorTsl(refracted, foamMask, waterWaveUniforms)
+            : refracted;
+        })(),
+      ) as any;
     } else {
-      material.colorNode = Fn(() => {
-        const theta = max(dot(eyeDirection, surfaceNormal), 0.0);
-        const rf0 = float(0.02);
-        const reflectance = mul(pow(float(1.0).sub(theta), 5.0), float(1.0).sub(rf0)).add(rf0);
-        const scatter = max(0.0, dot(surfaceNormal, eyeDirection)).mul(this.waterColor);
-        const reflectionMix = max(reflectance, minReflectionMix);
-        const procedural = this.sunColor.mul(diffuseLight).mul(0.3).add(scatter);
-        const reflected = mirrorSampler.rgb.add(specularLight);
-        return mix(
-          applySunShadowVisibility(procedural, sunShadow, uShadowFloor, uSunIntensity),
-          reflected,
-          reflectionMix,
-        );
-      })() as any;
+      material.colorNode = underSurfaceColor(
+        graph,
+        Fn(() => {
+          const theta = max(dot(eyeDirection, surfaceNormal), 0.0);
+          const rf0 = float(0.02);
+          const reflectance = mul(pow(float(1.0).sub(theta), 5.0), float(1.0).sub(rf0)).add(rf0);
+          const scatter = max(0.0, dot(surfaceNormal, eyeDirection)).mul(this.waterColor);
+          const reflectionMix = max(reflectance, minReflectionMix);
+          const procedural = this.sunColor.mul(diffuseLight).mul(0.3).add(scatter);
+          const reflected = mirrorSampler.rgb.add(specularLight);
+          return mix(
+            applySunShadowVisibility(procedural, sunShadow, uShadowFloor, uSunIntensity),
+            reflected,
+            reflectionMix,
+          );
+        })(),
+      ) as any;
     }
   }
 }
