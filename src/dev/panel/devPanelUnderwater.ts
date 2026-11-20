@@ -1,11 +1,17 @@
 // src/dev/panel/devPanelUnderwater.ts — live knobs for the water volume (DEV)
 // Writes to `underwaterSettings`; `syncUnderwater` pushes it to the GPU every frame. Per-stop colours are colour pickers.
+// The sea floor groups (kelp, motes) write into `VISUAL.underwater.seabed` like the Life section does: the motes read it
+// every frame, the kelp numbers are pushed to the grass uniforms and the kelp patches re-bake the grass data map.
 
+import { VISUAL } from '../../config/visualTuning';
 import {
   resetUnderwaterSettings,
   type UnderwaterSettings,
   underwaterSettings,
 } from '../../rendering/underwater/underwaterUniforms';
+import { applyGrassKelpUniforms } from '../../world/grass/config/grassUniforms';
+import type { GrassSystem } from '../../world/grass/core/GrassSystem';
+import { buildConfigGroups, type ConfigGroup } from '../bindConfig';
 import {
   bindCheckbox,
   bindSpecs,
@@ -95,6 +101,72 @@ const ALL_SPECS: UnderwaterSpec[] = [
 const STOP_IDS = ['night', 'goldenHour', 'noon'] as const;
 const STOP_LABELS = { night: 'Night', goldenHour: 'Golden hour', noon: 'Noon' } as const;
 
+const SEABED = VISUAL.underwater.seabed;
+
+/** The sea floor's numbers. The kelp is grass (`world/grass`), so its edits reach the grass system; `grass` is null in a scene without one. */
+function seabedGroups(grass: GrassSystem | null): ConfigGroup[] {
+  return [
+    {
+      title: 'Kelp',
+      hint: 'Grass blades on the sea floor. Length and density change as the blades regrow (a few seconds).',
+      root: SEABED.kelp,
+      colors: [
+        ['colorA', 'Root colour'],
+        ['colorB', 'Tip colour'],
+      ],
+      rows: [
+        ['density', 'Density (share of the grass blades)', 0, 0.4, 0.005, 3],
+        ['heightM.0', 'Shortest blade (m)', 0.3, 2.25, 0.05],
+        ['heightM.1', 'Longest blade (m)', 0.3, 2.25, 0.05],
+        ['widthMul', 'Width (× the grass blade)', 0.5, 6, 0.1, 1],
+        ['swayM', 'Sway (m)', 0, 2, 0.05],
+        ['swayHz', 'Sway rate (Hz)', 0, 1, 0.01],
+      ],
+      onChange: () => {
+        applyGrassKelpUniforms();
+        grass?.requestCompactPass();
+      },
+    },
+    {
+      title: 'Kelp patches',
+      hint: 'Where it grows. Baked into the grass data map: applied when you let go of a slider, then the whole map is baked again (a moment).',
+      root: SEABED.kelp,
+      rows: [
+        ['depthM.0', 'Shallowest (m of water)', 0, 6, 0.1, 1],
+        ['depthM.1', 'Deepest (m of water)', 4, 25, 0.5, 1],
+        ['patchM', 'Patch size (m)', 4, 60, 1, 0],
+        ['patchShare', 'Share of the sea floor', 0.05, 1, 0.01],
+      ],
+      commit: 'release',
+      onChange: () => {
+        grass?.refreshGrassDataMap();
+        grass?.requestCompactPass();
+      },
+    },
+    {
+      title: 'Motes',
+      hint: 'Specks adrift in the water. Their count and shape are built once: reload. Rocks are placed at load as map props: edit `seabed.rocks` in config/visual/underwater.ts and reload.',
+      root: SEABED.motes,
+      colors: [
+        ['colorA', 'Colour A'],
+        ['colorB', 'Colour B'],
+      ],
+      rows: [
+        ['alpha', 'Opacity', 0, 1, 0.01],
+        ['sizeM.0', 'Smallest (m)', 0.005, 0.15, 0.005, 3],
+        ['sizeM.1', 'Largest (m)', 0.005, 0.2, 0.005, 3],
+        ['nightMul', 'Brightness at night', 0, 1, 0.01],
+        ['boxM', 'Box (m)', 8, 60, 1, 0],
+        ['heightM', 'Height of the box (m)', 2, 30, 0.5, 1],
+        ['windMps', 'Carried (m/s)', 0, 1, 0.01],
+        ['fallMps', 'Fall (m/s)', 0, 0.5, 0.005, 3],
+        ['wobbleM', 'Wobble (m)', 0, 2, 0.05],
+        ['wobbleHz', 'Wobble rate (Hz)', 0, 1, 0.01],
+      ],
+    },
+  ];
+}
+
 function colorRowsHtml(): string {
   return STOP_IDS.map(
     (id) => `
@@ -118,7 +190,11 @@ function syncUi(panel: HTMLDivElement): void {
   }
 }
 
-export function initDevPanelUnderwater(panel: HTMLDivElement): () => void {
+export function initDevPanelUnderwater(
+  panel: HTMLDivElement,
+  grass: GrassSystem | null = null,
+): () => void {
+  const seabed = buildConfigGroups('dev-uw-seabed', SEABED, seabedGroups(grass));
   const body = mountSection(panel, {
     hostId: 'dev-section-underwater',
     title: 'Underwater',
@@ -135,6 +211,7 @@ export function initDevPanelUnderwater(panel: HTMLDivElement): () => void {
       ${subsectionHtml('Surface from below', '<div id="dev-uw-window"></div>')}
       ${subsectionHtml('Underwater wobble', '<div id="dev-uw-ripple"></div>')}
       ${subsectionHtml('Colours', colorRowsHtml())}
+      ${seabed.html}
       <div class="dev-actions">
         <button type="button" id="dev-uw-reset">Reset underwater</button>
       </div>
@@ -154,7 +231,7 @@ export function initDevPanelUnderwater(panel: HTMLDivElement): () => void {
   if (hostRipple) injectRangeRows(hostRipple, RIPPLE_SPECS);
   syncUi(panel);
 
-  const disposers: Array<() => void> = [];
+  const disposers: Array<() => void> = [seabed.bind(panel)];
   disposers.push(
     ...bindSpecs(panel, ALL_SPECS, (s, v) => {
       (d as UnderwaterSettings)[s.key] = v;
@@ -185,6 +262,7 @@ export function initDevPanelUnderwater(panel: HTMLDivElement): () => void {
   const resetBtn = panel.querySelector('#dev-uw-reset') as HTMLButtonElement | null;
   const onReset = () => {
     resetUnderwaterSettings();
+    seabed.reset(panel);
     syncUi(panel);
   };
   resetBtn?.addEventListener('click', onReset);

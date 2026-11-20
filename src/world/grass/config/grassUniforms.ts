@@ -14,6 +14,7 @@ import type { GrassRingDerived } from './grassFieldMetrics';
 
 const g = VISUAL.grass;
 const WHEAT = VISUAL.village.WHEAT;
+const KELP = VISUAL.underwater.seabed.kelp;
 const LIFE = VISUAL.life;
 const fl = g.foliageLighting;
 
@@ -62,6 +63,16 @@ export const grassSharedUniforms = {
   uWheatYoungColor: uniform(new Color(WHEAT.YOUNG_COLOR)),
   uWheatRipeColor: uniform(new Color(WHEAT.RIPE_COLOR)),
   uWheatTipColor: uniform(new Color(WHEAT.TIP_COLOR)),
+  /** Kelp is grass on the sea floor (`underwater.seabed.kelp`); `uKelpWaterY` is the water level its blades are capped under. */
+  uKelpWaterY: uniform(0),
+  uKelpDensity: uniform(KELP.density),
+  uKelpHeightMin: uniform(KELP.heightM[0]),
+  uKelpHeightMax: uniform(KELP.heightM[1]),
+  uKelpWidthMul: uniform(KELP.widthMul),
+  uKelpSwayM: uniform(KELP.swayM),
+  uKelpSwayOmega: uniform(Math.PI * 2 * KELP.swayHz),
+  uKelpColorA: uniform(new Color(KELP.colorA)),
+  uKelpColorB: uniform(new Color(KELP.colorB)),
   /** Wheat waves along the wind and lies down when wet; see `life.WHEAT_WIND`. */
   uWheatWaveGain: uniform(LIFE.WHEAT_WIND.WAVE_GAIN),
   uWheatWaveBase: uniform(LIFE.WHEAT_WIND.WAVE_BASE),
@@ -365,6 +376,19 @@ export function applyGrassSharedDevUniforms(settings: GrassDevSettings): void {
   u.uWidthNearRadiusSquared.value = widthNear * widthNear;
   u.uWidthFarRadiusSquared.value = widthFar * widthFar;
   u.uTrailRadiusSquared.value = settings.trailRadius * settings.trailRadius;
+}
+
+/** DEV: push the kelp numbers (`VISUAL.underwater.seabed.kelp`, edited live by the DEV panel) to the shared uniforms. */
+export function applyGrassKelpUniforms(): void {
+  const u = grassSharedUniforms;
+  u.uKelpDensity.value = KELP.density;
+  u.uKelpHeightMin.value = KELP.heightM[0];
+  u.uKelpHeightMax.value = KELP.heightM[1];
+  u.uKelpWidthMul.value = KELP.widthMul;
+  u.uKelpSwayM.value = KELP.swayM;
+  u.uKelpSwayOmega.value = Math.PI * 2 * KELP.swayHz;
+  u.uKelpColorA.value.set(KELP.colorA);
+  u.uKelpColorB.value.set(KELP.colorB);
 }
 
 export function applyGrassRingUniforms(

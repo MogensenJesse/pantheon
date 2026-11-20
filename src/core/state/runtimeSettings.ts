@@ -40,7 +40,6 @@ function createWaterDevFromVisual(): WaterDevSettings {
     resolutionScale: VISUAL.water.resolutionScale,
     stops: structuredClone(VISUAL.water.stops) as WaterDevSettings['stops'],
     shoreDepth: { ...VISUAL.water.shoreDepth },
-    tide: { ...VISUAL.water.tide },
   };
 }
 

@@ -40,6 +40,7 @@ import { type PropLodGroup, updatePropLod } from '../world/mapProps/mapPropLod';
 import type { VillageSystemContext } from '../world/village/VillageSystem';
 import type { PantheonWaterInstance } from '../world/water/mesh/pantheonWaterTypes';
 import { syncPantheonWater } from '../world/water/sync/syncPantheonWater';
+import { followCameraWithWater } from '../world/water/sync/syncWaterWaves';
 import { updateWaterReflectionQuality } from '../world/water/sync/updateWaterReflectionQuality';
 import type { CameraInputContext } from './CameraInput';
 import { getEnergyRatio } from './energy';
@@ -278,7 +279,8 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
         playWaterY,
         camera,
       );
-      syncPantheonWater(waterMesh, sun, skySystem.getDaylight());
+      syncPantheonWater(waterMesh, sun, skySystem.getDaylight(), camera.position.y - playWaterY);
+      followCameraWithWater(waterMesh, camera);
     }
     syncUnderwater(
       currentSunElevationDeg(),

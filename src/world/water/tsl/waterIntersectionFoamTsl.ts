@@ -1,111 +1,60 @@
-// src/world/water/tsl/waterIntersectionFoamTsl.ts — seaward waterline foam + landward wet sand
-import {
-  Fn,
-  float,
-  fwidth,
-  If,
-  max,
-  min,
-  mix,
-  sin,
-  smoothstep,
-  time,
-  triNoise3D,
-  vec3,
-} from 'three/tsl';
-import type { WaterWaveUniforms } from '../material/waterWaveUniforms';
+// src/world/water/tsl/waterIntersectionFoamTsl.ts — shore waves: foam fronts on the water, wet sand on the beach
+//
+// Two fronts run at once, half a cycle apart. Each is born `uShoreBreakM` out, runs toward the waterline (fast, then
+// slowing) and merges into the waterline when the uprush starts; seaward of it the water carries a foam trail. The water's
+// edge itself moves (the swash, tsl/waterRunUpTsl.ts); the foam is measured from where it really is, so the fronts, the
+// fringe and the edge are one thing. The sand is wet up to the highest recent swash and dries behind it.
+// Twin of the curves in waves/waveMath.ts. The phase is a function of world XZ and the wind clock only.
+import { Fn, float, fwidth, If, max, mix, smoothstep } from 'three/tsl';
+import { edgePulse, shoreFrontM, shoreWavePhases, swashLobe, wetPulse } from './waterRunUpTsl';
+import { lakeMulTsl, lakeShareTsl } from './waterWavesTsl';
 
 type TslNode = any;
 
 export const FOAM_AA_MIN_M = 0.008;
 
-/** Slower patch field [0,1] — drives thick/opaque vs thin/translucent foam along the shore. */
-function waterFoamPatchMaskTsl(worldXZ: TslNode, wave: WaterWaveUniforms) {
-  const t = time.mul(wave.uFoamRippleSpeed.mul(0.28));
-  const scale = wave.uFoamPatchScale;
-  const blobA = sin(worldXZ.x.mul(scale).add(t.mul(0.65)))
-    .mul(sin(worldXZ.y.mul(scale.mul(1.13)).add(t.mul(0.45))))
-    .mul(0.6);
-  const blobB = sin(worldXZ.x.mul(scale.mul(1.9)).sub(t.mul(0.9))).mul(0.25);
-  const blobC = sin(worldXZ.y.mul(scale.mul(2.4)).add(t.mul(1.1))).mul(0.2);
-  const raw = blobA.add(blobB).add(blobC).mul(0.5).add(0.5).clamp(0, 1);
-  return mix(float(1), raw, wave.uFoamPatchVariation);
-}
-
-/** triNoise3D ~[0,1] → metres of waterline scallop. */
-function waterFoamScallopOffsetTsl(worldXZ: TslNode, wave: WaterWaveUniforms): TslNode {
-  const n = triNoise3D(
-    vec3(worldXZ.x, float(0), worldXZ.y).mul(wave.uFoamRippleScale),
-    float(0.25),
-    time.mul(wave.uFoamRippleSpeed),
-  );
-  return n.sub(0.5).mul(2).mul(wave.uFoamRippleAmplitude);
-}
-
-/** Slow traveling sine along world XZ — advances and retreats the line. */
-function waterFoamRunUpPhaseTsl(worldXZ: TslNode, wave: WaterWaveUniforms): TslNode {
-  const period = max(wave.uRunUpPeriodSec, float(0.1));
-  return worldXZ.x
-    .add(worldXZ.y)
-    .mul(0.08)
-    .add(time.mul(float(Math.PI * 2)).div(period));
-}
-
-function waterFoamRunUpOffsetTsl(worldXZ: TslNode, wave: WaterWaveUniforms): TslNode {
-  return sin(waterFoamRunUpPhaseTsl(worldXZ, wave)).mul(wave.uRunUpM);
-}
-
-/** [0,1] lagged behind tidal bob — peaks while the wave is receding. */
-function waterWetSandTideFactorTsl(wave: WaterWaveUniforms): TslNode {
-  return sin(time.mul(wave.uWaveSpeed).sub(wave.uWetSandPhaseLag))
-    .mul(0.5)
-    .add(0.5)
-    .mul(wave.uTideEnabled);
-}
-
-function waterWetSandWidthTsl(wave: WaterWaveUniforms): TslNode {
-  return mix(wave.uWetSandMinM, wave.uWetSandM, waterWetSandTideFactorTsl(wave));
-}
-
-function waterFoamWarpedDistanceTsl(
-  distM: TslNode,
-  worldXZ: TslNode,
-  wave: WaterWaveUniforms,
-): TslNode {
-  const offset = waterFoamScallopOffsetTsl(worldXZ, wave)
-    .add(waterFoamRunUpOffsetTsl(worldXZ, wave))
-    .mul(wave.uTideEnabled);
-  return distM.sub(offset);
-}
-
-function waterFoamWidthScaleTsl(worldXZ: TslNode, wave: WaterWaveUniforms): TslNode {
-  return mix(wave.uFoamWidthMinRatio, float(1), waterFoamPatchMaskTsl(worldXZ, wave));
-}
-
 /**
- * [0,1] seaward foam from horizontal shore distance (positive = underwater).
- * `fwidth` runs in uniform control flow so AA stays legal inside later branches.
+ * [0,1] foam from horizontal distance to the real waterline (positive = underwater): fronts with a trail behind them, plus a
+ * thin fringe on the waterline that is strongest while the water climbs the beach. `fwidth` runs in uniform control flow so AA
+ * stays legal inside the branch.
  *
  * Do not use `viewportLinearDepth` here: in this pass(scene) + transparent water path
  * the gap is ~0 on every water pixel and the disc goes white.
  */
 export const waterSurfaceFoamMaskTsl = Fn(([worldXZ, wave, distM]: TslNode[]) => {
-  const warped = waterFoamWarpedDistanceTsl(distM, worldXZ, wave);
-  // Cap AA so a slope/height crease cannot widen the stripe across the disc.
-  const aa = min(
-    max(fwidth(warped), float(FOAM_AA_MIN_M)),
-    max(wave.uFoamWidthM, float(FOAM_AA_MIN_M)),
-  );
-  const widthScale = waterFoamWidthScaleTsl(worldXZ, wave);
-  const washW = max(wave.uFoamWidthM.mul(widthScale), float(1e-4));
-  const foamOpacity = mix(wave.uFoamOpacityMin, float(1), waterFoamPatchMaskTsl(worldXZ, wave));
-
-  const inland = smoothstep(aa.negate(), float(0), warped);
-  const band = float(1)
-    .sub(smoothstep(washW, washW.add(aa), warped))
-    .mul(inland);
-
-  return band.mul(foamOpacity).mul(wave.uTideEnabled);
+  const aa = max(fwidth(distM), float(FOAM_AA_MIN_M));
+  const foam = float(0).toVar();
+  // enclosed water (lakes): a narrower breaker zone and fainter foam
+  const k = lakeMulTsl(lakeShareTsl(worldXZ), wave.uLakeFoamShare);
+  const breakM = wave.uShoreBreakM.mul(k);
+  const trailM = wave.uShoreTrailM.mul(k);
+  // beyond the breaker zone there is nothing: skip the noise for the open sea
+  If(distM.lessThan(breakM.add(trailM).add(1)), () => {
+    const ph = shoreWavePhases(worldXZ, wave);
+    const front = (p: TslNode) => {
+      const d = distM.sub(shoreFrontM(p, wave, breakM));
+      const lead = smoothstep(aa.negate(), float(0), d);
+      const trail = float(1).sub(smoothstep(float(0), trailM, d));
+      // born faintly, gone once it has merged into the waterline
+      const born = smoothstep(float(0), float(0.12), p);
+      const gone = float(1).sub(smoothstep(float(1).sub(wave.uShoreRiseShare), float(1), p));
+      return lead.mul(trail).mul(born).mul(gone);
+    };
+    const onWater = smoothstep(aa.negate(), float(0), distM);
+    const active = max(edgePulse(ph.p1, wave), edgePulse(ph.p2, wave));
+    const fringe = float(1)
+      .sub(smoothstep(float(0), wave.uShoreFringeM, distM))
+      .mul(onWater)
+      .mul(mix(float(0.35), float(1), active));
+    const patch = mix(float(0.55), float(1), ph.n);
+    foam.assign(
+      max(max(front(ph.p1), front(ph.p2)), fringe)
+        .mul(patch)
+        .mul(wave.uShoreFoamAmount)
+        .mul(k),
+    );
+  });
+  return foam;
 });
 
 /** Composite foam onto water albedo (after refraction so the stripe sits on the surface). */
@@ -119,32 +68,39 @@ export const applyWaterSurfaceFoamOpacityTsl = Fn(([baseAlpha, foamMask]: TslNod
 );
 
 /**
- * Landward wet-sand darken on terrain — no shore lace, only a smooth ramp inland from the waterline.
- * `aaM` must be `fwidth` of unwarped shore distance (or a height-based proxy) in uniform control
- * flow. Scallop noise runs only inside the near-shore branch.
+ * Wet sand on terrain: dark up to the highest recent swash (measured in height above the mean level, `heightAboveM`, like
+ * the swash), fading out over its top part, drying behind it; plus a lighter, much wider band of moist sand (always a
+ * little wet near the sea, whether or not a wave reaches it): `uShoreMoistM` metres inland from the waterline, capped at
+ * `uShoreMoistH` of height. `distM` is the horizontal distance to the real waterline (positive underwater, which is not
+ * darkened), `aaM` its `fwidth` (or a height-based proxy) in uniform control flow. The caller gates it to the heights the
+ * swash and the moist band cover.
  */
 export const applyWaterTerrainWetnessTsl = Fn(
-  ([baseColor, worldXZ, distM, wave, aaM]: TslNode[]) => {
+  ([baseColor, worldXZ, distM, heightAboveM, wave, aaM]: TslNode[]) => {
     const aa = max(aaM, float(FOAM_AA_MIN_M));
-    const wetWidthM = waterWetSandWidthTsl(wave);
-    const result = baseColor.toVar();
-    const gate = wave.uWetSandM.add(wave.uFoamRippleAmplitude).add(wave.uRunUpM).add(float(0.35));
-
-    If(
-      distM
-        .abs()
-        .lessThan(gate)
-        .and(wave.uTideEnabled.greaterThan(float(0.5))),
-      () => {
-        const warped = waterFoamWarpedDistanceTsl(distM, worldXZ, wave);
-        const landward = float(1).sub(smoothstep(float(0), aa, warped));
-        const wet = smoothstep(wetWidthM.negate().sub(aa), float(0), warped).mul(landward);
-        result.assign(
-          mix(baseColor, baseColor.mul(float(1).sub(wave.uWetSandDarken)), wet as TslNode),
-        );
-      },
-    );
-
-    return result;
+    const ph = shoreWavePhases(worldXZ, wave);
+    const reach = max(wetPulse(ph.p1, wave), wetPulse(ph.p2, wave));
+    // a lake's swash is smaller (the same share the water mesh lifts by), so its wet sand is a narrower strip
+    const k = lakeMulTsl(lakeShareTsl(worldXZ), wave.uLakeSwashShare);
+    const dampH = wave.uShoreDampH.mul(k);
+    const peak = wave.uShoreSwashH.mul(k).mul(float(1).sub(wave.uShoreRecede)).mul(1.1).max(dampH);
+    const lobe = swashLobe(worldXZ, wave);
+    const wetH = mix(dampH, peak, reach).mul(lobe).max(1e-3);
+    const ground = float(1).sub(smoothstep(float(0), aa, distM));
+    const wet = float(1)
+      .sub(smoothstep(wetH.mul(0.6), wetH, heightAboveM))
+      .mul(ground);
+    // the lobes make the moist band's inland edge uneven too
+    const moistW = wave.uShoreMoistM.mul(lobe).max(1e-3);
+    const moist = float(1)
+      .sub(smoothstep(float(0), moistW, distM.negate()))
+      .mul(
+        float(1).sub(
+          smoothstep(wave.uShoreMoistH.mul(0.5), wave.uShoreMoistH.max(1e-3), heightAboveM),
+        ),
+      )
+      .mul(ground);
+    const darken = max(wet.mul(wave.uWetSandDarken), moist.mul(wave.uMoistDarken));
+    return baseColor.mul(float(1).sub(darken));
   },
 );

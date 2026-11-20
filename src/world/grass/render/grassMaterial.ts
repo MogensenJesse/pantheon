@@ -31,6 +31,7 @@ import {
   createRingFadeIn,
   createRingFadeOut,
   createSampleGrassField,
+  createSampleGrassKelp,
 } from '../compute/shared/vegetationVisibilityTsl';
 import { type GrassRingUniforms, grassSharedUniforms } from '../config/grassUniforms';
 import { grassBendOffset, grassSpriteRotation } from '../tsl/grassBladeBendTsl';
@@ -41,6 +42,7 @@ import {
 } from '../tsl/grassBladeLookTsl';
 import { applyGrassCullDebugColor } from '../tsl/grassCullDebugTsl';
 import { grassViewRayPull } from '../tsl/grassDepthBiasTsl';
+import { kelpMask, kelpSwayXZ, mixKelpColor } from '../tsl/grassKelpTsl';
 import { applyGrassLodDebugColor } from '../tsl/grassLodDebugTsl';
 import { applyGrassVegetationShading } from '../tsl/grassVegetationShadingTsl';
 import { mixWheatColor, wheatMask, wheatRipeness } from '../tsl/grassWheatTsl';
@@ -75,6 +77,7 @@ export function createGrassMaterial(
     uRingFadeHeightPower,
     uDepthPullM,
     uWorldSize,
+    uKelpWidthMul,
   } = grassSharedUniforms;
 
   const material = new SpriteNodeMaterial();
@@ -119,7 +122,18 @@ export function createGrassMaterial(
   const positionNoise: TslNode = hash(sourceIndex.add(196.4356));
   const farWidthBlend = smoothstep(uWidthNearRadiusSquared, uWidthFarRadiusSquared, distSq);
   const farWidthGain: TslNode = mix(float(1), uWidthFarGain, farWidthBlend);
-  const scaleX: TslNode = positionNoise.remap(0, 1, 0.5, 1.5).mul(farWidthGain).mul(ringFade);
+  // Kelp (grass data A) sits in the sea: wider blades (the far ring keeps its own width), its own colour and sway.
+  const worldX = offsetX.add(uPlayerPosition.x);
+  const worldZ = offsetZ.add(uPlayerPosition.z);
+  const kelpMaskNode: TslNode = kelpMask(
+    createSampleGrassKelp(texture(ssbo.grassDataMap), uWorldSize)(worldX, worldZ),
+  );
+  const kelpWidth: TslNode = mix(float(1), lodTier >= 2 ? float(1) : uKelpWidthMul, kelpMaskNode);
+  const scaleX: TslNode = positionNoise
+    .remap(0, 1, 0.5, 1.5)
+    .mul(farWidthGain)
+    .mul(ringFade)
+    .mul(kelpWidth);
   material.scaleNode = vec2(scaleX, scaleY);
 
   const bladeUv = uv();
@@ -129,8 +143,6 @@ export function createGrassMaterial(
   material.rotationNode = grassSpriteRotation(sourceIndex, h) as any;
 
   const bladeY = unpackTerrainY(packed.x, uHeightScale, uSurfaceBias);
-  const worldX = offsetX.add(uPlayerPosition.x);
-  const worldZ = offsetZ.add(uPlayerPosition.z);
   const worldPos = vec3(worldX, bladeY, worldZ);
   const sampleWindAtlas = (atlasUv: TslNode) => windTex.sample(atlasUv);
   // Wheat fields (grass data B): sampled before the wind, so a field rolls in waves and lies down when wet.
@@ -148,7 +160,9 @@ export function createGrassMaterial(
   // Near the orb (the near ring only) the blades rustle: plants answer the orb whatever the phase.
   const orbRustle =
     lodTier === 0 ? grassOrbRustleXZ(ringDist, scaleY, positionNoise) : vec2(float(0), float(0));
-  const bendXZ = windBend.add(trailBend).add(orbRustle);
+  const bendXZ = mix(windBend, kelpSwayXZ(worldPos, positionNoise), kelpMaskNode)
+    .add(trailBend)
+    .add(orbRustle);
   const depthPull = grassViewRayPull(worldPos, uDepthPullM);
   const bladePosition = vec3(offsetX, bladeY, offsetZ)
     .add(grassBendOffset(bendXZ, h, scaleY))
@@ -166,10 +180,15 @@ export function createGrassMaterial(
 
   // Wheat fields: the blade takes the field colour, green when young to gold when ripe.
   const fragWheat: TslNode = (vec2(wheatMaskNode, wheatRipeness(wheatRaw)) as any).toVarying();
+  const fragKelp: TslNode = (kelpMaskNode as any).toVarying();
   const bladeColor = mix(
-    mixGrassBladeColor(h, fragNoise),
-    mixWheatColor(h, fragNoise, (fragWheat as any).y),
-    (fragWheat as any).x,
+    mix(
+      mixGrassBladeColor(h, fragNoise),
+      mixWheatColor(h, fragNoise, (fragWheat as any).y),
+      (fragWheat as any).x,
+    ),
+    mixKelpColor(h, fragNoise),
+    fragKelp,
   );
   const occlusion =
     lodTier >= 2 ? float(1) : grassBladeOcclusion(bladeUv, fragOffsetX, fragOffsetZ);

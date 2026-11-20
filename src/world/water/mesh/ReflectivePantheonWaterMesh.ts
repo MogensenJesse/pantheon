@@ -32,7 +32,7 @@ export class ReflectivePantheonWaterMesh extends Mesh implements WaterMeshUnifor
   resolutionScale: number;
   /** Planar reflector node — adaptive quality writes resolutionScale each frame. */
   waterReflector: { resolutionScale: number } | null = null;
-  /** Reflector mirror/clip plane — syncPantheonWater offsets it off the tide each frame. */
+  /** Reflector mirror/clip plane — syncPantheonWater offsets it off the swell each frame. */
   reflectorTarget: Object3D | null = null;
   waterNormals!: WaterMeshUniformHost['waterNormals'];
   alpha!: WaterMeshUniformHost['alpha'];

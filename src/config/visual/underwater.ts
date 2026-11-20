@@ -52,4 +52,70 @@ export const underwater = {
   orbTint: 0.45,
   /** Camera depth (m) over which the submerged state fades in once the camera passes the surface. */
   submergeFadeM: 0.25,
+  /** Things on and above the seabed: rocks (map props, placed at load), kelp (grass blades) and drifting motes. */
+  seabed: {
+    rocks: {
+      /** Stone-pack props the rocks are drawn from (loaded with the map's other props). */
+      keys: [
+        'stone_small_1',
+        'stone_small_2',
+        'stone_small_3',
+        'stone_mid_1',
+        'stone_mid_2',
+        'stone_mid_3',
+        'stone_big_2',
+      ],
+      /** Rocks stand only where the water is this deep (m) and the ground is no steeper than `maxSlope` (rise over run). */
+      depthM: [0.8, 25],
+      maxSlope: 0.6,
+      /** One candidate per cell of this size (m); at most `maxCount` rocks are kept, thinned evenly over the map. */
+      cellM: 9,
+      maxCount: 6000,
+      /** Size multiplier range (log-uniform) and the share of a rock sunk into the sand. */
+      scale: [0.5, 1.9],
+      sink: 0.2,
+      /** No rocks within this many metres (times the landmark's scale) of a landmark: the sunken temple has its own. */
+      landmarkClearM: 22,
+    },
+    /** Kelp is grass: the grass system grows it where the data map's alpha says so (`world/grass/data/grassDataTexture.ts`), with these numbers. */
+    kelp: {
+      /** Share of the grass blades kept inside a kelp patch (the rings' own density times this: 150/m2 near the orb at 0.06 is 9/m2). */
+      density: 0.06,
+      /** Kelp grows where the water is this deep (m); it fades in over the first metre and out over the last two. */
+      depthM: [1.5, 20],
+      /** Blade length range (m); the grass bounds blades at its blade height times its max scale (2.25 m). A blade never reaches higher than three quarters of the water over it. */
+      heightM: [1.2, 3],
+      /** Blade width as a multiple of the grass's own (near and mid rings; the far ring keeps its own). */
+      widthMul: 2.5,
+      /** Metres of the blobs it grows in, and the share of the sea floor they cover. */
+      patchM: 18,
+      patchShare: 0.45,
+      /** Sway at the tip (m) and its rate (Hz). */
+      swayM: 0.5,
+      swayHz: 0.2,
+      colorA: '#2c441c',
+      colorB: '#92ab3f',
+    },
+    /** Specks adrift in the water, drawn like the air's drifting specks (life/particles/driftField.ts). */
+    motes: {
+      count: 1400,
+      boxM: 28,
+      heightM: 10,
+      shape: 'dot',
+      additive: false,
+      sizeM: [0.02, 0.05],
+      colorA: '#cfe6e2',
+      colorB: '#ffffff',
+      hdr: 1,
+      alpha: 0.45,
+      windMps: 0.08,
+      fallMps: 0.04,
+      wobbleM: 0.6,
+      wobbleHz: 0.12,
+      spin: 0,
+      blinkHz: 0,
+      nightMul: 0.3,
+      orbPullM: 0,
+    },
+  },
 } as const;

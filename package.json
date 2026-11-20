@@ -20,6 +20,7 @@
     "check:hand-quest": "node scripts/checks/run.mjs hand-quest",
     "check:landmarks": "node scripts/checks/run.mjs landmarks",
     "check:underwater": "node scripts/checks/run.mjs underwater",
+    "check:water-waves": "node scripts/checks/run.mjs water-waves",
     "check:restoration": "node scripts/checks/run.mjs restoration",
     "check:map-entities": "node scripts/checks/run.mjs map-entities",
     "check:overview": "node scripts/checks/run.mjs overview",

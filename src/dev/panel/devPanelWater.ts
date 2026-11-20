@@ -2,7 +2,6 @@
 // Writes to devSettings.water; syncPantheonWater reads it every frame, so no
 // direct mesh reference is needed for live water look edits.
 
-import { VISUAL } from '../../config/visualTuning';
 import { devSettings } from '../../core/settings';
 import { resetWaterDev } from '../../world/water/config/waterDevDefaults';
 import {
@@ -15,9 +14,7 @@ import {
   syncSlider,
   syncSpecs,
 } from '../bindRange';
-import { KEY_MAP, SHORE_SPECS, TIDE_SPECS, WATER_SPECS } from './devPanelWaterSpecs';
-
-const TD = VISUAL.water.tide;
+import { KEY_MAP, SHORE_SPECS, WATER_SPECS } from './devPanelWaterSpecs';
 
 function syncUi(panel: HTMLDivElement): void {
   for (const s of WATER_SPECS) {
@@ -27,16 +24,6 @@ function syncUi(panel: HTMLDivElement): void {
   const shore = devSettings.water.shoreDepth;
   const enabled = panel.querySelector('#dev-shore-enabled') as HTMLInputElement | null;
   if (enabled) enabled.checked = shore.enabled;
-  syncSpecs(panel, TIDE_SPECS, (s) =>
-    s.key === 'wetSandPhaseLagRad'
-      ? (devSettings.water.tide.wetSandPhaseLagRad * 180) / Math.PI
-      : devSettings.water.tide[s.key],
-  );
-  const tide = devSettings.water.tide;
-  const tideEnabled = panel.querySelector('#dev-tide-enabled') as HTMLInputElement | null;
-  if (tideEnabled) tideEnabled.checked = tide.enabled;
-  const foamColor = panel.querySelector('#dev-tide-foam-color') as HTMLInputElement | null;
-  if (foamColor) foamColor.value = tide.foamColor;
 }
 
 export function initDevPanelWater(panel: HTMLDivElement): () => void {
@@ -56,19 +43,6 @@ export function initDevPanelWater(panel: HTMLDivElement): () => void {
         </label>
         <div id="dev-shore-sliders"></div>`,
       )}
-      ${subsectionHtml(
-        'Tide / shore foam',
-        `<p class="dev-hint">Gentle tidal bob + a seaward lace ribbon on the water surface along the waterline. Landward wet-sand darkening lags behind the tide (max width while receding). Foam fades/tints with night valley fog (linked to Shore fog bypass).</p>
-        <label class="dev-row dev-row-check">
-          <span>Tide enabled</span>
-          <input type="checkbox" id="dev-tide-enabled" />
-        </label>
-        <div id="dev-tide-sliders"></div>
-        <label class="dev-row">
-          <span>Foam color</span>
-          <input type="color" id="dev-tide-foam-color" value="${TD.foamColor}" />
-        </label>`,
-      )}
       <div class="dev-actions">
         <button type="button" id="dev-water-reset">Reset water</button>
       </div>
@@ -78,14 +52,11 @@ export function initDevPanelWater(panel: HTMLDivElement): () => void {
 
   const shoreSliderHost = panel.querySelector('#dev-shore-sliders');
   if (shoreSliderHost) injectRangeRows(shoreSliderHost, SHORE_SPECS);
-  const tideSliderHost = panel.querySelector('#dev-tide-sliders');
-  if (tideSliderHost) injectRangeRows(tideSliderHost, TIDE_SPECS);
 
   syncUi(panel);
 
   const water = devSettings.water;
   const shore = water.shoreDepth;
-  const tide = water.tide;
   const disposers: Array<() => void> = [];
   for (const s of WATER_SPECS) {
     const key = KEY_MAP[s.id];
@@ -112,30 +83,6 @@ export function initDevPanelWater(panel: HTMLDivElement): () => void {
       },
     ),
   );
-  for (const s of TIDE_SPECS) {
-    disposers.push(
-      bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => {
-        tide[s.key] = s.key === 'wetSandPhaseLagRad' ? (v * Math.PI) / 180 : v;
-      }),
-    );
-  }
-  disposers.push(
-    bindCheckbox(
-      panel,
-      'dev-tide-enabled',
-      () => tide.enabled,
-      (v) => {
-        tide.enabled = v;
-      },
-    ),
-  );
-
-  const foamColorInput = panel.querySelector('#dev-tide-foam-color') as HTMLInputElement | null;
-  const onFoamColor = () => {
-    tide.foamColor = foamColorInput?.value ?? tide.foamColor;
-  };
-  foamColorInput?.addEventListener('input', onFoamColor);
-
   const resetBtn = panel.querySelector('#dev-water-reset') as HTMLButtonElement | null;
   const onReset = () => {
     resetWaterDev(devSettings.water);
@@ -145,7 +92,6 @@ export function initDevPanelWater(panel: HTMLDivElement): () => void {
 
   return () => {
     for (const fn of disposers) fn();
-    foamColorInput?.removeEventListener('input', onFoamColor);
     resetBtn?.removeEventListener('click', onReset);
   };
 }

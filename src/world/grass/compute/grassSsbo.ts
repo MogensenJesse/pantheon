@@ -19,6 +19,7 @@ import type { ComputeNode, IndirectStorageBufferAttribute } from 'three/webgpu';
 import { VISUAL } from '../../../config/visualTuning';
 import { GRASS_CONFIG } from '../config/grassConfig';
 import { type GrassRingUniforms, grassSharedUniforms } from '../config/grassUniforms';
+import { kelpBladeScale, kelpMask } from '../tsl/grassKelpTsl';
 import { WHEAT_MIN_WEIGHT, wheatBladeScale, wheatMask, wheatRipeness } from '../tsl/grassWheatTsl';
 import type { TslNode } from '../tsl/tslNode';
 import {
@@ -108,6 +109,8 @@ export class GrassSsbo {
       uSurfaceBias,
       uBladeHeight,
       uInvalidateTerrainCache,
+      uKelpWaterY,
+      uKelpDensity,
     } = grassSharedUniforms;
 
     const {
@@ -140,6 +143,7 @@ export class GrassSsbo {
       sampleGrassData,
       sampleGrassClump,
       sampleGrassField,
+      sampleGrassKelp,
       buildVisibility,
       propGrassTaper,
     } = createVegetationVisibilityContext({
@@ -251,8 +255,16 @@ export class GrassSsbo {
             const wheatRaw = sampleGrassField(worldX, worldZ);
             const wheat = wheatMask(wheatRaw);
             const wheatRipe = wheatRipeness(wheatRaw);
-            const weightHere = max(grassWeight, wheat.mul(float(WHEAT_MIN_WEIGHT))).toVar();
-            const clumpHere = mix(clumpRaw, float(1), wheat).toVar();
+            // Kelp (grass data A): sea-floor grass, thinned to `uKelpDensity` through the annulus weight so its blades
+            // keep their size, unclumped, with its own length (capped by the water over it).
+            const kelp = kelpMask(sampleGrassKelp(worldX, worldZ));
+            const kelpDepthM = uKelpWaterY.sub(yOffset.sub(uSurfaceBias));
+            const weightHere = max(
+              max(grassWeight, wheat.mul(float(WHEAT_MIN_WEIGHT))),
+              kelp,
+            ).toVar();
+            const clumpHere = mix(mix(clumpRaw, float(1), wheat), float(1), kelp).toVar();
+            const annulusHere = inAnnulus.mul(mix(float(1), uKelpDensity, kelp));
 
             const wasVisible = unpackVisKept(data.y);
             const previousKeep = wasVisible.mul(float(1).sub(isWrapped));
@@ -264,7 +276,7 @@ export class GrassSsbo {
               worldZ,
               yOffset,
               grassWeight: weightHere,
-              inAnnulus,
+              inAnnulus: annulusHere,
               biomeStrength,
               buildVisibility,
               previousKeep,
@@ -285,7 +297,11 @@ export class GrassSsbo {
             const compactDt = max(uCompactDeltaTime, EPSILON);
             const recoveryFactor = min(uTrailGrowthRate.mul(compactDt), 1);
             const propMul = propGrassTaper(compact.propInfluence);
-            const scaleHere = mix(randomScale, wheatBladeScale(wheatRipe, placed.atlas.b), wheat);
+            const scaleHere = mix(
+              mix(randomScale, wheatBladeScale(wheatRipe, placed.atlas.b), wheat),
+              kelpBladeScale(kelpDepthM, placed.atlas.b),
+              kelp,
+            );
             const baseScale = scaleHere.mul(transitionMul).mul(clumpMul).mul(propMul);
             const recoveredScale = mix(currentScale, baseScale, recoveryFactor);
             const didAppear = float(1).sub(wasVisible);

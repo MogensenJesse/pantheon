@@ -17,7 +17,6 @@ export type {
   TerrainDevSettings,
   WaterDevSettings,
   WaterShoreDevSettings,
-  WaterTideDevSettings,
 } from './state/settingsTypes';
 
 import { devDebugSettings } from './state/devDebugSettings';

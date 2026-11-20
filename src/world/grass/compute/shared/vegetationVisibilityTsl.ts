@@ -212,6 +212,13 @@ export function createSampleGrassField(grassDataTex: TslNode, uWorldSize: TslNod
   };
 }
 
+/** Kelp weight (grass data A): 0 off the sea floor's kelp patches, up to 1 inside them. */
+export function createSampleGrassKelp(grassDataTex: TslNode, uWorldSize: TslNode) {
+  return (worldX: TslNode, worldZ: TslNode): TslNode => {
+    return grassDataTex.sample(worldXZToGridUv(worldX, worldZ, uWorldSize)).a;
+  };
+}
+
 export function createPropGrassInfluence(propInfluenceTex: TslNode, uWorldSize: TslNode) {
   return (worldX: TslNode, worldZ: TslNode): TslNode => {
     const uv = worldXZToMapUv(worldX, worldZ, uWorldSize);

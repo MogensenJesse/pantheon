@@ -4,9 +4,13 @@
 // (life/habitat.ts) and the weather, turns them into a share of each field (life/driftRules.ts) and hands that
 // to the fields.
 import { type PerspectiveCamera, type Scene, Vector3 } from 'three';
+import { cameraPosition } from 'three/tsl';
 import { life } from '../../config/visual/life';
+import { underwater } from '../../config/visual/underwater';
 import { followTarget } from '../../core/math/scalar';
 import { ambience } from '../../rendering/ambience/ambienceState';
+import { underwaterSurfaceYTsl } from '../../rendering/underwater/underwaterTsl';
+import { underwaterUniforms } from '../../rendering/underwater/underwaterUniforms';
 import { weatherLook } from '../../rendering/weather/weatherLook';
 import { type DriftWorld, fireflyShare, leafShare, pollenShare, shoreness } from '../driftRules';
 import type { TreeGrid } from '../habitat';
@@ -39,7 +43,14 @@ export function createDriftFields(options: DriftFieldsOptions): DriftFields {
   const leaves = createDriftField('driftLeaves', life.LEAVES, groundNode);
   const pollen = createDriftField('driftPollen', life.POLLEN, groundNode);
   const fireflies = createDriftField('driftFireflies', life.FIREFLIES, groundNode);
-  const fields: DriftField[] = [leaves, pollen, fireflies];
+  // Motes hang in the water in a box centred on the camera's height (the sea floor can be far below), and none shows above the surface.
+  const motes = createDriftField(
+    'driftMotes',
+    underwater.seabed.motes,
+    () => cameraPosition.y.sub(underwater.seabed.motes.heightM / 2),
+    underwaterSurfaceYTsl(),
+  );
+  const fields: DriftField[] = [leaves, pollen, fireflies, motes];
   for (const field of fields) scene.add(field.mesh);
 
   // one set of numbers rewritten each frame, so a frame allocates nothing
@@ -111,6 +122,8 @@ export function createDriftFields(options: DriftFieldsOptions): DriftFields {
       pollen.update(state);
       state.density = fireflyShare(world);
       fireflies.update(state);
+      state.density = underwaterUniforms.uSubmerge.value;
+      motes.update(state);
     },
     dispose: () => {
       for (const field of fields) {

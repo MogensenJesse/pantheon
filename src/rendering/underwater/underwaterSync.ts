@@ -12,7 +12,7 @@ const _shallow = new Color();
 const _deep = new Color();
 const _back = new Vector3();
 
-/** Share of the camera's depth under the surface, 0 above it, 1 once `submergeFadeM` below. Base level only (no tide bob): CPU-side use. */
+/** Share of the camera's depth under the surface, 0 above it, 1 once `submergeFadeM` below. Pass the mean level plus the swell height at the camera (waves/waveMath.ts): CPU-side use. */
 export function submergeAmount(cameraY: number, waterY: number): number {
   return MathUtils.clamp((waterY - cameraY) / VISUAL.underwater.submergeFadeM, 0, 1);
 }

@@ -30,15 +30,15 @@ import {
 } from 'three/tsl';
 import { WORLD } from '../../config/world';
 import { waterWaveUniforms } from '../../world/water/material/waterWaveUniforms';
-import { waterCurrentHeightAtXzTsl } from '../../world/water/tsl/waterTideTsl';
+import { waterRunUpTsl } from '../../world/water/tsl/waterRunUpTsl';
 import { CRITICAL_COS, WATER_INDEX } from './underwaterMath';
 import { underwaterUniforms as U } from './underwaterUniforms';
 
 type TslNode = any;
 
-/** World Y of the water surface right now (base level plus the tide bob; the bob is the same everywhere). */
+/** World Y of the mean water surface (the swell's crests and troughs are ignored here: the fog treats the surface as flat). */
 export function underwaterSurfaceYTsl(): TslNode {
-  return waterCurrentHeightAtXzTsl(waterWaveUniforms.uWaterY, waterWaveUniforms);
+  return waterWaveUniforms.uWaterY;
 }
 
 /**
@@ -148,14 +148,21 @@ export const underwaterCausticLightTsl = Fn(
   ([worldPos, normal, sunDirection, sunVisibility]: TslNode[]) => {
     const out = float(0).toVar();
     // Gated with a real branch: above the water (most pixels) the pattern's maths is skipped.
+    // The surface is the mean level plus the swash at the shore (the swell never moves the waterline, and in deeper water the
+    // difference is a fraction of the depth): the gate reaches the top of the swash, the depth there is the mesh's.
     If(
       worldPos.y
-        .lessThan(underwaterSurfaceYTsl())
+        .lessThan(underwaterSurfaceYTsl().add(waterWaveUniforms.uShoreSwashH))
         .and(U.uEnabled.greaterThan(0.5))
         .and(U.uCausticStrength.greaterThan(0.001)),
       () => {
-        const depth = max(underwaterSurfaceYTsl().sub(worldPos.y), float(0));
-        const inWater = smoothstep(float(0), float(0.35), depth);
+        const surfaceY = underwaterSurfaceYTsl().add(
+          waterRunUpTsl(vec2(worldPos.x, worldPos.z), underwaterSurfaceYTsl().sub(worldPos.y)),
+        );
+        const depth = max(surfaceY.sub(worldPos.y), float(0));
+        // Starts at the waterline, like the water's own edge (`coastFadeM`, about half a metre across a flat beach), the wet
+        // sand and the foam: 2 cm of depth is about that across a gentle shelf, and still hides the edge on a steep one.
+        const inWater = smoothstep(float(0), float(0.02), depth);
         const fade = exp(depth.negate().div(U.uCausticFadeM));
         const facing = max(dot(normal, sunDirection), float(0)).mul(0.65).add(0.35);
         out.assign(

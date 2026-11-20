@@ -19,9 +19,13 @@ import {
   sampleChiseledWorldY,
   terrainFacetStepM,
 } from '../../terrain/cpu/terrainChiselCpu';
+import { kelpCoverage } from '../../underwater/kelpCoverage';
 
-/** R = grass weight (includes path fade), G = baked clump 0–1. Blade Y is sampled from terrain. */
-/** RGBA8 (B/A unused): sampling `.g` from an RG8 DataTexture was unreliable on WebGPU in r186. */
+/**
+ * R = grass weight (includes path fade), G = baked clump 0–1, B = wheat field (painted live), A = kelp weight 0–1
+ * (grass on the sea floor, `underwater.seabed.kelp`). Blade Y is sampled from terrain.
+ */
+/** RGBA8: sampling `.g` from an RG8 DataTexture was unreliable on WebGPU in r186. */
 const GRASS_DATA_STRIDE = 4;
 
 export interface GrassTerrainMapSources {
@@ -120,6 +124,15 @@ function bakedClumpAt(
   return smoothstepEdges(lo, Math.max(hi, lo + 1e-6), noise);
 }
 
+/** Value noise at the kelp patch size (two octaves, so a patch's rim is ragged), 0–1. */
+function kelpPatchNoise(worldX: number, worldZ: number, patchM: number): number {
+  const invScale = 1 / Math.max(patchM, 1e-3);
+  return (
+    vegetationValueNoise2(worldX, worldZ, invScale, 31) * 0.7 +
+    vegetationValueNoise2(worldX, worldZ, invScale * 2.3, 47) * 0.3
+  );
+}
+
 /** Sample terrain biome/meadow/path map pixels (already blurred at terrain bake). */
 function fillGrassDataTexture(
   data: Uint8Array,
@@ -134,6 +147,7 @@ function fillGrassDataTexture(
   const pack = VISUAL.terrain.packMaps;
   const denom = Math.max(1, size - 1);
   const { scaleM, coverage, softness } = readClumpBakeParams();
+  const kelp = VISUAL.underwater.enabled ? VISUAL.underwater.seabed.kelp : null;
   const waterY =
     options.waterHeightNorm !== undefined
       ? options.waterHeightNorm * WORLD.HEIGHT_SCALE
@@ -183,8 +197,15 @@ function fillGrassDataTexture(
         pathGrassMul,
         densities,
       );
-      if (waterY !== undefined && sampleChiseledWorldY(grids, worldX, worldZ) < waterY) {
+      let kelpWeight = 0;
+      const groundY = waterY === undefined ? Infinity : sampleChiseledWorldY(grids, worldX, worldZ);
+      if (waterY !== undefined && groundY < waterY) {
         grassWeight = 0;
+        const depthM = waterY - groundY;
+        if (kelp && depthM > kelp.depthM[0]) {
+          const noise = kelpPatchNoise(worldX, worldZ, kelp.patchM);
+          kelpWeight = kelpCoverage(depthM, noise, kelp.depthM, kelp.patchShare);
+        }
       } else {
         const rock = slopeRockDerivedFromNormalY(cachedFaceNy(worldX, worldZ));
         grassWeight *= 1 - rock * pack.grass.slopeKill;
@@ -194,7 +215,7 @@ function fillGrassDataTexture(
         Math.max(0, Math.min(1, bakedClumpAt(worldX, worldZ, scaleM, coverage, softness))) * 255,
       );
       data[o + 2] = 0;
-      data[o + 3] = 255;
+      data[o + 3] = Math.round(kelpWeight * 255);
     }
   }
 }

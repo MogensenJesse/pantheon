@@ -81,29 +81,6 @@ export interface TerrainDevSettings {
 /** Mutable copy of VISUAL.water.shoreDepth for live dev sliders. */
 export type WaterShoreDevSettings = DeepWritable<(typeof VISUAL.water)['shoreDepth']>;
 
-export interface WaterTideDevSettings {
-  enabled: boolean;
-  waveSpeed: number;
-  waveAmplitude: number;
-  foamColor: string;
-  foamWidthM: number;
-  foamRippleAmplitude: number;
-  foamRippleScale: number;
-  foamRippleSpeed: number;
-  foamPatchVariation: number;
-  foamPatchScale: number;
-  foamOpacityMin: number;
-  foamWidthMinRatio: number;
-  shoreSlopeStepM: number;
-  shoreMaxSlope: number;
-  runUpM: number;
-  runUpPeriodSec: number;
-  wetSandDarken: number;
-  wetSandMinM: number;
-  wetSandM: number;
-  wetSandPhaseLagRad: number;
-}
-
 export interface WaterDevSettings {
   size: number;
   alpha: number;
@@ -114,7 +91,6 @@ export interface WaterDevSettings {
   /** Look stops sampled via todWeights (DEV-mutable). */
   stops: DeepWritable<(typeof VISUAL.water)['stops']>;
   shoreDepth: WaterShoreDevSettings;
-  tide: WaterTideDevSettings;
 }
 
 /** Mutable mirror of VISUAL.postfx.grade (enabled + per-TOD stops). */

@@ -155,6 +155,7 @@ export async function initGrassSystem(
   const farSunShadow = createFarOnlySunShadowNode(options.sun);
   grassSharedUniforms.uWorldSize.value = WORLD.SIZE;
   grassSharedUniforms.uHeightScale.value = WORLD.HEIGHT_SCALE;
+  grassSharedUniforms.uKelpWaterY.value = terrain.waterLevelM;
   const mapGrassUniforms = mapGrassToUniforms(options?.mapGrass);
   // The village writes roads into the overlay's path channel after founding. Grass density bakes
   // from the authored masks only (wear clears grass through the exclusion map), so DEV re-bakes read

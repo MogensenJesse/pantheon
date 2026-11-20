@@ -108,7 +108,7 @@ export interface UnderwaterUniforms {
   uEdgeFloorY: UniformNode;
   /** 0..1 sunlight, for the bright window and the caustics' tint. */
   uDaylight: UniformNode;
-  /** Seconds on the caustic clock (advances with frame time; not TSL `time`, which the tide uses). */
+  /** Seconds on the caustic clock (advances with frame time; not TSL `time`). */
   uClock: UniformNode;
   /** 0..1, smoothed: how far the camera is under the surface. Drives the orb tint and anything CPU-side. */
   uSubmerge: UniformNode;

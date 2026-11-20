@@ -22,8 +22,8 @@ import {
   applyWaterTerrainWetnessTsl,
   FOAM_AA_MIN_M,
 } from '../../water/tsl/waterIntersectionFoamTsl';
+import { waterRunUpTsl } from '../../water/tsl/waterRunUpTsl';
 import { createShorelineFieldTsl, SHORE_MIN_SLOPE } from '../../water/tsl/waterShorelineFieldTsl';
-import { waterTideOffsetTsl } from '../../water/tsl/waterTideTsl';
 import { TERRAIN_ATLAS_BIOME_INDEX } from '../atlas/atlasConstants';
 import type { TerrainTextureSet } from '../loaders/loadTerrainTextures';
 import {
@@ -339,24 +339,28 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
 
     const wave = waterWaveUniforms;
     const heightM = chiseledWorldYAtWorldXZ(worldXZ);
-    const waterY = wave.uWaterY.add(waterTideOffsetTsl(wave));
-    const heightDelta = heightM.sub(waterY).abs();
-    const maxSlope = max(wave.uShoreMaxSlope, float(SHORE_MIN_SLOPE));
-    const wetGateM = wave.uWetSandM
-      .add(wave.uFoamRippleAmplitude)
-      .add(wave.uRunUpM)
-      .add(float(0.35));
+    const waterY = wave.uWaterY;
+    // Height above the mean level: the swash and the wet sand are both measured in it, and the waterline is where the swash puts it.
+    const heightAboveM = heightM.sub(waterY);
     const cheapDistM = waterY.sub(heightM).div(float(SHORE_MIN_SLOPE));
     const wetAa = max(fwidth(cheapDistM), float(FOAM_AA_MIN_M));
     const withWetness = shadowDebug.toVar();
+    // Wet sand reaches the swash, the lighter moist band (capped in height) higher up the beach.
     If(
-      heightDelta.lessThan(wetGateM.mul(maxSlope)).and(wave.uTideEnabled.greaterThan(float(0.5))),
+      heightAboveM
+        .greaterThan(wave.uShoreGateH.negate())
+        .and(heightAboveM.lessThan(wave.uShoreGateH.max(wave.uShoreMoistH)))
+        .and(wave.uShoreEnabled.greaterThan(float(0.5))),
       () => {
         withWetness.assign(
           applyWaterTerrainWetnessTsl(
             shadowDebug,
             vSurfaceWorldXZ,
-            shoreline!.shoreDistanceM(vSurfaceWorldXZ),
+            shoreline!.shoreDistanceAtM(
+              vSurfaceWorldXZ,
+              waterRunUpTsl(vSurfaceWorldXZ, heightAboveM.negate()),
+            ),
+            heightAboveM,
             wave,
             wetAa,
           ),

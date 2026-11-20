@@ -111,6 +111,7 @@ import {
   initTerrainAtlases,
   type TerrainTextureSet,
 } from './world/terrain';
+import { SEABED_ROCK_KEYS } from './world/underwater/seabedRocks';
 import { plotTypeOpen, templeOf } from './world/village/model/buildings';
 import { initVillageSystem, resolveSeed } from './world/village/VillageSystem';
 import { villageDevState } from './world/village/villageDevState';
@@ -243,6 +244,7 @@ async function main(): Promise<void> {
       e.type === 'prop' ? [e.key] : [],
     ),
     ...landmarkPropKeys(playMap.entities ?? []),
+    ...SEABED_ROCK_KEYS,
   ]);
   try {
     ({ assets, terrainTextures, waterNormals, nightHdri } = await runPlayAssetBatch(

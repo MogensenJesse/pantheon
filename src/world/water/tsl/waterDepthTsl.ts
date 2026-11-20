@@ -3,8 +3,6 @@ import { Discard, exp, Fn, float, If, max, mix, smoothstep, sub } from 'three/ts
 import { terrainGridUv } from '../../../map/mapUvTsl';
 import { computeEffectiveSunShadowFloor } from '../../../rendering/sunShadow/sunShadowTsl';
 import type { WaterShoreUniforms } from '../material/waterShoreUniforms';
-import { waterWaveUniforms } from '../material/waterWaveUniforms';
-import { waterCurrentHeightAtXzTsl } from './waterTideTsl';
 
 type TslNode = any;
 
@@ -38,7 +36,7 @@ function waterTerrainDepthBelowSurface(
   sampleWorldY?: (worldXZ: TslNode) => TslNode,
 ): TslNode {
   const terrainY = sampleWorldY ? sampleWorldY(worldXZ) : sampleTerrainWorldY(worldXZ, shore);
-  return waterCurrentHeightAtXzTsl(shore.uWaterY, waterWaveUniforms).sub(terrainY);
+  return shore.uWaterY.sub(terrainY);
 }
 
 /**
@@ -120,6 +118,7 @@ function waterShadowOpacityBoost(
   depthOpacity: TslNode,
   shore: WaterShoreUniforms,
   shadow: WaterSunShadowOpts,
+  landMask: TslNode,
 ): TslNode {
   const sunVis = computeEffectiveSunShadowFloor(
     shadow.sunShadow,
@@ -128,7 +127,12 @@ function waterShadowOpacityBoost(
   );
   const shadowRange = sub(float(1), shadow.uShadowFloor).max(0.001);
   const shadowAmt = sub(float(1), sunVis).div(shadowRange).clamp(0, 1);
-  const boosted = mix(depthOpacity, float(1), shadowAmt.mul(shore.uShadowOpacityBoost) as TslNode);
+  // Not over the edge: the boost must never make the water visible where the coast mask says there is none.
+  const boosted = mix(
+    depthOpacity,
+    float(1),
+    shadowAmt.mul(shore.uShadowOpacityBoost).mul(landMask) as TslNode,
+  );
   return mix(depthOpacity, boosted, shore.uEnabled as TslNode);
 }
 
@@ -152,7 +156,7 @@ export function waterDepthOpacityTsl(
   if (!shadow) {
     return depthOpacity;
   }
-  return waterShadowOpacityBoost(depthOpacity, shore, shadow);
+  return waterShadowOpacityBoost(depthOpacity, shore, shadow, landMask);
 }
 
 /**

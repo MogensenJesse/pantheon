@@ -15,6 +15,7 @@ import {
   sin,
   smoothstep,
   uniform,
+  varying,
   vec2,
   vec3,
 } from 'three/tsl';
@@ -61,10 +62,15 @@ const GROUND_FADE = 0.05;
 /** The most the clock may advance in one frame when carrying the specks (a hitch must not throw them across). */
 const MAX_CLOCK_STEP_S = 0.25;
 
+/**
+ * `ceilingY` (a shader node, optional) is a world height the specks must stay under: each fades out over its last half
+ * metre, so a field in the water never shows above the surface.
+ */
 export function createDriftField(
   name: string,
   look: DriftLook,
   groundNode: GroundNode,
+  ceilingY?: unknown,
 ): DriftField {
   const uCentre = uniform(new Vector3());
   const uDrift = uniform(new Vector2());
@@ -105,12 +111,16 @@ export function createDriftField(
   const fall = smoothstep(float(0), float(GROUND_FADE), v).mul(
     float(1).sub(smoothstep(float(1 - TOP_FADE), float(1), v)),
   );
+  // per vertex: `y` samples the terrain, which must not run for every fragment of the quad
+  const underCeiling = ceilingY
+    ? varying(float(1).sub(smoothstep(ceilingY.sub(0.5), ceilingY.sub(0.1), y)))
+    : float(1);
   const material = createSpeckMaterial({
     name,
     look,
     iSeed,
     position,
-    fade: edge.mul(fall),
+    fade: edge.mul(fall).mul(underCeiling),
     density: uDensity,
     alt: uAlt,
     live,

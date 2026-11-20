@@ -1,7 +1,6 @@
 // src/world/water/tsl/waterShorelineFieldTsl.ts — horizontal metres from the waterline
 import { Fn, float, length, vec2 } from 'three/tsl';
 import { waterWaveUniforms } from '../material/waterWaveUniforms';
-import { waterTideOffsetTsl } from './waterTideTsl';
 
 type TslNode = any;
 
@@ -51,10 +50,15 @@ export function createShorelineFieldTsl(inputs: ShorelineFieldInputs) {
     return depth.div(clampedSlope(worldXZ));
   });
 
-  /** Horizontal metres from the visual waterline (includes tide). Positive seaward. */
+  /** Horizontal metres from the waterline. Positive seaward. */
   const shoreDistanceM = Fn(([worldXZ]: TslNode[]) =>
-    shoreDistanceFromWaterY(worldXZ, wave.uWaterY.add(waterTideOffsetTsl(wave))),
+    shoreDistanceFromWaterY(worldXZ, wave.uWaterY),
   );
 
-  return { rawSlope, clampedSlope, shoreDistanceM };
+  /** Same, against the real surface: the mean level plus `surfaceOffset` (the swell's height there). */
+  const shoreDistanceAtM = Fn(([worldXZ, surfaceOffset]: TslNode[]) =>
+    shoreDistanceFromWaterY(worldXZ, wave.uWaterY.add(surfaceOffset)),
+  );
+
+  return { rawSlope, clampedSlope, shoreDistanceM, shoreDistanceAtM };
 }

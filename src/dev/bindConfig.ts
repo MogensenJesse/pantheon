@@ -4,7 +4,8 @@
 // into the object is the edit. The shipped value at panel start is the reset value; nothing is saved.
 import {
   bindColor,
-  bindSpecs,
+  bindRange,
+  bindRangeOnChange,
   mountSection,
   type RangeSpec,
   rangeRowHtml,
@@ -34,6 +35,10 @@ export interface ConfigGroup {
   root?: object;
   rows?: readonly ConfigRow[];
   colors?: readonly ConfigColorRow[];
+  /** Runs after a control of the group is written, and after the group is reset: what the edit must set going besides the write. */
+  onChange?: () => void;
+  /** 'release': write when the slider is let go, not on every move (for an edit that costs a re-bake). */
+  commit?: 'release';
 }
 
 interface ConfigSpec extends RangeSpec {
@@ -143,10 +148,23 @@ export function buildConfigGroups(
       .join(''),
     bind: (panel) => {
       const disposers: Array<() => void> = [];
-      for (const { specs, colors } of built) {
-        disposers.push(...bindSpecs(panel, specs, (s, v) => write(s.root, s.path, v)));
+      for (const { group, specs, colors } of built) {
+        const bindSlider = group.commit === 'release' ? bindRangeOnChange : bindRange;
+        for (const s of specs) {
+          disposers.push(
+            bindSlider(panel, s.id, `${s.id}-out`, s.format, (v) => {
+              write(s.root, s.path, v);
+              group.onChange?.();
+            }),
+          );
+        }
         for (const c of colors) {
-          disposers.push(bindColor(panel, c.id, (hex) => write(c.root, c.path, hex)));
+          disposers.push(
+            bindColor(panel, c.id, (hex) => {
+              write(c.root, c.path, hex);
+              group.onChange?.();
+            }),
+          );
         }
       }
       return () => {
@@ -154,13 +172,14 @@ export function buildConfigGroups(
       };
     },
     reset: (panel) => {
-      for (const { specs, colors } of built) {
+      for (const { group, specs, colors } of built) {
         for (const s of specs) write(s.root, s.path, s.defaultValue);
         for (const c of colors) {
           write(c.root, c.path, c.defaultValue);
           syncColor(panel, c.id, c.defaultValue);
         }
         syncSpecs(panel, specs, (s) => s.defaultValue);
+        group.onChange?.();
       }
     },
   };

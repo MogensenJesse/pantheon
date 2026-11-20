@@ -18,6 +18,7 @@ import {
   createSampleGrassClump,
   createSampleGrassData,
   createSampleGrassField,
+  createSampleGrassKelp,
   createTransitionStrength,
   type VegetationVisibilitySample,
 } from './vegetationVisibilityTsl';
@@ -65,6 +66,8 @@ export interface VegetationVisibilityContext {
   sampleGrassClump: (worldX: TslNode, worldZ: TslNode) => TslNode;
   /** Wheat-field byte at a world position (grass data B), 0 outside fields. */
   sampleGrassField: (worldX: TslNode, worldZ: TslNode) => TslNode;
+  /** Kelp weight at a world position (grass data A), 0 off the sea floor's kelp patches. */
+  sampleGrassKelp: (worldX: TslNode, worldZ: TslNode) => TslNode;
   buildVisibility: (sample: VegetationVisibilitySample) => {
     visible: TslNode;
     reason: TslNode;
@@ -110,6 +113,7 @@ export function createVegetationVisibilityContext(params: {
   );
   const sampleGrassClump = createSampleGrassClump(grassDataTex, params.uWorldSize);
   const sampleGrassField = createSampleGrassField(grassDataTex, params.uWorldSize);
+  const sampleGrassKelp = createSampleGrassKelp(grassDataTex, params.uWorldSize);
   const propGrassInfluenceFn = createPropGrassInfluence(propExclusionTex, params.uWorldSize);
   const buildVisibility = createBuildVisibility({
     frustumBoundsRadius: params.frustumBoundsRadius,
@@ -127,6 +131,7 @@ export function createVegetationVisibilityContext(params: {
     sampleGrassData,
     sampleGrassClump,
     sampleGrassField,
+    sampleGrassKelp,
     buildVisibility,
     propGrassTaper,
   };

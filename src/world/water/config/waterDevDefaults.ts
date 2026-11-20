@@ -10,7 +10,6 @@ function waterDevDefaultsSnapshot(): WaterDevSettings {
     resolutionScale: VISUAL.water.resolutionScale,
     stops: structuredClone(VISUAL.water.stops) as WaterDevSettings['stops'],
     shoreDepth: { ...VISUAL.water.shoreDepth },
-    tide: { ...VISUAL.water.tide },
   };
 }
 
@@ -25,5 +24,4 @@ export function resetWaterDev(target: WaterDevSettings): void {
   target.resolutionScale = defaults.resolutionScale;
   target.stops = structuredClone(defaults.stops);
   Object.assign(target.shoreDepth, defaults.shoreDepth);
-  Object.assign(target.tide, defaults.tide);
 }

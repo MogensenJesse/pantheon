@@ -58,6 +58,7 @@ import { initWaterWaveEditorPreview, waterWaveUniforms } from './water/material/
 import { createPantheonWater } from './water/mesh/createPantheonWater';
 import { disposePantheonWater } from './water/mesh/disposePantheonWater';
 import type { PantheonWaterInstance } from './water/mesh/pantheonWaterTypes';
+import { createShoreFieldTexture, updateShoreFieldTexture } from './water/waves/shoreFieldTexture';
 
 /** DEV: toggle bright painted-biome false-color overlay on terrain splat materials. */
 export function setTerrainBiomeDebugVisible(terrain: MapTerrainContext, enabled: boolean): void {
@@ -81,6 +82,8 @@ export interface MapTerrainContext {
   heightMap: DataTexture;
   /** R8 metres-from-ocean for night valley fog (inland lakes stay inland). */
   inlandMaskMap: DataTexture;
+  /** Distance to the nearest shore + the way to it (the swell's phase), baked from the height grid. */
+  shoreFieldMap: DataTexture;
   /** R8 prop base footprints for terrain contact AO — filled after entity bake. */
   propAoMap: DataTexture;
   getWorldY: (x: number, z: number) => number;
@@ -231,6 +234,9 @@ export function buildMapTerrain(
   const heightMap = createHeightTexture(grids);
   const inlandMaskMap = createOceanInlandMaskTexture(grids, waterY);
   bindValleyFogInlandMask(inlandMaskMap);
+  // The swell travels toward the nearest shore: the water's vertex shader reads this field (not a terrain sampler).
+  const shoreFieldMap = createShoreFieldTexture(grids, waterY);
+  waterWaveUniforms.uShoreField.value = shoreFieldMap;
   const propAoMap = createEmptyPropContactAoTexture(grids.size);
 
   const splatMaterial = createTerrainSplatMaterial(textures, sun, {
@@ -315,7 +321,10 @@ export function buildMapTerrain(
     waterWaveUniforms.uWaterY.value = levelM;
     const shore = (water as PantheonWaterInstance).shoreUniforms;
     if (shore) shore.uWaterY.value = levelM;
-    if (waterChanged) updateOceanInlandMaskTexture(inlandMaskMap, grids, waterLevelM);
+    if (waterChanged) {
+      updateOceanInlandMaskTexture(inlandMaskMap, grids, waterLevelM);
+      updateShoreFieldTexture(shoreFieldMap, grids, waterLevelM);
+    }
   };
   applyWaterY(waterY);
 
@@ -350,6 +359,7 @@ export function buildMapTerrain(
     overlayMap,
     heightMap,
     inlandMaskMap,
+    shoreFieldMap,
     propAoMap,
     getWorldY,
     getBiomeAt,
@@ -384,6 +394,7 @@ export function disposeMapTerrain(context: MapTerrainContext): void {
   context.heightMap.dispose();
   bindValleyFogInlandMask(null);
   context.inlandMaskMap.dispose();
+  context.shoreFieldMap.dispose();
   bindPropContactAoRebake(null);
   context.propAoMap.dispose();
   disposePantheonWater(context.water);

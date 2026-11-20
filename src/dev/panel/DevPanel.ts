@@ -29,6 +29,7 @@ import { initDevPanelUnderwater } from './devPanelUnderwater';
 import { initDevPanelUpscaling } from './devPanelUpscaling';
 import { type DevPanelVillageContext, initDevPanelVillage } from './devPanelVillage';
 import { initDevPanelWater } from './devPanelWater';
+import { initDevPanelWaves } from './devPanelWaves';
 import { initDevPanelClouds } from './sky/devPanelClouds';
 
 export type { DevPanelPropLodContext, DevPanelShadowContext, DevPanelVillageContext };
@@ -114,7 +115,8 @@ export function initDevPanel(
     disposers.push(initDevPanelClouds(panel, skyCtx.cloudSystem));
   }
   disposers.push(initDevPanelWater(panel));
-  disposers.push(initDevPanelUnderwater(panel));
+  disposers.push(initDevPanelWaves(panel));
+  disposers.push(initDevPanelUnderwater(panel, terrainCtx?.grass ?? null));
 
   disposers.push(initDevPanelUpscaling(panel, postFX));
   disposers.push(initPerformancePanel(perfPanel, postFX, onLogRenderDebug));

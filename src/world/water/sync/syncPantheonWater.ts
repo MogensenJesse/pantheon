@@ -8,7 +8,12 @@ import { copyBakedSunDirection } from '../../../rendering/sunShadow/bakedSunDire
 import { currentSunElevationDeg } from '../../../rendering/sunSpherical';
 import { sampleTodColor, sampleTodScalar } from '../../../rendering/tod/todBlend';
 import type { PantheonWaterSyncTarget } from '../mesh/pantheonWaterTypes';
-import { syncWaterWaveUniforms } from './syncWaterWaveUniforms';
+import { swellTotalHeightM } from '../waves/waveMath';
+import {
+  currentSwashPeakM,
+  currentWaveEnergy,
+  syncWaterWaveUniforms,
+} from './syncWaterWaveUniforms';
 import { syncWaterShoreUniforms } from './waterShoreSync';
 
 const _sunDir = new Vector3();
@@ -23,27 +28,34 @@ function liveWaterStops() {
  * How far the vertex shader can move the surface from base water Y, in either direction.
  */
 function surfaceHeadroomM(): number {
-  const t = runtimeSettings.water.tide;
-  if (!t.enabled) return 0;
-  return t.waveAmplitude;
+  return (
+    swellTotalHeightM(VISUAL.water.waves.swell, currentWaveEnergy()) +
+    currentSwashPeakM() +
+    VISUAL.water.waves.mesh.edgeLiftM
+  );
 }
+
+/** The reflector clears its image while the camera is below its mirror plane, so the plane stays at least this far (m) under the eye. */
+const EYE_OVER_PLANE_M = 0.3;
 
 const _lastSunDir = new Vector3();
 let lastSize = Number.NaN;
 let lastAlpha = Number.NaN;
 let lastDistortion = Number.NaN;
-let lastPlaneOffset = Number.NaN;
 
 /**
  * Syncs the ocean to the shared sun each frame. Sun direction matches the baked
  * shadow light (not continuous reveal angles — keeps water spec/shadow aligned).
  * Look (color / distortion / shallow) follows todWeights every frame so ToD
  * panel edits apply without waiting for an elevation change.
+ * `cameraAboveWaterM` (camera height over the mean level) keeps the mirror plane under the eye: a low camera (standing at
+ * the water, looking at the horizon) would otherwise sit below the lifted plane and lose the reflection.
  */
 export function syncPantheonWater(
   water: PantheonWaterSyncTarget,
   sun: DirectionalLight,
   daylight: number,
+  cameraAboveWaterM = Number.POSITIVE_INFINITY,
 ): void {
   const elev = currentSunElevationDeg();
   const w = runtimeSettings.water;
@@ -98,17 +110,15 @@ export function syncPantheonWater(
     lastAlpha = w.alpha;
   }
   if (water.reflectorTarget) {
-    // Push headroom in whichever direction the offset points, so the tide bob can never carry
-    // the surface across the mirror plane (a plane parked at base water Y was overtaken at
-    // high tide and the waterline seam reappeared).
+    // Push headroom in whichever direction the offset points, so the swell can never carry
+    // the surface across the mirror plane (a plane parked at base water Y was overtaken by
+    // the surface and the waterline seam reappeared).
     const offset = w.reflectionPlaneOffsetM;
     const planeOffset = offset + Math.sign(offset) * surfaceHeadroomM();
-    if (planeOffset !== lastPlaneOffset) {
-      // Local +Z is world +Y here (water mesh is rotated -PI/2 on X), so negate: positive
-      // offset drops the plane, negative lifts it.
-      water.reflectorTarget.position.z = -planeOffset;
-      lastPlaneOffset = planeOffset;
-    }
+    // Plane height over the mean level (local +Z is world +Y here: the water mesh is rotated -PI/2 on X; a positive offset
+    // drops the plane, a negative one lifts it). Never above the eye, but never below the mean level for that reason alone.
+    const eyeCapM = Math.max(cameraAboveWaterM - EYE_OVER_PLANE_M, 0);
+    water.reflectorTarget.position.z = Math.min(-planeOffset, eyeCapM);
   }
 
   if (water.shoreUniforms) {

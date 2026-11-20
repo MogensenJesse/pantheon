@@ -1,7 +1,7 @@
 // src/world/water/mesh/createPantheonWater.ts — reflective ocean (layer-culled reflector or cheap tier)
 
 import type { DirectionalLight, Texture } from 'three';
-import { CircleGeometry, Vector3 } from 'three';
+import { Vector3 } from 'three';
 import { VISUAL, type WaterTier } from '../../../config/visualTuning';
 import { WATER_LOOK_STOPS, WATER_PARAMS } from '../config/waterConfig';
 import type { WaterShoreDepthInputs } from '../material/waterShoreUniforms';
@@ -9,6 +9,7 @@ import { initWaterWaveUniforms } from '../material/waterWaveUniforms';
 import { CheapPantheonWaterMesh } from './cheapPantheonWater';
 import type { PantheonWaterInstance } from './pantheonWaterTypes';
 import { ReflectivePantheonWaterMesh } from './ReflectivePantheonWaterMesh';
+import { createWaterDiscGeometry } from './waterDiscGeometry';
 
 export interface PantheonWaterOptions {
   /** Half-extent of the ocean disc the water must cover. */
@@ -19,8 +20,14 @@ export interface PantheonWaterOptions {
   shoreDepth?: WaterShoreDepthInputs;
 }
 
-function buildWaterGeometry(waterRadius: number): CircleGeometry {
-  return new CircleGeometry(waterRadius, 64);
+/** The disc follows the camera (syncWaterWaves), so its rim must reach past the edge fade from any camera position on the map. */
+const FOLLOW_MARGIN_M = 4096;
+
+function buildWaterGeometry(waterRadius: number) {
+  return createWaterDiscGeometry({
+    radius: waterRadius + FOLLOW_MARGIN_M,
+    ...VISUAL.water.waves.mesh,
+  });
 }
 
 function sharedWaterOptions(
@@ -69,6 +76,7 @@ export function createPantheonWater(
   water.position.y = waterY;
   water.receiveShadow = VISUAL.water.receiveShadow;
   water.renderOrder = 1;
+  water.frustumCulled = false;
 
   return water as PantheonWaterInstance;
 }

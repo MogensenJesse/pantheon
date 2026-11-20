@@ -30,7 +30,9 @@ A divine remnant wakes five landmarks on **authored maps**, then guides a villag
 | `src/world/` | Terrain, map props, GPU grass (`grass/`), water |
 | `src/world/grass/` | Player-follow biome grass + optional flowers — see **Grass subsystem** below |
 | `src/world/mapProps/` | GLB instancing — `config/` / `material/` / `tsl/` (+ placement/instancing at root) |
-| `src/world/water/` | Water mesh + normals — `config/` / `mesh/` / `material/` / `sync/` / `data/` / `tsl/` |
+| `src/world/water/` | Water mesh + normals + waves — `config/` / `mesh/` / `material/` / `sync/` / `data/` / `tsl/` / `waves/` (pure wave maths: swell table, swash and front curves, shore-field bake) — see [docs/water-waves.md](docs/water-waves.md) |
+| `src/world/underwater/` | The sea floor: rocks placed at load as ordinary map props (`seabedRocks.ts`, pure) and where kelp grows (`kelpCoverage.ts`, pure; the grass system draws it) — see [docs/underwater.md](docs/underwater.md) |
+| `src/rendering/underwater/` | The water volume seen from under the surface: fog, caustics, the window, light shafts, the horizon fill; settings in `config/visual/underwater.ts` — see [docs/underwater.md](docs/underwater.md) |
 | `src/world/village/` | The village (temple, houses, fields, villagers): pure `sim/`, shared `model/`, `render/`, `assets/` — see **Village subsystem** below |
 | `src/overview/` | The village overview camera and the orb as a cursor; its screens are in `src/ui/overview/` — see **Village overview** below |
 | `src/rendering/` | Scene, post-FX, camera rig, WebGPU helpers |
@@ -68,6 +70,8 @@ A divine remnant wakes five landmarks on **authored maps**, then guides a villag
 | `docs/village/` | Per-milestone village notes: rules, config keys, events, save fields, DEV hooks, checks |
 | `docs/ambient.md` | Ambient life: the one wind, tree sway, drifting leaves and fireflies, sheep, hens and birds, the life at the places of power; rules, config keys, DEV hooks, checks |
 | `docs/phase0.md` | Phase 0 landmarks: rules, config keys, events, save field, DEV hook, checks, pacing model |
+| `docs/underwater.md` | The water volume and the sea floor: fog, caustics, the surface from below, shafts, horizon fill, rocks, kelp, motes; config keys, DEV hooks, checks |
+| `docs/water-waves.md` | The waves: open-sea swell (Gerstner vertex waves on a camera-following disc) and shore waves (foam fronts, swash, wet sand), calmer enclosed water (lakes), wind coupling, config keys, DEV section, `npm run check:water-waves` |
 | `src/landmarks/` | The five Phase 0 landmarks: pure rules and save slice (`landmarks.ts`), the runtime, the stand-in props (see `docs/phase0.md`) |
 | `src/entities/landmark/` | The light on the landmarks (beacon, dwell ring, awakening burst, glow); look values in `config/visual/landmark.ts` |
 | `scripts/` | `checks/` (headless checks and their runner), `assets/` (bake scripts), `tools/` — see **Scripts** |
@@ -328,6 +332,7 @@ The sun-driven look is sampled in `rendering/sky/lightingCurves.ts` (`sampleLigh
 
 ## Rendering notes
 
+- **Underwater:** The water volume is a third term of `scene.fogNode` (built once, never swapped), plus caustics in the terrain and prop shaders, a double-sided water surface (`underSurfaceColor`) and a world-space light-shaft pass in the post composite; all gated by one smoothed `uSubmerge` and `VISUAL.underwater.enabled` (`rendering/underwater/`, `docs/underwater.md`). Rocks on the sea floor are ordinary map props made at load (`world/underwater/seabedRocks.ts`); kelp is grass blades (the grass data map's alpha is the kelp weight, `world/grass`, `VISUAL.underwater.seabed.kelp`) and the motes are a camera-box field like the drifting specks.
 - **Bloom:** Single scene pass; emissive/glow via HDR `colorNode` — no MRT (Chrome-safe). Sky bloom attenuation: `postfx/bloomSkyMask.ts`, tunables in `VISUAL.bloom`. Player/guide/energy-orb sparkles and the organic orb rim use the same HDR path (`uHdrBloomScale` in `glowMaterial.ts`).
 - **God rays:** Screen-space occlusion shafts (`postfx/godrays/GodraysRadialNode.ts`) — radial scatter toward the sun’s screen UV. Emitter is a sun disc (`VISUAL.godrays` core/radius); sky is cleared far-plane *view distance* only so distant trees occlude. A 5-tap Gaussian on the half-res RT smooths sample rings. Additive composite in `pipelineComposite.ts` (not mix-to-tint). After shader warmup, **stay wired** (`effectGraphBypass` never auto-disconnects) so dawn does not rebuild the post graph; weight 0 at night skips the half-res pass (`skipPassesWhenWeightZero` in `godraysControls.ts`). DEV sliders: **Light shafts / god rays** (defaults in `visualTuning.ts` → `VISUAL.godrays`). Isolate with Perf **Disable god rays** vs **Disable valley fog** / **Disable distance haze**.
 - **Color grading:** Procedural grade (saturation/contrast/lift/warmth) after `renderOutput`, before LUT — `postfx/postGrade.ts` (`applyProceduralPostGrade`). Sat/contrast are one noon→golden pair (`todGoldenAmount`). Lift and warmth tint are live uniforms. Display creative LUT with delta-blend strength (`applyLutGrade`) — default `Other/Presetpro - Elite Chrome.cube`; LUT enable is independent of Grade enable. DEV **Post FX → Grade** LUT picker. Render debug **Disable grade** bypasses both. DoF bokeh stays on energy (`dofReveal.ts`).
