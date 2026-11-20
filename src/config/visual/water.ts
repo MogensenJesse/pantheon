@@ -11,6 +11,10 @@ export const water = {
   resolutionScale: 0.33,
   /** Floor on reflection mix — avoids void-black at grazing angles. */
   minReflectionMix: 0.22,
+  /** Cap on reflection mix: at grazing angles the sea keeps this much of its own colour instead of turning into a pure sky mirror (vivid, not washed out). */
+  maxReflectionMix: 0.7,
+  /** View-independent share of the body colour: 0 = it fades to nothing at grazing angles (far water is all reflected sky), 1 = same at every angle. */
+  bodyMinShare: 0.6,
   /**
    * Mirror plane offset (m) relative to the surface; the swell's current height, the swash peak and `waves.mesh.edgeLiftM`
    * add in the same direction, and the plane never rises above the camera's eye (a low camera would lose the reflection).
@@ -35,10 +39,10 @@ export const water = {
       shallowColor: '#2A5A58',
     },
     noon: {
-      waterColor: '#3A8ED0',
+      waterColor: '#0A6CC4',
       sunColor: '#FFF0D0',
       distortion: 5,
-      shallowColor: '#3AD8C8',
+      shallowColor: '#2CF0D8',
     },
   },
   edgeFadeStartRatio: 0.92,
@@ -62,7 +66,7 @@ export const water = {
     absorption: 0.35,
     /** Width of the water's soft edge at the waterline (horizontal m). Small on purpose: the water, its caustics, the foam and the wet sand all start on the same line; a wide fade leaves clear water the eye reads as dry sand. */
     coastFadeM: 0.5,
-    shallowDepthM: 13,
+    shallowDepthM: 22,
     refractionDepthM: 8,
     /** Translucent multiply of shallowColor over refracted seabed (1 = full tint, sand still shows). */
     shallowOverRefract: 0.7,

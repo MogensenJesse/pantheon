@@ -83,6 +83,8 @@ export class ReflectivePantheonWaterMesh extends Mesh implements WaterMeshUnifor
     this.reflectorTarget = mirrorSampler.target;
 
     const minReflectionMix = float(VISUAL.water.minReflectionMix);
+    const maxReflectionMix = float(VISUAL.water.maxReflectionMix);
+    const bodyMinShare = float(VISUAL.water.bodyMinShare);
 
     material.colorNode = underSurfaceColor(
       graph,
@@ -96,8 +98,8 @@ export class ReflectivePantheonWaterMesh extends Mesh implements WaterMeshUnifor
         const scatterWaterColor = shore
           ? waterDepthScatterTintTsl(this.waterColor, shore, shoreDepth)
           : this.waterColor;
-        const scatter = max(0.0, dot(surfaceNormal, eyeDirection)).mul(scatterWaterColor);
-        const reflectionMix = max(reflectance, minReflectionMix);
+        const scatter = mix(bodyMinShare, float(1), theta).mul(scatterWaterColor);
+        const reflectionMix = max(reflectance, minReflectionMix).min(maxReflectionMix);
         const procedural = this.sunColor.mul(diffuseLight).mul(0.3).add(scatter);
         const reflected = mirrorSampler.rgb.add(specularLight);
         const albedo = mix(applyShadow(procedural), reflected, reflectionMix);
