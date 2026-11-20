@@ -7,10 +7,9 @@ import { patchReflectorVirtualCameraLayers } from '../../../rendering/layers/wat
 import { PantheonWaterNodeMaterial } from '../material/PantheonWaterNodeMaterial';
 import { waterWaveUniforms } from '../material/waterWaveUniforms';
 import { applyWaterDryLandDiscardTsl, waterDepthScatterTintTsl } from '../tsl/waterDepthTsl';
-import { applyWaterSurfaceFoamColorTsl } from '../tsl/waterIntersectionFoamTsl';
+import { applyWaterSurfaceFoamColorTsl } from '../tsl/waterFoamTsl';
 import { applyWaterRefractionTsl, waterRefractionScreenOffsetTsl } from '../tsl/waterRefractionTsl';
 import {
-  applySunShadowVisibility,
   buildWaterMeshGraph,
   initWaterMeshUniforms,
   underSurfaceColor,
@@ -19,7 +18,7 @@ import {
 } from './buildWaterMeshGraph';
 
 export interface ReflectivePantheonWaterMeshOptions extends WaterMeshSharedOptions {
-  resolutionScale?: number;
+  resolutionScale: number;
 }
 
 /**
@@ -29,7 +28,6 @@ export interface ReflectivePantheonWaterMeshOptions extends WaterMeshSharedOptio
 export class ReflectivePantheonWaterMesh extends Mesh implements WaterMeshUniformHost {
   readonly isWaterMesh = true;
 
-  resolutionScale: number;
   /** Planar reflector node — adaptive quality writes resolutionScale each frame. */
   waterReflector: { resolutionScale: number } | null = null;
   /** Reflector mirror/clip plane — syncPantheonWater offsets it off the swell each frame. */
@@ -41,15 +39,12 @@ export class ReflectivePantheonWaterMesh extends Mesh implements WaterMeshUnifor
   sunDirection!: WaterMeshUniformHost['sunDirection'];
   waterColor!: WaterMeshUniformHost['waterColor'];
   distortionScale!: WaterMeshUniformHost['distortionScale'];
-  uSunIntensity!: WaterMeshUniformHost['uSunIntensity'];
-  uShadowFloor!: WaterMeshUniformHost['uShadowFloor'];
   shoreUniforms: WaterMeshUniformHost['shoreUniforms'] = null;
 
   constructor(geometry: BufferGeometry, options: ReflectivePantheonWaterMeshOptions) {
     const material = new PantheonWaterNodeMaterial();
     super(geometry, material);
 
-    this.resolutionScale = options.resolutionScale ?? 0.5;
     initWaterMeshUniforms(this, options);
     const graph = buildWaterMeshGraph(this, material, options, {
       normalSampleCount: 4,
@@ -66,9 +61,7 @@ export class ReflectivePantheonWaterMesh extends Mesh implements WaterMeshUnifor
       foamMask,
       refractMask,
       viewportScene,
-      sunShadow,
-      uShadowFloor,
-      uSunIntensity,
+      applyShadow,
       worldXZ,
       surfaceNormal,
       eyeDirection,
@@ -83,7 +76,7 @@ export class ReflectivePantheonWaterMesh extends Mesh implements WaterMeshUnifor
     mirrorSampler.uvNode = mirrorSampler.uvNode!.add(distortion);
     this.waterReflector = mirrorSampler.reflector;
     this.waterReflector.resolutionScale = Math.max(
-      this.resolutionScale,
+      options.resolutionScale,
       VISUAL.water.adaptive.minScale,
     );
     this.add(mirrorSampler.target);
@@ -91,68 +84,44 @@ export class ReflectivePantheonWaterMesh extends Mesh implements WaterMeshUnifor
 
     const minReflectionMix = float(VISUAL.water.minReflectionMix);
 
-    if (shore) {
-      material.colorNode = underSurfaceColor(
-        graph,
-        Fn(() => {
-          applyWaterDryLandDiscardTsl(worldXZ, shore, shoreDistM);
+    material.colorNode = underSurfaceColor(
+      graph,
+      Fn(() => {
+        if (shore) applyWaterDryLandDiscardTsl(worldXZ, shore, shoreDistM);
 
-          const theta = max(dot(eyeDirection, surfaceNormal), 0.0);
-          const rf0 = float(0.02);
-          const reflectance = mul(pow(float(1.0).sub(theta), 5.0), float(1.0).sub(rf0)).add(rf0);
-          const scatterWaterColor = waterDepthScatterTintTsl(
-            this.waterColor,
-            worldXZ,
-            shore,
-            shoreDepth,
-          );
-          const scatter = max(0.0, dot(surfaceNormal, eyeDirection)).mul(scatterWaterColor);
-          const reflectionMix = max(reflectance, minReflectionMix);
-          const procedural = this.sunColor.mul(diffuseLight).mul(0.3).add(scatter);
-          const reflected = mirrorSampler.rgb.add(specularLight);
-          const albedo = mix(
-            applySunShadowVisibility(procedural, sunShadow, uShadowFloor, uSunIntensity),
-            reflected,
-            reflectionMix,
-          );
-          const refractOffset = waterRefractionScreenOffsetTsl(
-            surfaceNormal.xz,
-            distance,
-            this.distortionScale,
-            shore,
-          );
-          const refracted = applyWaterRefractionTsl(
-            albedo,
-            refractOffset,
-            refractMask,
-            scatterWaterColor,
-            shoreDepth,
-            shore,
-            viewportScene,
-          );
-          return foamMask
-            ? applyWaterSurfaceFoamColorTsl(refracted, foamMask, waterWaveUniforms)
-            : refracted;
-        })(),
-      ) as any;
-    } else {
-      material.colorNode = underSurfaceColor(
-        graph,
-        Fn(() => {
-          const theta = max(dot(eyeDirection, surfaceNormal), 0.0);
-          const rf0 = float(0.02);
-          const reflectance = mul(pow(float(1.0).sub(theta), 5.0), float(1.0).sub(rf0)).add(rf0);
-          const scatter = max(0.0, dot(surfaceNormal, eyeDirection)).mul(this.waterColor);
-          const reflectionMix = max(reflectance, minReflectionMix);
-          const procedural = this.sunColor.mul(diffuseLight).mul(0.3).add(scatter);
-          const reflected = mirrorSampler.rgb.add(specularLight);
-          return mix(
-            applySunShadowVisibility(procedural, sunShadow, uShadowFloor, uSunIntensity),
-            reflected,
-            reflectionMix,
-          );
-        })(),
-      ) as any;
-    }
+        const theta = max(dot(eyeDirection, surfaceNormal), 0.0);
+        const rf0 = float(0.02);
+        const reflectance = mul(pow(float(1.0).sub(theta), 5.0), float(1.0).sub(rf0)).add(rf0);
+        // Open sea without shore depth (no height map): the plain water colour
+        const scatterWaterColor = shore
+          ? waterDepthScatterTintTsl(this.waterColor, shore, shoreDepth)
+          : this.waterColor;
+        const scatter = max(0.0, dot(surfaceNormal, eyeDirection)).mul(scatterWaterColor);
+        const reflectionMix = max(reflectance, minReflectionMix);
+        const procedural = this.sunColor.mul(diffuseLight).mul(0.3).add(scatter);
+        const reflected = mirrorSampler.rgb.add(specularLight);
+        const albedo = mix(applyShadow(procedural), reflected, reflectionMix);
+        if (!shore) return albedo;
+
+        const refractOffset = waterRefractionScreenOffsetTsl(
+          surfaceNormal.xz,
+          distance,
+          this.distortionScale,
+          shore,
+        );
+        const refracted = applyWaterRefractionTsl(
+          albedo,
+          refractOffset,
+          refractMask,
+          scatterWaterColor,
+          shoreDepth,
+          shore,
+          viewportScene,
+        );
+        return foamMask
+          ? applyWaterSurfaceFoamColorTsl(refracted, foamMask, waterWaveUniforms)
+          : refracted;
+      })(),
+    ) as any;
   }
 }

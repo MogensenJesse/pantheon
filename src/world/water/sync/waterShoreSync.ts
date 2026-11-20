@@ -1,16 +1,16 @@
 // src/world/water/sync/waterShoreSync.ts — live DEV + tod drive for shore-depth uniforms
 import { Color } from 'three';
 import { VISUAL } from '../../../config/visualTuning';
-import { devDebugSettings, runtimeSettings } from '../../../core/settings';
+import { devDebugSettings } from '../../../core/settings';
 import { currentSunElevationDeg } from '../../../rendering/sunSpherical';
 import { sampleTodColor } from '../../../rendering/tod/todBlend';
 import type { WaterShoreUniforms } from '../material/waterShoreUniforms';
 
 const _shallowColor = new Color();
 
-/** Push devSettings + render-debug + tod shallow tint into shore TSL uniforms. */
-export function syncWaterShoreUniforms(shore: WaterShoreUniforms, _daylight: number): void {
-  const sd = runtimeSettings.water.shoreDepth;
+/** Push `VISUAL.water.shoreDepth` (the DEV panel edits it live) + render-debug + tod shallow tint into shore TSL uniforms. */
+export function syncWaterShoreUniforms(shore: WaterShoreUniforms): void {
+  const sd = VISUAL.water.shoreDepth;
   const shoreEnabled =
     sd.enabled && !(import.meta.env.DEV && devDebugSettings.renderDebug.disableShoreDepth);
 
@@ -27,7 +27,7 @@ export function syncWaterShoreUniforms(shore: WaterShoreUniforms, _daylight: num
   shore.uMapBoundsFadeM.value = sd.mapBoundsFadeM;
   shore.uOpenOceanDepthM.value = sd.openOceanDepthM;
 
-  const stops = runtimeSettings.water.stops ?? VISUAL.water.stops;
+  const stops = VISUAL.water.stops;
   sampleTodColor(
     {
       night: stops.night.shallowColor,

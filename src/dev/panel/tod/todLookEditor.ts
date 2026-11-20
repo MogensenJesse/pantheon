@@ -129,6 +129,10 @@ const WATER_COLORS = [
   ['shallow', 'Shallow color', 'shallowColor'],
 ] as const;
 
+type WaterStop = Record<(typeof WATER_COLORS)[number][2], string> & { distortion: number };
+/** The shipped stops, kept to put them back on reset: the editor writes straight into `VISUAL.water.stops`. */
+const SHIPPED_WATER_STOPS = structuredClone(VISUAL.water.stops);
+
 /** Per-stop grass colours: id suffix, label, field of the grass colour stop. */
 const GRASS_COLORS = [
   ['base-dark', 'Dark base', 'baseColorDark'],
@@ -258,7 +262,7 @@ export function todLookHtml(): string {
 
 export function createTodLookEditor(env: TodEditorEnv): TodEditor {
   const { panel, body, ctx, stop } = env;
-  const waterStop = () => devSettings.water.stops[stop()];
+  const waterStop = () => VISUAL.water.stops[stop()] as WaterStop;
   const grassColorStop = () => devSettings.grass.colorStops[stop()];
 
   injectRangeRows(
@@ -478,6 +482,9 @@ export function createTodLookEditor(env: TodEditorEnv): TodEditor {
       resetShadowFloorDevOverrides();
       resetCloudPaletteDevOverride();
       resetValleyFogParams();
+      for (const k of Object.keys(SHIPPED_WATER_STOPS) as Array<keyof typeof SHIPPED_WATER_STOPS>) {
+        Object.assign(VISUAL.water.stops[k], SHIPPED_WATER_STOPS[k]);
+      }
       devSettings.grass.colorStops = structuredClone(VISUAL.grass.colorStops);
       ctx?.postFX.resetGodraysParams();
     },

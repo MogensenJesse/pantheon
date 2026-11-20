@@ -1,7 +1,6 @@
 // src/world/water/sync/syncWaterWaveUniforms.ts — per-frame wave drive: the swell and the shore waves from the config and the wind
 import { Color } from 'three';
 import { VISUAL } from '../../../config/visualTuning';
-import { runtimeSettings } from '../../../core/settings';
 import { windUniforms } from '../../../rendering/ambience/windUniforms';
 import { waterWaveUniforms as U } from '../material/waterWaveUniforms';
 import {
@@ -64,7 +63,7 @@ export function syncWaterWaveUniforms(): void {
   U.uLakeRippleShare.value = lake.rippleShare;
   U.uShoreSlopeStepM.value = shore.shoreSlopeStepM;
   U.uShoreMaxSlope.value = shore.shoreMaxSlope;
-  U.uShoreFogBypass.value = runtimeSettings.water.shoreDepth.fogBypassStrength;
+  U.uShoreFogBypass.value = VISUAL.water.shoreDepth.fogBypassStrength;
   syncSwell(swell, energy);
   if (shore.foamColor !== lastFoamHex) {
     _foamColor.set(shore.foamColor);

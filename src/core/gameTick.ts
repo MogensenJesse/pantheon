@@ -279,7 +279,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
         playWaterY,
         camera,
       );
-      syncPantheonWater(waterMesh, sun, skySystem.getDaylight(), camera.position.y - playWaterY);
+      syncPantheonWater(waterMesh, sun, camera.position.y - playWaterY);
       followCameraWithWater(waterMesh, camera);
     }
     syncUnderwater(

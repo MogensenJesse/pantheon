@@ -3,7 +3,6 @@
 import type { DirectionalLight } from 'three';
 import { Color, Vector3 } from 'three';
 import { VISUAL } from '../../../config/visualTuning';
-import { runtimeSettings } from '../../../core/settings';
 import { copyBakedSunDirection } from '../../../rendering/sunShadow/bakedSunDirection';
 import { currentSunElevationDeg } from '../../../rendering/sunSpherical';
 import { sampleTodColor, sampleTodScalar } from '../../../rendering/tod/todBlend';
@@ -19,10 +18,6 @@ import { syncWaterShoreUniforms } from './waterShoreSync';
 const _sunDir = new Vector3();
 const _waterColor = new Color();
 const _sunColor = new Color();
-
-function liveWaterStops() {
-  return runtimeSettings.water.stops ?? VISUAL.water.stops;
-}
 
 /**
  * How far the vertex shader can move the surface from base water Y, in either direction.
@@ -54,12 +49,11 @@ let lastDistortion = Number.NaN;
 export function syncPantheonWater(
   water: PantheonWaterSyncTarget,
   sun: DirectionalLight,
-  daylight: number,
   cameraAboveWaterM = Number.POSITIVE_INFINITY,
 ): void {
   const elev = currentSunElevationDeg();
-  const w = runtimeSettings.water;
-  const stops = liveWaterStops();
+  const w = VISUAL.water;
+  const stops = w.stops;
 
   copyBakedSunDirection(sun, _sunDir);
   const sunMoved = _lastSunDir.distanceToSquared(_sunDir) > 1e-8;
@@ -109,12 +103,14 @@ export function syncPantheonWater(
     water.alpha.value = w.alpha;
     lastAlpha = w.alpha;
   }
+  // before the plane: the headroom reads this frame's wave energy and swash peak
+  syncWaterWaveUniforms();
   if (water.reflectorTarget) {
     // Push headroom in whichever direction the offset points, so the swell can never carry
     // the surface across the mirror plane (a plane parked at base water Y was overtaken by
-    // the surface and the waterline seam reappeared).
+    // the surface and the waterline seam reappeared). An offset of exactly 0 lifts.
     const offset = w.reflectionPlaneOffsetM;
-    const planeOffset = offset + Math.sign(offset) * surfaceHeadroomM();
+    const planeOffset = offset + (Math.sign(offset) || -1) * surfaceHeadroomM();
     // Plane height over the mean level (local +Z is world +Y here: the water mesh is rotated -PI/2 on X; a positive offset
     // drops the plane, a negative one lifts it). Never above the eye, but never below the mean level for that reason alone.
     const eyeCapM = Math.max(cameraAboveWaterM - EYE_OVER_PLANE_M, 0);
@@ -122,7 +118,6 @@ export function syncPantheonWater(
   }
 
   if (water.shoreUniforms) {
-    syncWaterShoreUniforms(water.shoreUniforms, daylight);
+    syncWaterShoreUniforms(water.shoreUniforms);
   }
-  syncWaterWaveUniforms();
 }

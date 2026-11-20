@@ -65,14 +65,15 @@ export const grassSharedUniforms = {
   uWheatTipColor: uniform(new Color(WHEAT.TIP_COLOR)),
   /** Kelp is grass on the sea floor (`underwater.seabed.kelp`); `uKelpWaterY` is the water level its blades are capped under. */
   uKelpWaterY: uniform(0),
-  uKelpDensity: uniform(KELP.density),
-  uKelpHeightMin: uniform(KELP.heightM[0]),
-  uKelpHeightMax: uniform(KELP.heightM[1]),
-  uKelpWidthMul: uniform(KELP.widthMul),
-  uKelpSwayM: uniform(KELP.swayM),
-  uKelpSwayOmega: uniform(Math.PI * 2 * KELP.swayHz),
-  uKelpColorA: uniform(new Color(KELP.colorA)),
-  uKelpColorB: uniform(new Color(KELP.colorB)),
+  // The rest of the kelp numbers are filled by `applyGrassKelpUniforms()` below, once at load and again from the DEV panel.
+  uKelpDensity: uniform(0),
+  uKelpHeightMin: uniform(0),
+  uKelpHeightMax: uniform(0),
+  uKelpWidthMul: uniform(0),
+  uKelpSwayM: uniform(0),
+  uKelpSwayOmega: uniform(0),
+  uKelpColorA: uniform(new Color()),
+  uKelpColorB: uniform(new Color()),
   /** Wheat waves along the wind and lies down when wet; see `life.WHEAT_WIND`. */
   uWheatWaveGain: uniform(LIFE.WHEAT_WIND.WAVE_GAIN),
   uWheatWaveBase: uniform(LIFE.WHEAT_WIND.WAVE_BASE),
@@ -390,6 +391,7 @@ export function applyGrassKelpUniforms(): void {
   u.uKelpColorA.value.set(KELP.colorA);
   u.uKelpColorB.value.set(KELP.colorB);
 }
+applyGrassKelpUniforms();
 
 export function applyGrassRingUniforms(
   ringUniforms: GrassRingUniforms,

@@ -13,7 +13,6 @@ import { WebGPURenderer } from 'three/webgpu';
 import { PHASE0 } from '../config/phase0';
 import { VISUAL } from '../config/visualTuning';
 import { initValleyFog } from './atmosphere';
-import { enableWaterReflectionOnCamera } from './layers/waterReflectionLayers';
 import { CAMERA_FAR, SKY_BACKGROUND } from './sceneConstants';
 import {
   CLOUD_SHADOW_LAYER,
@@ -78,7 +77,6 @@ export async function initSceneSetup(
   const initialH = options?.fitCanvas ? layoutH : window.innerHeight;
 
   const camera = new PerspectiveCamera(PHASE0.CAMERA.FOV, initialW / initialH, 0.1, CAMERA_FAR);
-  enableWaterReflectionOnCamera(camera);
   // Soft cloud casters live on CLOUD_SHADOW_LAYER only (not layer 0).
   camera.layers.enable(CLOUD_SHADOW_LAYER);
 

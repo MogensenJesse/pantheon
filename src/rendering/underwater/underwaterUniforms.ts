@@ -1,4 +1,4 @@
-// src/rendering/underwater/underwaterUniforms.ts — live uniforms + mutable settings of the water volume
+// src/rendering/underwater/underwaterUniforms.ts — the live uniforms of the water volume (its numbers are `VISUAL.underwater`, pushed in by `syncUnderwater`)
 import { Color, Vector2, Vector3 } from 'three';
 import { uniform } from 'three/tsl';
 import { VISUAL } from '../../config/visualTuning';
@@ -6,61 +6,6 @@ import { VISUAL } from '../../config/visualTuning';
 type UniformNode = any;
 
 const U = VISUAL.underwater;
-
-/** Mutable copy of the look defaults: the dev panel writes here, `syncUnderwater` pushes it to the GPU every frame. */
-export interface UnderwaterSettings {
-  enabled: boolean;
-  density: number;
-  deepM: number;
-  stops: { [K in 'night' | 'goldenHour' | 'noon']: { shallow: string; deep: string } };
-  causticStrength: number;
-  causticScaleM: number;
-  causticSpeed: number;
-  causticWidth: number;
-  causticFadeM: number;
-  shaftStrength: number;
-  windowGlow: number;
-  windowEdgeCos: number;
-  windowEdgeSoft: number;
-  windowRipple: number;
-  rippleAmp: number;
-  rippleScale: number;
-  rippleSpeed: number;
-  orbTint: number;
-}
-
-export function defaultUnderwaterSettings(): UnderwaterSettings {
-  return {
-    enabled: U.enabled,
-    density: U.density,
-    deepM: U.deepM,
-    stops: {
-      night: { ...U.stops.night },
-      goldenHour: { ...U.stops.goldenHour },
-      noon: { ...U.stops.noon },
-    },
-    causticStrength: U.caustics.strength,
-    causticScaleM: U.caustics.scaleM,
-    causticSpeed: U.caustics.speed,
-    causticWidth: U.caustics.width,
-    causticFadeM: U.caustics.fadeM,
-    shaftStrength: U.shafts.strength,
-    windowGlow: U.window.glow,
-    windowEdgeCos: U.window.edgeCos,
-    windowEdgeSoft: U.window.edgeSoft,
-    windowRipple: U.window.ripple,
-    rippleAmp: U.ripple.amplitude,
-    rippleScale: U.ripple.wavelength,
-    rippleSpeed: U.ripple.speed,
-    orbTint: U.orbTint,
-  };
-}
-
-export const underwaterSettings: UnderwaterSettings = defaultUnderwaterSettings();
-
-export function resetUnderwaterSettings(): void {
-  Object.assign(underwaterSettings, defaultUnderwaterSettings());
-}
 
 export interface UnderwaterUniforms {
   /** 0 leaves every material as it was; 1 = the volume is on. */

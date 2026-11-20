@@ -1,9 +1,9 @@
-// src/world/underwater/kelpCoverage.ts — where kelp grows: a band of depth, in blobs (pure, node-runnable)
+// src/world/grass/data/kelpCoverage.ts — where kelp grows: a band of depth, in blobs (pure, node-runnable)
 //
 // Kelp is grass blades (`world/grass`). The grass data map keeps this 0..1 weight in its alpha, baked on the CPU with
 // the rest of the map; the grass shaders read it. `noise01` is smooth value noise at the patch size.
 
-import { smoothstepEdges } from '../../core/math/scalar.ts';
+import { smoothstepEdges } from '../../../core/math/scalar.ts';
 
 /** Metres over which kelp fades in at the shallow end of its band and out at the deep end. */
 const FADE_IN_M = 1;

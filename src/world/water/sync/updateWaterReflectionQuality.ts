@@ -1,7 +1,6 @@
 // src/world/water/sync/updateWaterReflectionQuality.ts — adaptive reflector resolutionScale
 import { MathUtils, type PerspectiveCamera, Vector3 } from 'three';
 import { VISUAL, type WaterTier } from '../../../config/visualTuning';
-import { runtimeSettings } from '../../../core/settings';
 import type { PantheonWaterSyncTarget } from '../mesh/pantheonWaterTypes';
 import { coastDistanceM } from './waterCoastProximity';
 
@@ -98,8 +97,8 @@ function coastDistanceCached(
 
 /**
  * Drives runtime `resolutionScale` from coast proximity and camera pitch.
- * Reflection mix stays at 1 — weight was tied to quality and blacked out water when
- * looking down or standing inland while water was still in view.
+ * The reflection mix does not follow this quality: it was tied to it once and blacked out
+ * water when looking down or standing inland while water was still in view.
  * Skipped for cheap tier (no reflector). Dev slider sets the RT ceiling.
  */
 export function updateWaterReflectionQuality(
@@ -113,7 +112,7 @@ export function updateWaterReflectionQuality(
 ): void {
   if ((VISUAL.water.tier as WaterTier) === 'cheap') return;
 
-  const devMax = runtimeSettings.water.resolutionScale;
+  const devMax = VISUAL.water.resolutionScale;
   const coastDist = coastDistanceCached(playerPosition.x, playerPosition.z, getWorldY, waterY);
   const shore = shoreWeightFromCoastDistance(coastDist);
   const horizon = horizonWeight(cameraPitchRad);
@@ -127,7 +126,6 @@ export function updateWaterReflectionQuality(
   // Never set resolutionScale to 0 — ReflectorNode resizes its RT to 0×0 and WebGPU bind
   // groups then mismatch (multisampled vs single-sample validation errors).
   const scale = Math.max(smoothedScale, adaptive.minScale);
-  water.resolutionScale = scale;
   if (water.waterReflector) {
     water.waterReflector.resolutionScale = scale;
   }

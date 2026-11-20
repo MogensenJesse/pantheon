@@ -15,10 +15,8 @@ import {
   createInAnnulusMask,
   createPropGrassInfluence,
   createPropGrassTaper,
-  createSampleGrassClump,
+  createSampleGrassChannel,
   createSampleGrassData,
-  createSampleGrassField,
-  createSampleGrassKelp,
   createTransitionStrength,
   type VegetationVisibilitySample,
 } from './vegetationVisibilityTsl';
@@ -111,9 +109,9 @@ export function createVegetationVisibilityContext(params: {
     params.uSurfaceBias,
     params.sampleTerrainSurfaceY,
   );
-  const sampleGrassClump = createSampleGrassClump(grassDataTex, params.uWorldSize);
-  const sampleGrassField = createSampleGrassField(grassDataTex, params.uWorldSize);
-  const sampleGrassKelp = createSampleGrassKelp(grassDataTex, params.uWorldSize);
+  const sampleGrassClump = createSampleGrassChannel(grassDataTex, params.uWorldSize, 'g');
+  const sampleGrassField = createSampleGrassChannel(grassDataTex, params.uWorldSize, 'b');
+  const sampleGrassKelp = createSampleGrassChannel(grassDataTex, params.uWorldSize, 'a');
   const propGrassInfluenceFn = createPropGrassInfluence(propExclusionTex, params.uWorldSize);
   const buildVisibility = createBuildVisibility({
     frustumBoundsRadius: params.frustumBoundsRadius,

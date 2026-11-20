@@ -3,6 +3,7 @@
 // built once: edit them in config/visual/water.ts and reload.
 
 import { VISUAL } from '../../config/visualTuning';
+import { SHOAL_DEPTH_PER_HEIGHT } from '../../world/water/waves/waveMath';
 import { type ConfigGroup, type ConfigRow, mountConfigSection } from '../bindConfig';
 import { bindCheckbox } from '../bindRange';
 
@@ -17,14 +18,14 @@ const GROUPS: ConfigGroup[] = [
       ['calmHeightM', 'Height in calm weather (m)', 0, 3, 0.05],
       ['stormHeightM', 'Height in a full storm (m)', 0, 6, 0.05],
       ['fullEnergyBoost', 'Wind boost of a full storm', 1.05, 3, 0.05],
-      ['openSea.gain', 'Open sea: taller than the coast by (×)', 0.5, 4, 0.05],
+      ['openSea.gain', 'Open sea: taller than the coast by (×)', 0.5, 8, 0.05],
       ['openSea.fromM', 'Open sea: starts growing (m from land)', 0, 1000, 10, 0],
       ['openSea.toM', 'Open sea: fully grown (m from land)', 50, 2000, 10, 0],
       ['speedScale', 'Speed (× real waves)', 0.1, 2, 0.05],
       ['steepness', 'Sharp crests', 0, 1.5, 0.05],
       [
         'shoalDepthM',
-        'Dies out in water shallower than (m, at least 2.5 swell heights)',
+        `Dies out in water shallower than (m, at least ${SHOAL_DEPTH_PER_HEIGHT} swell heights)`,
         1,
         25,
         0.5,

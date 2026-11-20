@@ -1,5 +1,5 @@
 // src/rendering/layers/waterReflectionLayers.ts — layer mask for slim water reflector pass
-import type { Camera, Object3D, PerspectiveCamera } from 'three';
+import type { Camera, Object3D } from 'three';
 import type { NodeFrame } from 'three/webgpu';
 
 /**
@@ -10,16 +10,7 @@ import type { NodeFrame } from 'three/webgpu';
  */
 export const WATER_REFLECTION_LAYER = 2;
 
-export const WATER_REFLECTION_LAYER_MASK = 1 << WATER_REFLECTION_LAYER;
-
-/**
- * Main gameplay camera stays on layer 0 only.
- * Dual-tagged (0|2) objects remain visible via layer 0; reflection-only proxies (layer 2 alone)
- * must not be enabled here or they would draw in the main pass.
- */
-export function enableWaterReflectionOnCamera(_camera: PerspectiveCamera): void {
-  // Intentionally no-op — see comment above.
-}
+const WATER_REFLECTION_LAYER_MASK = 1 << WATER_REFLECTION_LAYER;
 
 /** Tag an object (and descendants) for the water reflector without removing layer 0 visibility. */
 export function enableWaterReflectionLayer(object: Object3D): void {

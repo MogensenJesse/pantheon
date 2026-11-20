@@ -4,6 +4,7 @@ import { texture, uniform } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
 import { WORLD } from '../../../config/world';
 import { terrainFacetStepM } from '../../terrain/cpu/terrainChiselCpu';
+import { waterWaveUniforms } from './waterWaveUniforms';
 
 type WaterUniform = any;
 
@@ -36,22 +37,20 @@ export interface WaterShoreDepthInputs {
   heightMap: DataTexture;
   worldSize: number;
   heightScale: number;
-  waterY: number;
 }
 
-/** Macro sculpt height map + shore-depth tunables for waterDepthTsl. */
+/** Macro sculpt height map + shore-depth tunables for waterDepthTsl. `uWaterY` is the wave uniforms' own mean level. */
 export function createWaterShoreUniforms({
   heightMap,
   worldSize,
   heightScale,
-  waterY,
 }: WaterShoreDepthInputs): WaterShoreUniforms {
   const sd = VISUAL.water.shoreDepth;
   return {
     uHeightTex: texture(heightMap),
     uWorldSize: uniform(worldSize),
     uHeightScale: uniform(heightScale),
-    uWaterY: uniform(waterY),
+    uWaterY: waterWaveUniforms.uWaterY,
     uEnabled: uniform(sd.enabled ? 1 : 0),
     uAbsorption: uniform(sd.absorption),
     uCoastFadeM: uniform(sd.coastFadeM),

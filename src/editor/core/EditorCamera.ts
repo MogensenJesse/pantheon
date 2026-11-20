@@ -9,7 +9,7 @@ const DEG = Math.PI / 180;
 const MOUSE_NONE = -1 as unknown as MOUSE.ROTATE;
 /** High orbit so the full map stays in frame. */
 const EDITOR_MAX_DISTANCE = WORLD.SIZE * 4;
-/** Past map diagonal + oversized water disc (`playWaterPlaneDiameter` is SIZE×8). */
+/** Past map diagonal + oversized water disc (`playWaterPlaneDiameter` is `max(CAMERA_FAR × 3, SIZE × 12)`). */
 const EDITOR_CAMERA_FAR = WORLD.SIZE * 12;
 
 export interface EditorCameraContext {

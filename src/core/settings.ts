@@ -15,8 +15,6 @@ export type {
   RenderDebugSettings,
   RuntimeSettings,
   TerrainDevSettings,
-  WaterDevSettings,
-  WaterShoreDevSettings,
 } from './state/settingsTypes';
 
 import { devDebugSettings } from './state/devDebugSettings';
@@ -54,7 +52,6 @@ export const devSettings: DevSettings = {
   },
   renderDebug: devDebugSettings.renderDebug,
   terrain: runtimeSettings.terrain,
-  water: runtimeSettings.water,
   grass: runtimeSettings.grass,
   postfx: runtimeSettings.postfx,
 };

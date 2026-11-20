@@ -57,7 +57,6 @@ import { playWaterPlaneDiameter } from './water/config/waterExtent';
 import { initWaterWaveEditorPreview, waterWaveUniforms } from './water/material/waterWaveUniforms';
 import { createPantheonWater } from './water/mesh/createPantheonWater';
 import { disposePantheonWater } from './water/mesh/disposePantheonWater';
-import type { PantheonWaterInstance } from './water/mesh/pantheonWaterTypes';
 import { createShoreFieldTexture, updateShoreFieldTexture } from './water/waves/shoreFieldTexture';
 
 /** DEV: toggle bright painted-biome false-color overlay on terrain splat materials. */
@@ -302,7 +301,6 @@ export function buildMapTerrain(
             heightMap,
             worldSize: SIZE,
             heightScale: HEIGHT_SCALE,
-            waterY,
           },
         },
         sun,
@@ -319,8 +317,6 @@ export function buildMapTerrain(
     waterLevelM = levelM;
     water.position.y = levelM;
     waterWaveUniforms.uWaterY.value = levelM;
-    const shore = (water as PantheonWaterInstance).shoreUniforms;
-    if (shore) shore.uWaterY.value = levelM;
     if (waterChanged) {
       updateOceanInlandMaskTexture(inlandMaskMap, grids, waterLevelM);
       updateShoreFieldTexture(shoreFieldMap, grids, waterLevelM);

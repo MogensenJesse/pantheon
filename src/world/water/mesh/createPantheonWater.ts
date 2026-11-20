@@ -1,11 +1,9 @@
 // src/world/water/mesh/createPantheonWater.ts — reflective ocean (layer-culled reflector or cheap tier)
 
 import type { DirectionalLight, Texture } from 'three';
-import { Vector3 } from 'three';
+import { Color, Vector3 } from 'three';
 import { VISUAL, type WaterTier } from '../../../config/visualTuning';
-import { WATER_LOOK_STOPS, WATER_PARAMS } from '../config/waterConfig';
 import type { WaterShoreDepthInputs } from '../material/waterShoreUniforms';
-import { initWaterWaveUniforms } from '../material/waterWaveUniforms';
 import { CheapPantheonWaterMesh } from './cheapPantheonWater';
 import type { PantheonWaterInstance } from './pantheonWaterTypes';
 import { ReflectivePantheonWaterMesh } from './ReflectivePantheonWaterMesh';
@@ -43,13 +41,14 @@ function sharedWaterOptions(
     shoreDepth,
     edgeFadeStartRatio: VISUAL.water.edgeFadeStartRatio,
     edgeFadeEndRatio: VISUAL.water.edgeFadeEndRatio,
-    resolutionScale: WATER_PARAMS.resolutionScale,
-    size: WATER_PARAMS.size,
-    alpha: WATER_PARAMS.alpha,
+    resolutionScale: VISUAL.water.resolutionScale,
+    size: VISUAL.water.size,
+    alpha: VISUAL.water.alpha,
+    // the starting look (night stop); syncPantheonWater overwrites all three every frame
     sunDirection: new Vector3(0, 1, 0),
-    sunColor: WATER_LOOK_STOPS.night.sunColor.clone(),
-    waterColor: WATER_LOOK_STOPS.night.waterColor.clone(),
-    distortionScale: WATER_LOOK_STOPS.night.distortionScale,
+    sunColor: new Color(VISUAL.water.stops.night.sunColor),
+    waterColor: new Color(VISUAL.water.stops.night.waterColor),
+    distortionScale: VISUAL.water.stops.night.distortion,
   };
 }
 
@@ -64,8 +63,6 @@ export function createPantheonWater(
 ): PantheonWaterInstance {
   const geometry = buildWaterGeometry(waterRadius);
   const options = sharedWaterOptions(sun, waterNormals, waterRadius, shoreDepth);
-
-  initWaterWaveUniforms(waterY);
 
   const water =
     (VISUAL.water.tier as WaterTier) === 'cheap'

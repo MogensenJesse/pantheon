@@ -1,6 +1,5 @@
 // src/world/water/tsl/waterDepthTsl.ts — terrain-height shore depth, Beer-Lambert opacity, shallow tint
 import { Discard, exp, Fn, float, If, max, mix, smoothstep, sub } from 'three/tsl';
-import { terrainGridUv } from '../../../map/mapUvTsl';
 import { computeEffectiveSunShadowFloor } from '../../../rendering/sunShadow/sunShadowTsl';
 import type { WaterShoreUniforms } from '../material/waterShoreUniforms';
 
@@ -12,16 +11,6 @@ export interface WaterSunShadowOpts {
   uSunIntensity: TslNode;
 }
 
-/** Normalized sculpt height [0,1] at world XZ (same sampling as terrainMacroHeightTsl). */
-function sampleTerrainNormY(worldXZ: TslNode, shore: WaterShoreUniforms): TslNode {
-  return shore.uHeightTex.sample(terrainGridUv(shore.uWorldSize, worldXZ)).r;
-}
-
-/** World-space terrain Y from the height texture (bilinear — fallback only). */
-function sampleTerrainWorldY(worldXZ: TslNode, shore: WaterShoreUniforms): TslNode {
-  return sampleTerrainNormY(worldXZ, shore).mul(shore.uHeightScale);
-}
-
 /** 1 inside painted map square, 0 beyond — fades across mapBoundsFadeM inset from edge. */
 function waterMapBoundsMaskTsl(worldXZ: TslNode, shore: WaterShoreUniforms): TslNode {
   const half = shore.uWorldSize.mul(0.5);
@@ -29,32 +18,18 @@ function waterMapBoundsMaskTsl(worldXZ: TslNode, shore: WaterShoreUniforms): Tsl
   return smoothstep(float(0), shore.uMapBoundsFadeM, inside);
 }
 
-/** Terrain-sculpt depth only (no open-ocean override). */
-function waterTerrainDepthBelowSurface(
-  worldXZ: TslNode,
-  shore: WaterShoreUniforms,
-  sampleWorldY?: (worldXZ: TslNode) => TslNode,
-): TslNode {
-  const terrainY = sampleWorldY ? sampleWorldY(worldXZ) : sampleTerrainWorldY(worldXZ, shore);
-  return shore.uWaterY.sub(terrainY);
-}
-
 /**
- * Water depth below surface — inside map uses terrain height; outside blends to openOceanDepthM
- * so clamped heightmap edges do not read as shallow refracting water over the mesh boundary.
+ * Water depth below surface — inside map uses the terrain height (`sampleWorldY`, the visible chiseled mesh); outside
+ * blends to openOceanDepthM so clamped heightmap edges do not read as shallow refracting water over the mesh boundary.
  */
 export function waterDepthBelowSurface(
   worldXZ: TslNode,
   shore: WaterShoreUniforms,
-  sampleWorldY?: (worldXZ: TslNode) => TslNode,
+  sampleWorldY: (worldXZ: TslNode) => TslNode,
 ): TslNode {
-  const terrainDepth = waterTerrainDepthBelowSurface(worldXZ, shore, sampleWorldY);
+  const terrainDepth = shore.uWaterY.sub(sampleWorldY(worldXZ));
   const boundsMask = waterMapBoundsMaskTsl(worldXZ, shore);
   return mix(shore.uOpenOceanDepthM, terrainDepth, boundsMask);
-}
-
-function resolvedShoreDepth(worldXZ: TslNode, shore: WaterShoreUniforms, depth?: TslNode): TslNode {
-  return depth ?? waterDepthBelowSurface(worldXZ, shore);
 }
 
 function waterLandMask(shoreDistM: TslNode, shore: WaterShoreUniforms): TslNode {
@@ -98,14 +73,12 @@ function waterShallowTintFactor(depthClamped: TslNode, shore: WaterShoreUniforms
  * Drives screen-space refraction color + opacity lock only.
  */
 export function waterRefractionMaskTsl(
-  worldXZ: TslNode,
   shore: WaterShoreUniforms,
-  depth?: TslNode,
-  shoreDistM?: TslNode,
+  depth: TslNode,
+  shoreDistM: TslNode,
 ): TslNode {
-  const d = resolvedShoreDepth(worldXZ, shore, depth);
-  const depthClamped = max(d, float(0));
-  const landMask = waterLandMask(shoreDistM ?? d, shore);
+  const depthClamped = max(depth, float(0));
+  const landMask = waterLandMask(shoreDistM, shore);
   const shallow = exp(depthClamped.negate().div(shore.uRefractionDepthM));
   return landMask.mul(shallow).mul(shore.uEnabled);
 }
@@ -142,20 +115,15 @@ function waterShadowOpacityBoost(
  */
 export function waterDepthOpacityTsl(
   baseAlpha: TslNode,
-  worldXZ: TslNode,
   shore: WaterShoreUniforms,
-  shadow?: WaterSunShadowOpts,
-  depth?: TslNode,
-  shoreDistM?: TslNode,
+  shadow: WaterSunShadowOpts,
+  depth: TslNode,
+  shoreDistM: TslNode,
 ): TslNode {
-  const d = resolvedShoreDepth(worldXZ, shore, depth);
-  const depthClamped = max(d, float(0));
-  const landMask = waterLandMask(shoreDistM ?? d, shore);
+  const depthClamped = max(depth, float(0));
+  const landMask = waterLandMask(shoreDistM, shore);
   const absorbed = waterBeerLambertOpacity(depthClamped, shore);
   const depthOpacity = baseAlpha.mul(mix(float(1), landMask.mul(absorbed), shore.uEnabled));
-  if (!shadow) {
-    return depthOpacity;
-  }
   return waterShadowOpacityBoost(depthOpacity, shore, shadow, landMask);
 }
 
@@ -165,11 +133,10 @@ export function waterDepthOpacityTsl(
  */
 export function waterDepthScatterTintTsl(
   deepColor: TslNode,
-  worldXZ: TslNode,
   shore: WaterShoreUniforms,
-  depth?: TslNode,
+  depth: TslNode,
 ): TslNode {
-  const depthClamped = max(resolvedShoreDepth(worldXZ, shore, depth), float(0));
+  const depthClamped = max(depth, float(0));
   const shallowT = waterShallowTintFactor(depthClamped, shore);
   const tinted = mix(deepColor, shore.uShallowColor, shallowT);
   return mix(deepColor, tinted, shore.uEnabled);

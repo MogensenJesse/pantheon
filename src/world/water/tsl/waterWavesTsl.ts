@@ -27,7 +27,7 @@ export interface SwellSample {
  * grows toward the shore) and `toward` its gradient (the way to the shore, about unit length, shorter where two coasts meet).
  * Beyond the map the distance keeps growing along the nearest edge texel's direction.
  */
-export function shoreFieldTsl(worldXZ: TslNode): {
+function shoreFieldTsl(worldXZ: TslNode): {
   along: TslNode;
   distM: TslNode;
   toward: TslNode;

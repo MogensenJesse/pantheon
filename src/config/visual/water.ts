@@ -12,8 +12,9 @@ export const water = {
   /** Floor on reflection mix — avoids void-black at grazing angles. */
   minReflectionMix: 0.22,
   /**
-   * Mirror plane offset (m) relative to surface; the swell's current height adds in the same direction.
-   * Negative lifts plane toward shore (2× image shift closes low-res seam).
+   * Mirror plane offset (m) relative to the surface; the swell's current height, the swash peak and `waves.mesh.edgeLiftM`
+   * add in the same direction, and the plane never rises above the camera's eye (a low camera would lose the reflection).
+   * Negative lifts the plane toward shore (2× image shift closes the low-res seam).
    */
   reflectionPlaneOffsetM: -0.05,
   receiveShadow: true,

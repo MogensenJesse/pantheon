@@ -1,8 +1,7 @@
 // src/rendering/postfx/pipelineComposite.ts — god-rays/bloom composite + grade sharp color
-import { agxToneMapping, Fn, If, mix, renderOutput, rtt, screenUV, vec3, vec4 } from 'three/tsl';
-import { underwaterRippleOffsetTsl } from '../underwater/underwaterRippleTsl';
+import { agxToneMapping, Fn, If, renderOutput, rtt, screenUV, vec3, vec4 } from 'three/tsl';
+import { underwaterFillVoidTsl, underwaterRippleOffsetTsl } from '../underwater/underwaterPostTsl';
 import { underwaterShaftsTsl } from '../underwater/underwaterShaftsTsl';
-import { underwaterVoidFillTsl } from '../underwater/underwaterTsl';
 import { underwaterUniforms } from '../underwater/underwaterUniforms';
 import { bloomSkyAttenuation } from './bloomSkyMask';
 import type { createBloomControls } from './controls/bloomControls';
@@ -53,16 +52,10 @@ export function createPipelineComposite(deps: PipelineCompositeDeps) {
         uv.addAssign(underwaterRippleOffsetTsl(screenUV));
       });
 
-      const baseSample = sceneBeauty.sample(uv);
-      const sceneVar = baseSample.rgb.toVar();
       // Under water, the void below the horizon past the terrain's edge is water, not sky (the bloom source gets the same
       // fill in createPostFxPipeline, so it does not glow from a sky band that is no longer there).
-      const skyMaskRgb = baseSample.rgb.toVar();
-      If(underwaterUniforms.uSubmerge.greaterThan(0.001), () => {
-        const fill = underwaterVoidFillTsl(uv, deps.sceneDepth);
-        sceneVar.assign(mix(sceneVar, fill.color, fill.weight));
-        skyMaskRgb.assign(sceneVar);
-      });
+      const skyMaskRgb = underwaterFillVoidTsl(sceneBeauty.sample(uv).rgb, uv, deps.sceneDepth);
+      const sceneVar = skyMaskRgb.toVar();
       // Light shafts in the water: a uniform condition, so above water (or with the sun gone) this costs nothing.
       If(underwaterUniforms.uShaftFade.greaterThan(0.001), () => {
         sceneVar.addAssign(underwaterShafts.sample(uv).rgb);

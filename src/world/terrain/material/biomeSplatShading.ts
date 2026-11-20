@@ -18,10 +18,7 @@ import { guideReceiveGlowTsl } from '../../../rendering/tsl/guideReceiveGlowTsl'
 import { applyWetLookTsl } from '../../../rendering/tsl/wetLookTsl';
 import { underwaterCausticLightTsl } from '../../../rendering/underwater/underwaterTsl';
 import { waterWaveUniforms } from '../../water/material/waterWaveUniforms';
-import {
-  applyWaterTerrainWetnessTsl,
-  FOAM_AA_MIN_M,
-} from '../../water/tsl/waterIntersectionFoamTsl';
+import { FOAM_AA_MIN_M } from '../../water/tsl/waterFoamTsl';
 import { waterRunUpTsl } from '../../water/tsl/waterRunUpTsl';
 import { createShorelineFieldTsl, SHORE_MIN_SLOPE } from '../../water/tsl/waterShorelineFieldTsl';
 import { TERRAIN_ATLAS_BIOME_INDEX } from '../atlas/atlasConstants';
@@ -45,6 +42,7 @@ import {
   STYLIZE_LIGHTING_OPEN,
 } from '../tsl/terrainStylizeLightingTsl';
 import type { TerrainSplatUniforms } from './biomeSplatUniforms';
+import { applyWaterTerrainWetnessTsl } from './waterWetnessTsl';
 
 type TslNode = any;
 
@@ -338,11 +336,9 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     );
 
     const wave = waterWaveUniforms;
-    const heightM = chiseledWorldYAtWorldXZ(worldXZ);
-    const waterY = wave.uWaterY;
     // Height above the mean level: the swash and the wet sand are both measured in it, and the waterline is where the swash puts it.
-    const heightAboveM = heightM.sub(waterY);
-    const cheapDistM = waterY.sub(heightM).div(float(SHORE_MIN_SLOPE));
+    const heightAboveM = chiseledWorldYAtWorldXZ(worldXZ).sub(wave.uWaterY);
+    const cheapDistM = heightAboveM.negate().div(float(SHORE_MIN_SLOPE));
     const wetAa = max(fwidth(cheapDistM), float(FOAM_AA_MIN_M));
     const withWetness = shadowDebug.toVar();
     // Wet sand reaches the swash, the lighter moist band (capped in height) higher up the beach.

@@ -19,7 +19,7 @@ import {
   sampleChiseledWorldY,
   terrainFacetStepM,
 } from '../../terrain/cpu/terrainChiselCpu';
-import { kelpCoverage } from '../../underwater/kelpCoverage';
+import { kelpCoverage } from './kelpCoverage';
 
 /**
  * R = grass weight (includes path fade), G = baked clump 0–1, B = wheat field (painted live), A = kelp weight 0–1

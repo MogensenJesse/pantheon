@@ -4,10 +4,9 @@ import { underwater } from '../../../src/config/visual/underwater.ts';
 import {
   apparentSunElevationDeg,
   CRITICAL_COS,
-  underwaterFogFactor,
   underwaterPathM,
 } from '../../../src/rendering/underwater/underwaterMath.ts';
-import { kelpCoverage } from '../../../src/world/underwater/kelpCoverage.ts';
+import { kelpCoverage } from '../../../src/world/grass/data/kelpCoverage.ts';
 import { SEABED_ROCK_KEYS, seabedRockEntities } from '../../../src/world/underwater/seabedRocks.ts';
 import { check, finish } from '../lib/check.ts';
 
@@ -35,14 +34,6 @@ await check('looking up from under the surface: the way to the surface only', ()
 
 await check('the path follows the height of the surface', () => {
   assert.ok(Math.abs(underwaterPathM(at(0, 5, 0), at(0, -8, 0), 0.25) - 8.25) < 1e-9);
-});
-
-await check('fog grows with the path and never passes one', () => {
-  assert.equal(underwaterFogFactor(0, 0.08), 0);
-  const a = underwaterFogFactor(4, 0.08);
-  const b = underwaterFogFactor(20, 0.08);
-  assert.ok(a > 0 && a < b && b < 1);
-  assert.ok(Math.abs(underwaterFogFactor(8, 0.08) - (1 - Math.exp(-0.64))) < 1e-12);
 });
 
 await check('the sun looks higher from under the surface, never lower', () => {

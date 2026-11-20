@@ -16,12 +16,8 @@ import {
   vec2,
   vec3,
 } from 'three/tsl';
-import {
-  causticPatternTsl,
-  surfaceEntryXzTsl,
-  underwaterSurfaceYTsl,
-  underwaterViewRayTsl,
-} from './underwaterTsl';
+import { underwaterViewRayTsl } from './underwaterPostTsl';
+import { causticPatternTsl, surfaceEntryXzTsl, underwaterSurfaceYTsl } from './underwaterTsl';
 import { underwaterUniforms as U } from './underwaterUniforms';
 
 type TslNode = any;

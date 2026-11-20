@@ -142,12 +142,8 @@ export function spawnMapEntities(
 ): MapEntitySpawnContext {
   const entities = map.entities ?? [];
   // The landmarks stand as props until their own models exist; the sea floor gets rocks (not saved in the map).
-  const rocks = seabedRockEntities(
-    terrain.getWorldY,
-    terrain.waterLevelM,
-    WORLD.SIZE,
-    collectLandmarks(entities),
-  );
+  const landmarks = collectLandmarks(entities);
+  const rocks = seabedRockEntities(terrain.getWorldY, terrain.waterLevelM, WORLD.SIZE, landmarks);
   const props = spawnMapProps(scene, sun, assets, terrain, [
     ...withLandmarkStandIns(entities),
     ...rocks,
@@ -155,7 +151,6 @@ export function spawnMapEntities(
   const orbPlacements = collectOrbPlacements(entities);
   const villageSeeds = collectVillageSeeds(entities);
   const shrines = collectShrines(entities);
-  const landmarks = collectLandmarks(entities);
 
   const dispose = () => disposeMapProps(scene, props);
 

@@ -30,8 +30,7 @@ import { vegetationFollowSlot } from '../compute/shared/vegetationOffsetTsl';
 import {
   createRingFadeIn,
   createRingFadeOut,
-  createSampleGrassField,
-  createSampleGrassKelp,
+  createSampleGrassChannel,
 } from '../compute/shared/vegetationVisibilityTsl';
 import { type GrassRingUniforms, grassSharedUniforms } from '../config/grassUniforms';
 import { grassBendOffset, grassSpriteRotation } from '../tsl/grassBladeBendTsl';
@@ -125,8 +124,9 @@ export function createGrassMaterial(
   // Kelp (grass data A) sits in the sea: wider blades (the far ring keeps its own width), its own colour and sway.
   const worldX = offsetX.add(uPlayerPosition.x);
   const worldZ = offsetZ.add(uPlayerPosition.z);
+  const grassDataTex = texture(ssbo.grassDataMap);
   const kelpMaskNode: TslNode = kelpMask(
-    createSampleGrassKelp(texture(ssbo.grassDataMap), uWorldSize)(worldX, worldZ),
+    createSampleGrassChannel(grassDataTex, uWorldSize, 'a')(worldX, worldZ),
   );
   const kelpWidth: TslNode = mix(float(1), lodTier >= 2 ? float(1) : uKelpWidthMul, kelpMaskNode);
   const scaleX: TslNode = positionNoise
@@ -146,7 +146,7 @@ export function createGrassMaterial(
   const worldPos = vec3(worldX, bladeY, worldZ);
   const sampleWindAtlas = (atlasUv: TslNode) => windTex.sample(atlasUv);
   // Wheat fields (grass data B): sampled before the wind, so a field rolls in waves and lies down when wet.
-  const wheatRaw = createSampleGrassField(texture(ssbo.grassDataMap), uWorldSize)(worldX, worldZ);
+  const wheatRaw = createSampleGrassChannel(grassDataTex, uWorldSize, 'b')(worldX, worldZ);
   const wheatMaskNode: TslNode = wheatMask(wheatRaw);
   const windBend = grassLiveWindBendXZ({
     worldPos,

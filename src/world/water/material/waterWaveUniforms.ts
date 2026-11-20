@@ -36,12 +36,13 @@ export interface SwellUniforms {
 }
 
 /** The vertex shader unrolls this many components; extra components in the config are ignored, missing ones are silent. */
-export const SWELL_SHADER_COMPONENTS = 4;
+const SWELL_SHADER_COMPONENTS = 4;
 
 export interface WaterWaveUniforms {
   swell: SwellUniforms;
   /** The baked shore field (distance to the nearest shore + the way to it): the swell travels toward the shore. Bound by the map builder. */
   uShoreField: WaterUniform;
+  /** World Y of the mean water level: written by the map builder (`applyWaterY`); the shore-depth uniforms share this node. */
   uWaterY: WaterUniform;
   uFoamColor: WaterUniform;
   uShoreSlopeStepM: WaterUniform;
@@ -141,11 +142,6 @@ export const waterWaveUniforms: WaterWaveUniforms = {
   uLakeRippleShare: uniform(VISUAL.water.waves.lake.rippleShare),
   uShoreFogBypass: uniform(VISUAL.water.shoreDepth.fogBypassStrength),
 };
-
-/** Set once at play init — same world Y as shore-depth uWaterY. */
-export function initWaterWaveUniforms(waterY: number): void {
-  waterWaveUniforms.uWaterY.value = waterY;
-}
 
 /** Map editor — static water level reference, no waves and no shore foam. */
 export function initWaterWaveEditorPreview(waterY: number): void {

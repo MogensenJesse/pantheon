@@ -198,25 +198,18 @@ export function createSampleGrassData(
   };
 }
 
-/** Baked clump 0–1 — cheap path when terrain Y is already cached. */
-export function createSampleGrassClump(grassDataTex: TslNode, uWorldSize: TslNode) {
-  return (worldX: TslNode, worldZ: TslNode): TslNode => {
-    return grassDataTex.sample(worldXZToGridUv(worldX, worldZ, uWorldSize)).g;
-  };
-}
-
-/** Wheat-field byte (grass data B): 0 outside a field, `WHEAT_FLOOR`..1 inside by ripeness. */
-export function createSampleGrassField(grassDataTex: TslNode, uWorldSize: TslNode) {
-  return (worldX: TslNode, worldZ: TslNode): TslNode => {
-    return grassDataTex.sample(worldXZToGridUv(worldX, worldZ, uWorldSize)).b;
-  };
-}
-
-/** Kelp weight (grass data A): 0 off the sea floor's kelp patches, up to 1 inside them. */
-export function createSampleGrassKelp(grassDataTex: TslNode, uWorldSize: TslNode) {
-  return (worldX: TslNode, worldZ: TslNode): TslNode => {
-    return grassDataTex.sample(worldXZToGridUv(worldX, worldZ, uWorldSize)).a;
-  };
+/**
+ * One channel of the grass data map at a world position. `g` is the baked clump 0–1 (the cheap path when terrain Y is
+ * already cached), `b` the wheat-field byte (0 outside a field, `WHEAT_FLOOR`..1 inside by ripeness), `a` the kelp
+ * weight (0 off the sea floor's kelp patches, up to 1 inside them).
+ */
+export function createSampleGrassChannel(
+  grassDataTex: TslNode,
+  uWorldSize: TslNode,
+  channel: 'g' | 'b' | 'a',
+) {
+  return (worldX: TslNode, worldZ: TslNode): TslNode =>
+    grassDataTex.sample(worldXZToGridUv(worldX, worldZ, uWorldSize))[channel];
 }
 
 export function createPropGrassInfluence(propInfluenceTex: TslNode, uWorldSize: TslNode) {

@@ -1,6 +1,6 @@
 // src/world/water/mesh/buildWaterMeshGraph.ts — shared uniforms + surface/material shell for water tiers
 import type { DirectionalLight, Texture } from 'three';
-import { Color, DoubleSide, Vector3 } from 'three';
+import { type Color, DoubleSide, type Vector3 } from 'three';
 import {
   add,
   cameraPosition,
@@ -50,11 +50,8 @@ import {
   waterRefractionMaskTsl,
 } from '../tsl/waterDepthTsl';
 import { applyWaterEdgeFade, createWaterEdgeFadeUniforms } from '../tsl/waterEdgeFadeTsl';
+import { applyWaterSurfaceFoamOpacityTsl, waterSurfaceFoamMaskTsl } from '../tsl/waterFoamTsl';
 import { waterShoreFogBypassTsl } from '../tsl/waterFogBypassTsl';
-import {
-  applyWaterSurfaceFoamOpacityTsl,
-  waterSurfaceFoamMaskTsl,
-} from '../tsl/waterIntersectionFoamTsl';
 import {
   viewportSharedTexture,
   waterRefractionOpacityCompensateTsl,
@@ -71,14 +68,14 @@ export interface WaterMeshSharedOptions {
   waterNormals: Texture;
   waterRadius: number;
   shoreDepth?: WaterShoreDepthInputs;
-  edgeFadeStartRatio?: number;
-  edgeFadeEndRatio?: number;
-  size?: number;
-  alpha?: number;
-  sunColor?: Color;
-  sunDirection?: Vector3;
-  waterColor?: Color;
-  distortionScale?: number;
+  edgeFadeStartRatio: number;
+  edgeFadeEndRatio: number;
+  size: number;
+  alpha: number;
+  sunColor: Color;
+  sunDirection: Vector3;
+  waterColor: Color;
+  distortionScale: number;
 }
 
 export interface WaterMeshSurfaceTuning {
@@ -101,8 +98,6 @@ export interface WaterMeshUniformHost {
   sunDirection: WaterUniform;
   waterColor: WaterUniform;
   distortionScale: WaterUniform;
-  uSunIntensity: (typeof waterSunReceiverUniforms)['uSunIntensity'];
-  uShadowFloor: (typeof waterSunReceiverUniforms)['uShadowFloor'];
   shoreUniforms: WaterShoreUniforms | null;
 }
 
@@ -114,13 +109,8 @@ export interface WaterMeshGraph extends WaterMeshUniformHost {
   foamMask: TslNode | null;
   refractMask: TslNode | null;
   viewportScene: TslNode | null;
-  sunShadow: TslNode;
-  sunShadowOpts: {
-    sunShadow: TslNode;
-    uShadowFloor: (typeof waterSunReceiverUniforms)['uShadowFloor'];
-    uSunIntensity: (typeof waterSunReceiverUniforms)['uSunIntensity'];
-  };
-  edgeAlpha: TslNode;
+  /** Darkens a colour where the sun's shadow falls on the water (the receiver shadow, floor and sun intensity). */
+  applyShadow: (color: TslNode) => TslNode;
   worldXZ: TslNode;
   surfaceNormal: TslNode;
   eyeDirection: TslNode;
@@ -134,33 +124,18 @@ export interface WaterMeshGraph extends WaterMeshUniformHost {
 }
 
 function createWaterNormalNoiseFn(waterNormals: TslNode, sampleCount: 2 | 4) {
-  if (sampleCount === 4) {
-    return Fn(([uv]: TslNode[]) => {
-      const offset = time;
-      const uv0 = add(div(uv, 103), vec2(div(offset, 17), div(offset, 29))).toVar();
-      const uv1 = div(uv, 107)
-        .sub(vec2(div(offset, -19), div(offset, 31)))
-        .toVar();
-      const uv2 = add(div(uv, vec2(8907, 9803)), vec2(div(offset, 101), div(offset, 97))).toVar();
-      const uv3 = sub(div(uv, vec2(1091, 1027)), vec2(div(offset, 109), div(offset, -113))).toVar();
-      const sample0 = waterNormals.sample(uv0);
-      const sample1 = waterNormals.sample(uv1);
-      const sample2 = waterNormals.sample(uv2);
-      const sample3 = waterNormals.sample(uv3);
-      const noise = sample0.add(sample1).add(sample2).add(sample3);
-      return noise.mul(0.5).sub(1);
-    });
-  }
-
   return Fn(([uv]: TslNode[]) => {
     const offset = time;
     const uv0 = add(div(uv, 103), vec2(div(offset, 17), div(offset, 29))).toVar();
     const uv1 = div(uv, 107)
       .sub(vec2(div(offset, -19), div(offset, 31)))
       .toVar();
-    const sample0 = waterNormals.sample(uv0);
-    const sample1 = waterNormals.sample(uv1);
-    const noise = sample0.add(sample1);
+    let noise = waterNormals.sample(uv0).add(waterNormals.sample(uv1));
+    if (sampleCount === 4) {
+      const uv2 = add(div(uv, vec2(8907, 9803)), vec2(div(offset, 101), div(offset, 97))).toVar();
+      const uv3 = sub(div(uv, vec2(1091, 1027)), vec2(div(offset, 109), div(offset, -113))).toVar();
+      noise = noise.add(waterNormals.sample(uv2)).add(waterNormals.sample(uv3));
+    }
     return noise.mul(0.5).sub(1);
   });
 }
@@ -171,14 +146,12 @@ export function initWaterMeshUniforms(
   options: WaterMeshSharedOptions,
 ): void {
   host.waterNormals = texture(options.waterNormals);
-  host.alpha = uniform(options.alpha ?? 1);
-  host.size = uniform(options.size ?? 1);
-  host.sunColor = uniform(options.sunColor?.clone() ?? new Color(0xffffff));
-  host.sunDirection = uniform(options.sunDirection?.clone() ?? new Vector3(0.70707, 0.70707, 0));
-  host.waterColor = uniform(options.waterColor?.clone() ?? new Color(0x7f7f7f));
-  host.distortionScale = uniform(options.distortionScale ?? 20);
-  host.uSunIntensity = waterSunReceiverUniforms.uSunIntensity;
-  host.uShadowFloor = waterSunReceiverUniforms.uShadowFloor;
+  host.alpha = uniform(options.alpha);
+  host.size = uniform(options.size);
+  host.sunColor = uniform(options.sunColor.clone());
+  host.sunDirection = uniform(options.sunDirection.clone());
+  host.waterColor = uniform(options.waterColor.clone());
+  host.distortionScale = uniform(options.distortionScale);
 }
 
 /**
@@ -196,8 +169,8 @@ export function buildWaterMeshGraph(
 
   const edgeFade = createWaterEdgeFadeUniforms(
     options.waterRadius,
-    options.edgeFadeStartRatio ?? 0.72,
-    options.edgeFadeEndRatio ?? 1,
+    options.edgeFadeStartRatio,
+    options.edgeFadeEndRatio,
   );
   const shore = options.shoreDepth ? createWaterShoreUniforms(options.shoreDepth) : null;
   host.shoreUniforms = shore;
@@ -291,9 +264,7 @@ export function buildWaterMeshGraph(
   const whitecaps = swellWhitecapTsl(swellVary.z, noise);
   const foamMask = shoreFoam ? max(shoreFoam, whitecaps) : whitecaps;
   const refractMask =
-    shore && shoreDepth
-      ? waterRefractionMaskTsl(worldXZ, shore, shoreDepth, shoreDistM ?? undefined)
-      : null;
+    shore && shoreDepth ? waterRefractionMaskTsl(shore, shoreDepth, shoreDistM) : null;
   // Seen from below the surface is a back face: opaque, a refracted view of the world above, no valley fog (the volume's own fog is in its colour).
   // Off with the volume (the map editor never syncs it), the back face then stays invisible as it was when culled.
   material.side = DoubleSide;
@@ -302,14 +273,7 @@ export function buildWaterMeshGraph(
   const depthOpacity =
     shore && shoreDepth
       ? waterRefractionOpacityCompensateTsl(
-          waterDepthOpacityTsl(
-            edgeAlpha,
-            worldXZ,
-            shore,
-            sunShadowOpts,
-            shoreDepth,
-            shoreDistM ?? undefined,
-          ),
+          waterDepthOpacityTsl(edgeAlpha, shore, sunShadowOpts, shoreDepth, shoreDistM),
           refractMask,
           shore,
         )
@@ -335,9 +299,7 @@ export function buildWaterMeshGraph(
     foamMask,
     refractMask,
     viewportScene,
-    sunShadow,
-    sunShadowOpts,
-    edgeAlpha,
+    applyShadow: (color) => applySunShadowVisibility(color, sunShadow, uShadowFloor, uSunIntensity),
     worldXZ,
     surfaceNormal,
     eyeDirection,
@@ -354,5 +316,3 @@ export function buildWaterMeshGraph(
 export function underSurfaceColor(graph: WaterMeshGraph, frontColor: TslNode): TslNode {
   return select(frontFacing, frontColor, graph.ceilingColor);
 }
-
-export { applySunShadowVisibility };

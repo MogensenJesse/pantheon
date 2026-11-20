@@ -6,14 +6,14 @@ import { WORLD } from '../../config/world';
 import { currentSunAzimuthDeg, sunDirectionFromSpherical } from '../sunSpherical';
 import { sampleTodColor } from '../tod/todBlend';
 import { apparentSunElevationDeg } from './underwaterMath';
-import { underwaterUniforms as U, underwaterSettings } from './underwaterUniforms';
+import { underwaterUniforms as U } from './underwaterUniforms';
 
 const _shallow = new Color();
 const _deep = new Color();
 const _back = new Vector3();
 
-/** Share of the camera's depth under the surface, 0 above it, 1 once `submergeFadeM` below. Pass the mean level plus the swell height at the camera (waves/waveMath.ts): CPU-side use. */
-export function submergeAmount(cameraY: number, waterY: number): number {
+/** Share of the camera's depth under the surface, 0 above it, 1 once `submergeFadeM` below. Pass the flat mean level (`uWaterY`): the fog and shafts treat the surface as that plane, the swell is left out on purpose. */
+function submergeAmount(cameraY: number, waterY: number): number {
   return MathUtils.clamp((waterY - cameraY) / VISUAL.underwater.submergeFadeM, 0, 1);
 }
 
@@ -37,7 +37,7 @@ function syncCamera(camera: PerspectiveCamera): void {
 
 /**
  * Push the live settings and the time-of-day colours to the GPU, advance the caustic clock, note how far the camera is
- * under, and aim the sun's light in the water. Cheap enough to run every frame; the dev panel only writes `underwaterSettings`.
+ * under, and aim the sun's light in the water. Cheap enough to run every frame; the dev panel writes `VISUAL.underwater`.
  */
 export function syncUnderwater(
   elevationDeg: number,
@@ -47,24 +47,24 @@ export function syncUnderwater(
   dt: number,
   edgeFloorY: number,
 ): void {
-  const s = underwaterSettings;
+  const s = VISUAL.underwater;
   U.uEdgeFloorY.value = edgeFloorY;
   U.uEnabled.value = s.enabled ? 1 : 0;
   U.uDensity.value = s.density;
   U.uDeepM.value = s.deepM;
-  U.uCausticStrength.value = s.causticStrength;
-  U.uCausticScaleM.value = s.causticScaleM;
-  U.uCausticSpeed.value = s.causticSpeed;
-  U.uCausticWidth.value = s.causticWidth;
-  U.uCausticFadeM.value = s.causticFadeM;
-  U.uShaftStrength.value = s.shaftStrength;
-  U.uWindowGlow.value = s.windowGlow;
-  U.uWindowEdgeCos.value = s.windowEdgeCos;
-  U.uWindowEdgeSoft.value = s.windowEdgeSoft;
-  U.uWindowRipple.value = s.windowRipple;
-  U.uRippleAmp.value = s.rippleAmp;
-  U.uRippleScale.value = s.rippleScale;
-  U.uRippleSpeed.value = s.rippleSpeed;
+  U.uCausticStrength.value = s.caustics.strength;
+  U.uCausticScaleM.value = s.caustics.scaleM;
+  U.uCausticSpeed.value = s.caustics.speed;
+  U.uCausticWidth.value = s.caustics.width;
+  U.uCausticFadeM.value = s.caustics.fadeM;
+  U.uShaftStrength.value = s.shafts.strength;
+  U.uWindowGlow.value = s.window.glow;
+  U.uWindowEdgeCos.value = s.window.edgeCos;
+  U.uWindowEdgeSoft.value = s.window.edgeSoft;
+  U.uWindowRipple.value = s.window.ripple;
+  U.uRippleAmp.value = s.ripple.amplitude;
+  U.uRippleScale.value = s.ripple.wavelength;
+  U.uRippleSpeed.value = s.ripple.speed;
   U.uOrbTint.value = s.orbTint;
   sampleTodColor(
     {
@@ -89,7 +89,7 @@ export function syncUnderwater(
   // The sun in the water is needed above water too: the floor caustics slant along it. A sun at or under the horizon
   // is parked at the horizon's refracted spot (it is dark then anyway), so the direction never flips.
   sunDirectionFromSpherical(
-    apparentSunElevationDeg(Math.max(elevationDeg, 0.01), s.windowEdgeCos),
+    apparentSunElevationDeg(Math.max(elevationDeg, 0.01), s.window.edgeCos),
     currentSunAzimuthDeg(),
     U.uSunDirWater.value as Vector3,
   );

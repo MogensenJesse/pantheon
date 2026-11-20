@@ -40,8 +40,3 @@ export function apparentSunElevationDeg(
   const cosView = windowEdgeCos + cosEff * (1 - windowEdgeCos);
   return 90 - (Math.acos(cosView) * 180) / Math.PI;
 }
-
-/** 1 - exp(-path * density): the share of a surface's colour the water has replaced with fog. */
-export function underwaterFogFactor(pathM: number, density: number): number {
-  return 1 - Math.exp(-pathM * density);
-}

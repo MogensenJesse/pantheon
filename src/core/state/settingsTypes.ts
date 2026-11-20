@@ -78,21 +78,6 @@ export interface TerrainDevSettings {
   dirty: boolean;
 }
 
-/** Mutable copy of VISUAL.water.shoreDepth for live dev sliders. */
-export type WaterShoreDevSettings = DeepWritable<(typeof VISUAL.water)['shoreDepth']>;
-
-export interface WaterDevSettings {
-  size: number;
-  alpha: number;
-  /** Signed mirror-plane offset (m) — negative lifts the plane, positive drops it. */
-  reflectionPlaneOffsetM: number;
-  /** Reflector resolution ceiling (adaptive quality scales below this inland). */
-  resolutionScale: number;
-  /** Look stops sampled via todWeights (DEV-mutable). */
-  stops: DeepWritable<(typeof VISUAL.water)['stops']>;
-  shoreDepth: WaterShoreDevSettings;
-}
-
 /** Mutable mirror of VISUAL.postfx.grade (enabled + per-TOD stops). */
 export type PostFxGradeDevSettings = DeepWritable<(typeof VISUAL)['postfx']['grade']>;
 
@@ -102,7 +87,6 @@ export interface PostFxDevSettings {
 
 export interface RuntimeSettings {
   terrain: TerrainDevSettings;
-  water: WaterDevSettings;
   grass: GrassDevSettings;
   postfx: PostFxDevSettings;
 }

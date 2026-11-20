@@ -1,6 +1,7 @@
-// src/world/water/waves/waveMath.ts — plain-number side of the waves: the swell table and height (twin of tsl/waterWavesTsl.ts) and the shore swash curves (twin of tsl/waterRunUpTsl.ts and tsl/waterIntersectionFoamTsl.ts). Checked by scripts/checks/water.
+// src/world/water/waves/waveMath.ts — plain-number side of the waves: the swell table and height (twin of tsl/waterWavesTsl.ts) and the shore swash curves (twin of tsl/waterRunUpTsl.ts and tsl/waterFoamTsl.ts and terrain/material/waterWetnessTsl.ts). Checked by scripts/checks/water.
+import { clamp01, smoothstepEdges as smoothstep } from '../../../core/math/scalar.ts';
 
-export const GRAVITY = 9.81;
+const GRAVITY = 9.81;
 /** Phase offsets between components: the golden angle, so no two crests line up for long. */
 const PHASE_STEP = 2.399963;
 /**
@@ -57,13 +58,6 @@ export interface SwellWave {
   omega: number;
   amp: number;
   phase: number;
-}
-
-const clamp01 = (v: number) => Math.min(Math.max(v, 0), 1);
-
-function smoothstep(a: number, b: number, v: number): number {
-  const t = clamp01((v - a) / (b - a));
-  return t * t * (3 - 2 * t);
 }
 
 /** 1 on the open sea down to `share` in enclosed water (lake and ponds): `lake` is the baked field's 0..1 lake share. */
