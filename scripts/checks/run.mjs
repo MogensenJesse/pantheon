@@ -61,6 +61,7 @@ const CHECKS = [
   { name: 'ui', file: 'ui/kit-check.ts' },
   { name: 'underwater', file: 'underwater/underwater-check.ts' },
   { name: 'water-waves', file: 'water/water-waves-check.ts' },
+  { name: 'snow', file: 'snow/snow-check.ts' },
 ];
 
 const args = process.argv.slice(2);

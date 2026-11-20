@@ -245,6 +245,14 @@ export function createWeather(options: WeatherOptions): Weather {
 }
 
 /**
+ * The share (0..1) of the precipitation that falls as snow at a height (m): none `fadeM` below the snow line `lineM`, all of
+ * it `fadeM` above.
+ */
+export function snowShare(heightM: number, lineM: number, fadeM: number): number {
+  return smoothstepEdges(lineM - fadeM, lineM + fadeM, heightM);
+}
+
+/**
  * Wet ground follows the rain at one place: it soaks over `RISE_S` while rain falls and dries over `DRY_S`
  * after. Returns the new wetness (0..1).
  */

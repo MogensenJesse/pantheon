@@ -8,6 +8,7 @@ import { smoothstepEdges } from '../core/math/scalar';
 import { devDebugSettings } from '../core/settings';
 import { modifiers } from '../skills/modifiers';
 import type { MapTerrainContext } from '../world/MapTerrainBuilder';
+import { snowDepthAt, snowSinkM, snowSpeedMultiplier } from '../world/snow/cpu/snowDepth';
 import { orbCenterY, orbHoverBaseY } from './orbFloat';
 import { createOrbFootingSmoother } from './orbFootingSmooth';
 import { sampleOrbTerrainFooting } from './orbTerrainFooting';
@@ -107,20 +108,25 @@ export function initPlayerController(
     applyIlluminationRatio(targetRatio);
   };
 
+  /** Snow depth under the orb, eased like the footing so the camera does not jump at the snow line. */
+  let snowDepthM = 0;
+
   const syncDerivedPose = (dt: number): void => {
     const footing = footingSmoother.sample(logicPosition.x, logicPosition.z, dt);
+    const depth = snowDepthAt(logicPosition.x, logicPosition.z);
+    snowDepthM +=
+      dt > 0
+        ? (depth - snowDepthM) * (1 - Math.exp(-VISUAL.player.orbFootingSmoothHz * dt))
+        : depth - snowDepthM;
+    // the orb rides the snow surface, a share of the depth down in it
+    const { sinkShare, sinkCapM } = VISUAL.snow.orb;
+    const surfaceY = footing.surfaceY + snowDepthM - snowSinkM(snowDepthM, sinkShare, sinkCapM);
     cameraAnchor.set(
       logicPosition.x,
-      orbHoverBaseY(footing.surfaceY, PHASE0.ORB.PLAYER_RADIUS, footing.normalY),
+      orbHoverBaseY(surfaceY, PHASE0.ORB.PLAYER_RADIUS, footing.normalY),
       logicPosition.z,
     );
-    logicPosition.y = orbCenterY(
-      footing.surfaceY,
-      PHASE0.ORB.PLAYER_RADIUS,
-      elapsed,
-      0,
-      footing.normalY,
-    );
+    logicPosition.y = orbCenterY(surfaceY, PHASE0.ORB.PLAYER_RADIUS, elapsed, 0, footing.normalY);
   };
 
   syncDerivedPose(0);
@@ -162,8 +168,12 @@ export function initPlayerController(
     if (hasInput) {
       const worldY = terrain.getWorldY(logicPosition.x, logicPosition.z);
       const h = worldY / WORLD.HEIGHT_SCALE;
+      const { slowMul, slowDepthM } = VISUAL.snow.orb;
       targetSpeed =
-        PLAYER.BASE_SPEED * terrainSpeedMultiplier(h) * devDebugSettings.movementSpeedMultiplier;
+        PLAYER.BASE_SPEED *
+        terrainSpeedMultiplier(h) *
+        snowSpeedMultiplier(snowDepthAt(logicPosition.x, logicPosition.z), slowMul, slowDepthM) *
+        devDebugSettings.movementSpeedMultiplier;
     }
 
     const forward = -dir.y;

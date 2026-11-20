@@ -13,6 +13,7 @@ import { applyDataTextureDefaults } from '../../../map/dataTexture';
 import type { MapGrids } from '../../../map/MapGrids';
 import type { MapGrassUniforms } from '../../../map/mapGrassSettings';
 import { OVERLAY_CHANNEL, OVERLAY_STRIDE } from '../../../map/overlayChannels';
+import { snowDepthAt } from '../../snow/cpu/snowDepth';
 import { slopeRockDerivedFromNormalY } from '../../terrain/config/terrainBiomeTuning';
 import {
   sampleChiseledFaceNy,
@@ -145,6 +146,7 @@ function fillGrassDataTexture(
   const overlay = terrainMaps.overlay;
   const { size } = grids;
   const pack = VISUAL.terrain.packMaps;
+  const snowKill = VISUAL.snow.grassKill;
   const denom = Math.max(1, size - 1);
   const { scaleM, coverage, softness } = readClumpBakeParams();
   const kelp = VISUAL.underwater.enabled ? VISUAL.underwater.seabed.kelp : null;
@@ -209,6 +211,9 @@ function fillGrassDataTexture(
       } else {
         const rock = slopeRockDerivedFromNormalY(cachedFaceNy(worldX, worldZ));
         grassWeight *= 1 - rock * pack.grass.slopeKill;
+        // buried under deep snow (0 depth, so no change, while the shell is off): thins out towards thin snow
+        grassWeight *=
+          1 - smoothstepEdges(snowKill.startM, snowKill.endM, snowDepthAt(worldX, worldZ));
       }
       data[o] = Math.round(Math.max(0, Math.min(1, grassWeight)) * 255);
       data[o + 1] = Math.round(

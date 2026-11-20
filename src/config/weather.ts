@@ -31,6 +31,11 @@ export const WEATHER = {
   /** Wet ground: seconds to soak at full rain and to dry out again. */
   WET: { RISE_S: 90, DRY_S: 900 },
   /**
+   * Where precipitation turns to snow: none this far (m) below the terrain's snow line (`VISUAL.terrain.snow.heightStart` x
+   * the height scale), all of it this far above, a smooth mix between.
+   */
+  SNOW_FADE_M: 40,
+  /**
    * How a front looks. The sky closes in before the rain: overcast reaches `OVERCAST_LEAD_M` beyond the
    * rim and is full where the rain is.
    */
@@ -58,5 +63,10 @@ export const WEATHER = {
       WIDTH_M: 0.03,
       ALPHA: 0.55,
     },
+    /**
+     * Snow flakes: the share of the streaks that fall as snow instead (`snowShare`). Round, small, slow, swaying, and
+     * `COUNT_MUL` times as many as streaks in the same box (the mesh holds that many; rain still shows `STREAKS.COUNT`).
+     */
+    FLAKES: { SIZE_M: 0.1, FALL_MPS: 1.4, SWAY_M: 0.6, ALPHA: 0.85, COUNT_MUL: 2.5 },
   },
 } as const;

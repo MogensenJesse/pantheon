@@ -51,6 +51,7 @@
     "check:village-smoke": "node scripts/checks/run.mjs village-smoke",
     "check:village-skills": "node scripts/checks/run.mjs village-skills",
     "check:weather": "node scripts/checks/run.mjs weather",
+    "check:snow": "node scripts/checks/run.mjs snow",
     "check:wind": "node scripts/checks/run.mjs wind",
     "check:drift": "node scripts/checks/run.mjs drift",
     "check:animal": "node scripts/checks/run.mjs animal",

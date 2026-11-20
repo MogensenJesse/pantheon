@@ -8,6 +8,8 @@ export const weatherLook = {
   rain01: 0,
   /** How closed in the sky is at the camera, 0..1 (it starts before the rain and ends after it). */
   overcast01: 0,
+  /** The part of `rain01` that falls as snow at the camera (the rain times the snow share at its height), 0..1. */
+  snow01: 0,
   /** Wet ground, 0..1: it soaks while it rains and dries slowly after. */
   wetness01: 0,
 };

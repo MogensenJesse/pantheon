@@ -29,9 +29,10 @@ export function initWeatherProbe(src: WeatherProbeSources): () => void {
       return round(weather.rainAt(x ?? p.x, z ?? p.z, src.clock()));
     },
     clock: () => round(src.clock()),
-    /** What the camera sees: rain, how closed in the sky is, and wet ground. */
+    /** What the camera sees: rain, the part of it that is snow, how closed in the sky is, and wet ground. */
     look: () => ({
       rain: round(weatherLook.rain01),
+      snow: round(weatherLook.snow01),
       overcast: round(weatherLook.overcast01),
       wetness: round(weatherLook.wetness01),
     }),

@@ -106,6 +106,7 @@ import { disposeMapTerrain } from './world/MapTerrainBuilder';
 import { collectVillageSeeds } from './world/map/MapEntitySpawner';
 import { propShadowUniforms } from './world/mapProps/config/mapPropShadowUniforms';
 import { PROP_TREE_KEYS } from './world/mapProps/config/propShadowKeys';
+import { createSnowSystem } from './world/snow/snowSystem';
 import {
   applyTerrainDevUniforms,
   initTerrainAtlases,
@@ -620,6 +621,34 @@ async function main(): Promise<void> {
   const offHandHook = gameplay.handUi ? frameTick.addRenderHook(gameplay.handUi.frame) : () => {};
   // The runestones hang in the air: a bob and a slow turn, written into their matrices before the prop LOD uploads them.
   const offHoverHook = frameTick.addRenderHook(createLandmarkHover(propLodGroups).frame);
+  // Deep snow: the shell, the tracks field and the orb's furrow (VISUAL.snow.enabled; off by default while it is built up).
+  const snow = createSnowSystem({
+    scene,
+    renderer,
+    sun,
+    terrain,
+    onDepthChange: () => grassSystem?.refreshGrassDataMap(),
+    walkers: {
+      villagers: () => village?.sim.villagers,
+      sheepWithin: life.animals.hand.sheepWithin,
+    },
+  });
+  // The shell and the prints follow the player, not the orb as drawn: the overview's cursor must not plough furrows.
+  const offSnowHook = frameTick.addRenderHook((frameDelta) =>
+    snow.update(frameDelta, player.position),
+  );
+  if (import.meta.env.DEV) {
+    Object.assign(window, {
+      // `player` / `anchor` are the live player position and camera anchor (what the orb rides on).
+      __pantheonSnow: {
+        stamp: snow.stamp,
+        rebake: snow.rebake,
+        stats: snow.stats,
+        player: player.position,
+        anchor: player.cameraAnchor,
+      },
+    });
+  }
   // The hand lifts and puts down from the overview too, with the orb as the cursor.
   const overviewHand =
     overviewUi && village && gameplay.handUi && gameplay.handRuntime
@@ -741,6 +770,8 @@ async function main(): Promise<void> {
     overview.dispose();
     offHandHook();
     offHoverHook();
+    offSnowHook();
+    snow.dispose();
     gameplay.dispose();
     disposeProgression();
     disposeLandmarkBoons();

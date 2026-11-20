@@ -8,6 +8,7 @@ import {
   createWeather,
   type Front,
   frontRainAt,
+  snowShare,
   stepWetness,
 } from '../../../src/world/weather/weather.ts';
 import { check, finish } from '../lib/check.ts';
@@ -206,6 +207,22 @@ await check(
     assert.ok(stepWetness(0.9, 0.3, 1) >= 0.3, 'drying stops at the rain falling now');
   },
 );
+
+await check('snow share: rain below the snow line, snow above it, a smooth mix between', () => {
+  const line = 140;
+  const fade = W.SNOW_FADE_M;
+  assert.equal(snowShare(line - fade, line, fade), 0);
+  assert.equal(snowShare(0, line, fade), 0);
+  assert.equal(snowShare(line + fade, line, fade), 1);
+  assert.equal(snowShare(350, line, fade), 1);
+  assert.ok(Math.abs(snowShare(line, line, fade) - 0.5) < 1e-9, 'half at the line');
+  let last = 0;
+  for (let y = line - fade; y <= line + fade; y += 2) {
+    const s = snowShare(y, line, fade);
+    assert.ok(s >= last - 1e-12, `rises with height at ${y}`);
+    last = s;
+  }
+});
 
 await check('the three configs agree on the length of a game day', () => {
   assert.equal(W.DAY_S, sky.cycle.dayDurationSec, 'weather vs sky');

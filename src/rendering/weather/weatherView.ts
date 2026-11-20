@@ -1,7 +1,9 @@
 // src/rendering/weather/weatherView.ts — the weather where the camera is: rain streaks, overcast and wet ground
 import { type PerspectiveCamera, type Scene, Vector3 } from 'three';
+import { VISUAL } from '../../config/visualTuning';
 import { WEATHER } from '../../config/weather';
-import { stepWetness, type Weather } from '../../world/weather/weather';
+import { WORLD } from '../../config/world';
+import { snowShare, stepWetness, type Weather } from '../../world/weather/weather';
 import { uWetness } from '../tsl/wetLookTsl';
 import { createRainStreaks } from './rainStreaks';
 import { weatherLook } from './weatherLook';
@@ -38,15 +40,19 @@ export function createWeatherView(options: WeatherViewOptions): WeatherView {
       const on = options.weatherOn();
       const rain = forced ?? (on ? weather.rainAt(x, z, clockS) : 0);
       const overcast = forced ?? (on ? weather.overcastAt(x, z, clockS) : 0);
-      wetness = stepWetness(wetness, rain, frameDelta);
+      // above the snow line the precipitation is snow: it does not wet the ground, and it falls as flakes
+      const snowLineM = VISUAL.terrain.snow.heightStart * WORLD.HEIGHT_SCALE;
+      const snowPart = snowShare(camera.position.y, snowLineM, WEATHER.SNOW_FADE_M);
+      wetness = stepWetness(wetness, rain * (1 - snowPart), frameDelta);
       weatherLook.rain01 = rain;
+      weatherLook.snow01 = rain * snowPart;
       weatherLook.overcast01 = Math.max(overcast, rain);
       weatherLook.wetness01 = wetness;
       uWetness.value = wetness;
       // the box sits a little ahead of the camera, so the streaks fill the view rather than the back of the head
       camera.getWorldDirection(_forward);
       _centre.copy(camera.position).addScaledVector(_forward, WEATHER.LOOK.STREAKS.BOX_M * 0.25);
-      streaks.update(rain, _centre);
+      streaks.update(rain, _centre, snowPart);
     },
     dispose: () => {
       scene.remove(streaks.mesh);

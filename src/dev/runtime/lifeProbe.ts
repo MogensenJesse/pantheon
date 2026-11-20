@@ -31,6 +31,11 @@ export function initLifeProbe(src: LifeProbeSources): () => void {
     clearFakes: () => ambient.clearFakes(),
     /** How many sheep, hens, flocks and birds there are now. */
     animals: () => animals.counts(),
+    /** The free, full-grown sheep within `radiusM` of the orb (or of x, z): where they are, e.g. to look for their tracks. */
+    sheep: (radiusM = 100, x?: number, z?: number) => {
+      const here = src.playerPosition();
+      return animals.hand.sheepWithin(x ?? here.x, z ?? here.z, radiusM, []);
+    },
     /** Have the farm animals now, whatever the village's state. */
     farm: (on = true) => animals.setAlways(on),
   });

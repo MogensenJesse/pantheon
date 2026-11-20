@@ -216,9 +216,9 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     const snowFaceXZ = chiseledFaceCentroidXZAtWorldXZ(worldXZ);
     const snowFaceN = knifeWorldNormalAtWorldXZ(worldXZ);
     const snowHeightNorm = chiseledWorldYAtWorldXZ(snowFaceXZ).div(uHeightScale);
-    const snowW = computeSnowWeight(uniforms, snowHeightNorm, hwUsed, snowFaceXZ, snowFaceN).mul(
-      float(1).sub(slopeRockDerivedTsl(snowFaceN)),
-    );
+    const snowW = computeSnowWeight(uniforms, snowHeightNorm, hwUsed, snowFaceXZ, snowFaceN)
+      .mul(float(1).sub(slopeRockDerivedTsl(snowFaceN)))
+      .mul(uniforms.uSnowSplatMul);
 
     const mixOverlay = (weight: TslNode, worldRepeat: TslNode, index: TslNode, grads: TslNode) => {
       If(weight.greaterThan(overlayEps), () => {

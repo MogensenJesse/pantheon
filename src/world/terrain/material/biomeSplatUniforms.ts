@@ -66,6 +66,8 @@ export interface TerrainSplatUniforms extends TerrainBiomeParamUniforms {
   uSnowAspectStrength: ReturnType<typeof uniform>;
   uSnowAspectShadeBoost: ReturnType<typeof uniform>;
   uSnowReferenceSunDir: ReturnType<typeof uniform>;
+  /** Scales the splat's snow weight: 1 = the terrain paints its own snow, 0 = the deep-snow shell draws it (`world/snow`). */
+  uSnowSplatMul: ReturnType<typeof uniform>;
   uBiomeMap: ReturnType<typeof texture>;
   /** RGBA8 on the height grid: R path, G meadow, B water, A convex (`map/overlayChannels.ts`). */
   uOverlayMap: ReturnType<typeof texture>;
@@ -284,6 +286,7 @@ export function createBiomeSplatUniforms(
     uSnowAspectStrength: uniform(snow.aspect.strength),
     uSnowAspectShadeBoost: uniform(snow.aspect.shadeBoost),
     uSnowReferenceSunDir: uniform(snowReferenceSunDir(snow)),
+    uSnowSplatMul: uniform(1),
     uBiomeMap: texture(biomeMap),
     uOverlayMap: texture(overlayMap),
     uPropAoMap: texture(propAoMap),

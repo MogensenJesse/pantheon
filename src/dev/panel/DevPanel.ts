@@ -22,6 +22,7 @@ import { initPerformancePanel } from './devPanelPerformance';
 import { type DevPanelPropLodContext, initDevPanelPropLod } from './devPanelPropLod';
 import { type DevPanelShadowContext, initDevPanelShadows } from './devPanelShadows';
 import { initDevPanelSky } from './devPanelSky';
+import { initDevPanelSnow } from './devPanelSnow';
 import { initDevPanelTerrain } from './devPanelTerrain';
 import { initDevPanelTod } from './devPanelTod';
 import { initDevPanelTreeSway } from './devPanelTreeSway';
@@ -116,6 +117,7 @@ export function initDevPanel(
   }
   disposers.push(initDevPanelWater(panel));
   disposers.push(initDevPanelWaves(panel));
+  disposers.push(initDevPanelSnow(panel));
   disposers.push(initDevPanelUnderwater(panel, terrainCtx?.grass ?? null));
 
   disposers.push(initDevPanelUpscaling(panel, postFX));

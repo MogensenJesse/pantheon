@@ -31,6 +31,7 @@ A divine remnant wakes five landmarks on **authored maps**, then guides a villag
 | `src/world/grass/` | Player-follow biome grass + optional flowers — see **Grass subsystem** below |
 | `src/world/mapProps/` | GLB instancing — `config/` / `material/` / `tsl/` (+ placement/instancing at root) |
 | `src/world/water/` | Water mesh + normals + waves — `config/` / `mesh/` / `material/` / `sync/` / `data/` / `tsl/` / `waves/` (pure wave maths: swell table, swash and front curves, shore-field bake) — see [docs/water-waves.md](docs/water-waves.md) |
+| `src/world/snow/` | Deep snow you wade through (off by default): baked hull, clipmap shell, the tracks field, villager and sheep prints, the orb's furrow; `cpu/` is pure — see [docs/snow.md](docs/snow.md) |
 | `src/world/underwater/` | The sea floor: rocks placed at load as ordinary map props (`seabedRocks.ts`, pure). Where kelp grows is `world/grass/data/kelpCoverage.ts` (pure; the grass system draws it) — see [docs/underwater.md](docs/underwater.md) |
 | `src/rendering/underwater/` | The water volume seen from under the surface: fog, caustics, the window, light shafts, the horizon fill; settings in `config/visual/underwater.ts` — see [docs/underwater.md](docs/underwater.md) |
 | `src/world/village/` | The village (temple, houses, fields, villagers): pure `sim/`, shared `model/`, `render/`, `assets/` — see **Village subsystem** below |
@@ -71,6 +72,7 @@ A divine remnant wakes five landmarks on **authored maps**, then guides a villag
 | `docs/ambient.md` | Ambient life: the one wind, tree sway, drifting leaves and fireflies, sheep, hens and birds, the life at the places of power; rules, config keys, DEV hooks, checks |
 | `docs/phase0.md` | Phase 0 landmarks: rules, config keys, events, save field, DEV hook, checks, pacing model |
 | `docs/underwater.md` | The water volume and the sea floor: fog, caustics, the surface from below, shafts, horizon fill, rocks, kelp, motes; config keys, DEV hooks, checks |
+| `docs/snow.md` | Deep snow: how the shell, the tracks field, the wading and the snowfall fit together, config keys, DEV section, `npm run check:snow` |
 | `docs/water-waves.md` | The waves: open-sea swell (Gerstner vertex waves on a camera-following disc) and shore waves (foam fronts, swash, wet sand), calmer enclosed water (lakes), wind coupling, config keys, DEV section, `npm run check:water-waves` |
 | `src/landmarks/` | The five Phase 0 landmarks: pure rules and save slice (`landmarks.ts`), the runtime, the stand-in props (see `docs/phase0.md`) |
 | `src/entities/landmark/` | The light on the landmarks (beacon, dwell ring, awakening burst, glow); look values in `config/visual/landmark.ts` |

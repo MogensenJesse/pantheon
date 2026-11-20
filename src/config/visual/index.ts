@@ -21,6 +21,7 @@ import { render } from './render.ts';
 import { shadows } from './shadows.ts';
 import { shrineZone } from './shrineZone.ts';
 import { sky } from './sky.ts';
+import { snow } from './snow.ts';
 import { terrain } from './terrain.ts';
 import { tod } from './tod.ts';
 import { underwater } from './underwater.ts';
@@ -58,6 +59,7 @@ export const VISUAL = {
   water,
   underwater,
   terrain,
+  snow,
   props,
   foliage,
   grass,
